@@ -1,7 +1,7 @@
 repositories {
     mavenCentral()
     google() // Needed for androidx
-    maven { url = "https://mymaven.bylazar.com/releases" }
+    // DELETED: The "mymaven.bylazar.com" repository is not needed and causes conflicts.
 }
 
 dependencies {
@@ -15,8 +15,12 @@ dependencies {
     implementation 'org.firstinspires.ftc:Vision:11.0.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
 
+    // This is the only line for full-panels you should have.
+    implementation 'com.github.lazar-c:full-panels:1.0.9'
+
     implementation 'com.pedropathing:ftc:2.0.4'
     implementation 'com.pedropathing:telemetry:1.0.0'
-    implementation 'com.bylazar:fullpanels:1.0.9'
-}
 
+    // DELETED: This line was conflicting with the correct one above.
+    // implementation 'com.bylazar:fullpanels:1.0.9'
+}

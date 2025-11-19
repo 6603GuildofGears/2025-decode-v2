@@ -268,7 +268,7 @@ public class Rango extends OpMode {
      */
     private void handleSubsystemControls() {
         // Intake motor control (simplified and corrected)
-        double rpm = 3500;
+        double rpm = 3700;
         if (gamepad2.right_bumper) {
             // intake.setVelocity(getTickSpeed(rpm));
             intake.setPower(1.0);

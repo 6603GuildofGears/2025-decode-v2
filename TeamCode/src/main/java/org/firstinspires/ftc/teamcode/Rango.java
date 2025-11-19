@@ -26,7 +26,10 @@ import com.qualcomm.hardware.limelightvision.LLStatus;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import java.util.List;
 
+@Config
 @TeleOp(name = "Rango", group = "Robot")
 public class Rango extends OpMode {
 
@@ -46,6 +49,15 @@ public class Rango extends OpMode {
     // Constants
     private final double TICKS_PER_REV = 28;
     private final double gear = 1.0;  // Gear ratio for rotation speed
+    
+    // Auto-aim constants (tunable via FTC Dashboard)
+    public static double KP_ROTATE = 0.02;
+    public static double ROTATE_DEADBAND = 3.0;
+    public static double MAX_AUTO_ROTATE_SPEED = 0.5;
+    
+    // Auto-aim state
+    private boolean autoAimEnabled = true;  // Start enabled
+    private boolean lastAButtonState = false;
 
     @Override
     public void init() {
@@ -147,6 +159,12 @@ public class Rango extends OpMode {
         boolean dpadRight2 = gamepad2.dpad_right;
         boolean dpadLeft2 = gamepad2.dpad_left;
 
+        // Toggle auto-aim with gamepad1 A button
+        if (a1 && !lastAButtonState) {
+            autoAimEnabled = !autoAimEnabled;
+        }
+        lastAButtonState = a1;
+
         // Update odometry localization
         follower.update();
 
@@ -216,7 +234,12 @@ public class Rango extends OpMode {
 
             double r = Math.hypot(newX, newY);
             double robotAngle = Math.atan2(newY, newX) - Math.PI / 4;
-            double rightX = gamepad1.right_stick_x;  // Match RStickX direction
+            double rightX = RStickX;  // Use the stick value
+            
+            // Auto-aim override: rotate to face AprilTag if enabled and right stick centered
+            if (autoAimEnabled && Math.abs(RStickX) < 0.1) {
+                rightX = getAutoAimRotation();
+            }
 
             double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
             double v2 = r * Math.sin(robotAngle) + rightX * gear; //rf
@@ -231,9 +254,26 @@ public class Rango extends OpMode {
         } else if (RBumper1) {
             SetPower(gear, -gear, -gear, gear);
 
-      
+        } else if (dpadUp1) {
+            SetPower(1, 1, 1, 1);
+        } else if (dpadRight1) {
+            SetPower(1, -1, -1, 1);
+        } else if (dpadLeft1) {
+            SetPower(-1, 1, 1, -1);
+        } else if (dpadDown1) {
+            SetPower(-1, -1, -1, -1);
 
         } else {
+            // Auto-aim when joysticks are released - apply auto-rotation
+            if (autoAimEnabled) {
+                double autoRotate = getAutoAimRotation();
+                if (Math.abs(autoRotate) > 0.01) {
+                    // Apply pure rotation to all wheels
+                    SetPower(autoRotate * gear, autoRotate * gear, -autoRotate * gear, -autoRotate * gear);
+                    return;
+                }
+            }
+            
             frontLeftDrive.setPower(0);
             backLeftDrive.setPower(0);
             frontRightDrive.setPower(0);
@@ -256,6 +296,37 @@ public class Rango extends OpMode {
         frontRightDrive.setPower(v2);
         backLeftDrive.setPower(v3);
         backRightDrive.setPower(v4);
+    }
+
+    /**
+     * Calculate auto-aim rotation to face AprilTag
+     */
+    private double getAutoAimRotation() {
+        if (limelight == null) {
+            return 0;
+        }
+        
+        LLResult result = limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
+            if (!fiducials.isEmpty()) {
+                LLResultTypes.FiducialResult tag = fiducials.get(0);
+                double tx = tag.getTargetXDegrees();
+                
+                if (Math.abs(tx) > ROTATE_DEADBAND) {
+                    double rotation = tx * KP_ROTATE;  // Positive to turn toward tag
+                    return clamp(rotation, -MAX_AUTO_ROTATE_SPEED, MAX_AUTO_ROTATE_SPEED);
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Clamp value between min and max
+     */
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     /**
@@ -288,6 +359,11 @@ public class Rango extends OpMode {
      * Displays all telemetry data to the Driver Station and FTC Dashboard.
      */
     private void displayTelemetry() {
+        // Auto-Aim Status
+        telemetry.addLine("--- Auto-Aim ---");
+        telemetry.addData("Auto-Aim", autoAimEnabled ? "ENABLED" : "DISABLED");
+        telemetry.addLine();
+        
         // Driver Controls and Subsystem Status
         telemetry.addLine("--- Driver & Subsystems ---");
         telemetry.addLine("G2 RT: Intake | G2 RB: Reverse Intake");

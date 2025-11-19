@@ -1,8 +1,8 @@
 package org.firstinspires.ftc.teamcode;
 
-// Imports for the Lazar full-panels library
-import com.lazar.fullpanels.FtcDashboard;
-import com.lazar.fullpanels.TelemetryPacket;
+// Imports for FTC Dashboard
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -17,7 +17,7 @@ import java.net.URL;
 public class Limelight {
 
     private final String limelightName;
-//    private final FtcDashboard dashboard;
+    private final FtcDashboard dashboard;
 
     /**
      * Default constructor. Assumes the Limelight's hostname is "limelight".

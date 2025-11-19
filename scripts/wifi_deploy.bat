@@ -32,6 +32,8 @@ if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
     set ADB=%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb.exe
 ) else if exist "%ANDROID_HOME%\platform-tools\adb.exe" (
     set ADB=%ANDROID_HOME%\platform-tools\adb.exe
+) else if exist "C:\Users\%USERNAME%\AppData\Local\Android\Sdk\platform-tools\adb.exe" (
+    set ADB=C:\Users\%USERNAME%\AppData\Local\Android\Sdk\platform-tools\adb.exe
 ) else (
     where adb.exe >nul 2>&1
     if !errorlevel!==0 (
@@ -40,7 +42,13 @@ if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
 )
 
 if "%ADB%"=="" (
-    echo [ERROR] adb.exe not found. Install Android SDK platform-tools.
+    echo [ERROR] adb.exe not found. 
+    echo.
+    echo Please install Android SDK Platform Tools from:
+    echo https://developer.android.com/studio/releases/platform-tools
+    echo.
+    echo Or set ANDROID_HOME environment variable to your Android SDK location
+    pause
     exit /b 1
 )
 

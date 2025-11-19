@@ -28,6 +28,10 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import java.util.List;
+import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 
 @Config
 @TeleOp(name = "Rango", group = "Robot")
@@ -66,6 +70,11 @@ public class Rango extends OpMode {
     private double lastOdoY = 0;
     private double lastLimelightUpdateTime = 0;
     public static double LIMELIGHT_WEIGHT = 0.85;  // Weight for Limelight updates (tunable via dashboard)
+    
+    // Field calibration offsets (loaded from file saved during field inspection)
+    public static double FIELD_OFFSET_X = 0.0;
+    public static double FIELD_OFFSET_Y = 0.0;
+    private static final String CALIBRATION_FILE = "/sdcard/FIRST/field_calibration.txt";
     
     // AprilTag tracking
     private int currentTagId = -1;
@@ -135,6 +144,9 @@ public class Rango extends OpMode {
     public void init() {
         // Set up FTC Dashboard
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+        
+        // Load field calibration from saved file
+        loadCalibration();
 
         // Hardware mapping
         frontLeftDrive = hardwareMap.get(DcMotorEx.class, "frontLeftDrive");
@@ -467,8 +479,8 @@ public class Rango extends OpMode {
                     
                     // Calculate robot position from tag position
                     // Convert to Pedro Pathing coordinates (inches, origin top-left)
-                    double llX = tagFieldPos[0] + (robotPose.getPosition().x * 39.3701);
-                    double llY = tagFieldPos[1] - (robotPose.getPosition().y * 39.3701);  // Invert Y
+                    double llX = tagFieldPos[0] + (robotPose.getPosition().x * 39.3701) + FIELD_OFFSET_X;
+                    double llY = tagFieldPos[1] - (robotPose.getPosition().y * 39.3701) + FIELD_OFFSET_Y;
                     
                     // Blend positions: high Limelight weight for accuracy
                     fusedX = (1.0 - LIMELIGHT_WEIGHT) * odoX + LIMELIGHT_WEIGHT * llX;
@@ -521,6 +533,31 @@ public class Rango extends OpMode {
         currentTagType = "Unknown";
         currentTagLocation = "Unknown";
         return null;
+    }
+    
+    /**
+     * Load calibration values from file saved during field inspection
+     */
+    private void loadCalibration() {
+        try {
+            File file = new File(CALIBRATION_FILE);
+            if (file.exists()) {
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("FIELD_OFFSET_X=")) {
+                        FIELD_OFFSET_X = Double.parseDouble(line.substring(15));
+                    } else if (line.startsWith("FIELD_OFFSET_Y=")) {
+                        FIELD_OFFSET_Y = Double.parseDouble(line.substring(15));
+                    } else if (line.startsWith("LIMELIGHT_WEIGHT=")) {
+                        LIMELIGHT_WEIGHT = Double.parseDouble(line.substring(17));
+                    }
+                }
+                reader.close();
+            }
+        } catch (IOException e) {
+            // No saved calibration, use defaults
+        }
     }
 
     /**

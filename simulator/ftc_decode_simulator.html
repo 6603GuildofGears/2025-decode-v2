@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FTC DECODE Autonomous Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+        
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        select, button, input {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        select {
+            background: #3a3a3a;
+            color: #fff;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .pause-btn {
+            background: #ff9800;
+        }
+        
+        .pause-btn:hover {
+            background: #e68900;
+        }
+        
+        .reset-btn {
+            background: #f44336;
+        }
+        
+        .reset-btn:hover {
+            background: #da190b;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+        }
+        
+        .canvas-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        canvas {
+            border: 2px solid #444;
+            background: #3a3a3a;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .info-panel {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .info-item {
+            background: #3a3a3a;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        
+        .info-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .legend {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 FTC DECODE Autonomous Simulator</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Select Autonomous</label>
+                <select id="autoSelect">
+                    <option value="RedCloseAuto">Red Close Auto (Observation Zone)</option>
+                    <option value="RedSimpleAuto">Red Simple Auto (3 Preloads)</option>
+                    <option value="RedFarAuto">Red Far Auto (Net Zone)</option>
+                </select>
+            </div>
+            
+            <button id="startBtn">▶ Start</button>
+            <button id="pauseBtn" class="pause-btn" disabled>⏸ Pause</button>
+            <button id="resetBtn" class="reset-btn">↻ Reset</button>
+            
+            <div class="control-group">
+                <label>Speed: <span id="speedValue">1.0x</span></label>
+                <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+            </div>
+            
+            <div class="control-group">
+                <label>Show Limelight</label>
+                <input type="checkbox" id="limelightToggle" checked>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="fieldCanvas" width="800" height="800"></canvas>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <div class="info-label">Robot X</div>
+                <div class="info-value" id="robotX">0.0"</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Robot Y</div>
+                <div class="info-value" id="robotY">0.0"</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Heading</div>
+                <div class="info-value" id="robotHeading">0.0°</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Path State</div>
+                <div class="info-value" id="pathState">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Time Elapsed</div>
+                <div class="info-value" id="timeElapsed">0.0s</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Current Action</div>
+                <div class="info-value" id="currentAction" style="font-size: 14px;">Waiting</div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <h3>Legend</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #0066CC;"></div>
+                    <span>Blue Alliance Zones</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #CC0000;"></div>
+                    <span>Red Alliance Zones</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4CAF50;"></div>
+                    <span>Robot (18" x 18")</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFC107; border: 2px solid #fff;"></div>
+                    <span>Robot Path Trail</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9C27B0;"></div>
+                    <span>Neutral Samples</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00FF00;"></div>
+                    <span>Alliance Samples</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFD700;"></div>
+                    <span>AprilTags (Limelight)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF00FF; opacity: 0.3;"></div>
+                    <span>Limelight Vision Cone</span>
+                </div>
+            </div>
+            <p style="margin-top: 10px; font-size: 12px; color: #888;">
+                Note: Limelight uses AprilTags on red wall (24-27) for position correction (85% weight). Pinpoint odometry provides 15% weight.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('fieldCanvas');
+        const ctx = canvas.getContext('2d');
+        const FIELD_SIZE = 141.24; // inches
+        const SCALE = canvas.width / FIELD_SIZE;
+        
+        // Autonomous programs data
+        const autonomousPrograms = {
+            RedCloseAuto: {
+                name: "Red Close Auto",
+                startPose: { x: 81.5, y: 131.5, heading: 0 },
+                paths: [
+                    { type: "drive", end: { x: 75, y: 81, heading: 45 }, action: "Drive to shooting position" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter to 3700 RPM" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push sample 1 through" },
+                    { type: "drive", end: { x: 130, y: 84, heading: 0 }, action: "Drive to sample 1" },
+                    { type: "action", duration: 1.0, action: "Intake sample 1" },
+                    { type: "drive", end: { x: 75, y: 81, heading: 45 }, action: "Return to shooting" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push sample 2 through" },
+                    { type: "drive", end: { x: 130, y: 55, heading: 0 }, action: "Drive to sample 2" },
+                    { type: "action", duration: 1.0, action: "Intake sample 2" },
+                    { type: "drive", end: { x: 75, y: 81, heading: 45 }, action: "Return to shooting" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push sample 3 through" },
+                    { type: "drive", end: { x: 85, y: 37, heading: 0 }, action: "Move to sample 3 position" },
+                    { type: "drive", end: { x: 130, y: 35, heading: 0 }, action: "Grab sample 3" },
+                    { type: "action", duration: 1.0, action: "Intake sample 3" },
+                    { type: "drive", end: { x: 75, y: 81, heading: 45 }, action: "Return to shooting" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push sample 4 through" }
+                ]
+            },
+            RedSimpleAuto: {
+                name: "Red Simple Auto",
+                startPose: { x: 105, y: 135, heading: 0 },
+                paths: [
+                    { type: "drive", end: { x: 105, y: 100, heading: 45 }, action: "Back up to shooting zone" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter to 3700 RPM" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push 3 preloaded samples" }
+                ]
+            },
+            RedFarAuto: {
+                name: "Red Far Auto",
+                startPose: { x: 135, y: 85, heading: 180 },
+                paths: [
+                    { type: "drive", end: { x: 110, y: 25, heading: 45 }, action: "Drive to shooting position" },
+                    { type: "action", duration: 0.5, action: "Settle" },
+                    { type: "action", duration: 3.0, action: "Rev shooter to 3700 RPM" },
+                    { type: "action", duration: 0.3, action: "Open blocker" },
+                    { type: "action", duration: 3.0, action: "Push 3 preloaded samples" }
+                ]
+            }
+        };
+        
+        // Simulation state
+        let currentAuto = 'RedCloseAuto';
+        let robot = { x: 0, y: 0, heading: 0 };
+        let pathHistory = [];
+        let isRunning = false;
+        let isPaused = false;
+        let currentPathIndex = 0;
+        let currentPathProgress = 0;
+        let currentActionTime = 0;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let speed = 1.0;
+        let showLimelight = true;
+        let animationId = null;
+        
+        // AprilTag positions
+        const redGoalTag = { x: 135.24, y: 47.25, id: 24 };
+        
+        // Field background image
+        const fieldImage = new Image();
+        fieldImage.src = 'FTC 25-26 field.jpg';
+        let fieldImageLoaded = false;
+        
+        fieldImage.onload = function() {
+            fieldImageLoaded = true;
+            drawField();
+            drawRobot();
+        };
+        
+        fieldImage.onerror = function() {
+            console.log('Field image failed to load, using fallback rendering');
+            fieldImageLoaded = false;
+        };
+        
+        // Draw field
+        function drawField() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Field background - black
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // If field image is loaded, draw it rotated 90° counter-clockwise
+            if (fieldImageLoaded) {
+                ctx.save();
+                // Rotate 90° counter-clockwise around center
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.drawImage(fieldImage, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+                ctx.restore();
+            } else {
+                // Fallback rendering if image doesn't load
+                drawFieldFallback();
+            }
+        }
+        
+        function drawFieldFallback() {
+            // Grid lines - 6x6 tiles
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 6; i++) {
+                const pos = (i * FIELD_SIZE / 6) * SCALE;
+                ctx.beginPath();
+                ctx.moveTo(pos, 0);
+                ctx.lineTo(pos, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, pos);
+                ctx.lineTo(canvas.width, pos);
+                ctx.stroke();
+            }
+            
+            // Perimeter walls - white
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+            
+            // BLUE ALLIANCE (LEFT SIDE)
+            ctx.fillStyle = '#0066CC';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(24 * SCALE, 0);
+            ctx.lineTo(0, 24 * SCALE);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 24 * SCALE);
+            ctx.lineTo(24 * SCALE, 0);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#0066CC';
+            ctx.strokeRect(2 * SCALE, (FIELD_SIZE - 26) * SCALE, 24 * SCALE, 24 * SCALE);
+            
+            // RED ALLIANCE (RIGHT SIDE)
+            ctx.fillStyle = '#CC0000';
+            ctx.beginPath();
+            ctx.moveTo(canvas.width, 0);
+            ctx.lineTo((FIELD_SIZE - 24) * SCALE, 0);
+            ctx.lineTo(canvas.width, 24 * SCALE);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo((FIELD_SIZE - 24) * SCALE, 0);
+            ctx.lineTo(canvas.width, 24 * SCALE);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#CC0000';
+            ctx.strokeRect((FIELD_SIZE - 26) * SCALE, (FIELD_SIZE - 26) * SCALE, 24 * SCALE, 24 * SCALE);
+            
+            // CENTER STRUCTURES
+            ctx.fillStyle = '#666';
+            ctx.fillRect((FIELD_SIZE/2 - 2) * SCALE, 0, 4 * SCALE, canvas.height);
+            
+            // Horizontal cage bars
+            ctx.fillStyle = '#CC0000';
+            ctx.fillRect((FIELD_SIZE - 35) * SCALE, 8 * SCALE, 3 * SCALE, 13 * SCALE);
+            ctx.fillRect((FIELD_SIZE - 35) * SCALE, (FIELD_SIZE - 21) * SCALE, 3 * SCALE, 13 * SCALE);
+            
+            ctx.fillStyle = '#0066CC';
+            ctx.fillRect(32 * SCALE, 8 * SCALE, 3 * SCALE, 13 * SCALE);
+            ctx.fillRect(32 * SCALE, (FIELD_SIZE - 21) * SCALE, 3 * SCALE, 13 * SCALE);
+            
+            // SAMPLES
+            drawSample(46, 18, '#9C27B0');
+            drawSample(46, 30, '#9C27B0');
+            drawSample(46, 42, '#00FF00');
+            drawSample(46, 54, '#9C27B0');
+            
+            drawSample(95, 18, '#9C27B0');
+            drawSample(95, 30, '#00FF00');
+            drawSample(95, 42, '#9C27B0');
+            drawSample(95, 54, '#9C27B0');
+            
+            drawSample(46, 87, '#9C27B0');
+            drawSample(46, 99, '#00FF00');
+            drawSample(46, 111, '#9C27B0');
+            drawSample(46, 123, '#9C27B0');
+            
+            drawSample(95, 87, '#9C27B0');
+            drawSample(95, 99, '#9C27B0');
+            drawSample(95, 111, '#00FF00');
+            drawSample(95, 123, '#9C27B0');
+            
+            drawSample(14, 128, '#9C27B0');
+            drawSample(127, 128, '#9C27B0');
+            
+            drawSample(9, 9, '#9C27B0');
+            drawSample(132, 9, '#9C27B0');
+            drawSample(9, 132, '#00FF00');
+            drawSample(132, 132, '#00FF00');
+            
+            // AprilTags
+            drawAprilTag(135.24, 12, '27');
+            drawAprilTag(135.24, 35.25, '26');
+            drawAprilTag(135.24, 47.25, '24');
+            drawAprilTag(135.24, 70.5, '25');
+        }
+        
+        function drawAprilTag(x, y, id) {
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect((x - 2) * SCALE, (y - 2) * SCALE, 4 * SCALE, 4 * SCALE);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect((x - 2) * SCALE, (y - 2) * SCALE, 4 * SCALE, 4 * SCALE);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(id, x * SCALE, (y + 1) * SCALE);
+            ctx.textAlign = 'left';
+        }
+        
+        function drawSample(x, y, color) {
+            // Draw as hexagon shape like in the image
+            const size = 3 * SCALE;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i;
+                const px = x * SCALE + size * Math.cos(angle);
+                const py = y * SCALE + size * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        }
+        
+        function drawRobot() {
+            const x = robot.x * SCALE;
+            const y = robot.y * SCALE;
+            const size = 9 * SCALE; // 18" robot
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(robot.heading * Math.PI / 180);
+            
+            // Robot body
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(-size/2, -size/2, size, size);
+            
+            // Direction indicator
+            ctx.fillStyle = '#FFC107';
+            ctx.beginPath();
+            ctx.moveTo(size/2, 0);
+            ctx.lineTo(size/2 - 5, -5);
+            ctx.lineTo(size/2 - 5, 5);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Limelight vision cone and AprilTag detection
+            if (showLimelight && isRunning) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(robot.heading * Math.PI / 180);
+                
+                // Vision cone
+                ctx.fillStyle = 'rgba(255, 0, 255, 0.1)';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, 50 * SCALE, -Math.PI/6, Math.PI/6);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+                
+                // Check if AprilTag 24 (Red Goal) is visible
+                const tagX = 135.24 * SCALE;
+                const tagY = 47.25 * SCALE;
+                const dx = tagX - x;
+                const dy = tagY - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angleToTag = Math.atan2(dy, dx) * 180 / Math.PI;
+                const headingDiff = Math.abs(((angleToTag - robot.heading + 180) % 360) - 180);
+                
+                // Tag is visible if within 60° cone and within range
+                const canSeeTag = distance < (60 * SCALE) && headingDiff < 30;
+                
+                if (canSeeTag) {
+                    // Draw line to AprilTag
+                    ctx.strokeStyle = '#FF00FF';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(tagX, tagY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // Highlight AprilTag
+                    ctx.strokeStyle = '#FF00FF';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect((135.24 - 2) * SCALE, (47.25 - 2) * SCALE, 4 * SCALE, 4 * SCALE);
+                    
+                    // Show localization correction indicator
+                    ctx.fillStyle = '#FF00FF';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText('LL Lock', x + 12, y - 12);
+                }
+            }
+        }
+        
+        function drawPathHistory() {
+            if (pathHistory.length < 2) return;
+            
+            ctx.strokeStyle = '#FFC107';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(pathHistory[0].x * SCALE, pathHistory[0].y * SCALE);
+            for (let i = 1; i < pathHistory.length; i++) {
+                ctx.lineTo(pathHistory[i].x * SCALE, pathHistory[i].y * SCALE);
+            }
+            ctx.stroke();
+        }
+        
+        function updateRobot(deltaTime) {
+            const auto = autonomousPrograms[currentAuto];
+            if (currentPathIndex >= auto.paths.length) {
+                stopSimulation();
+                return;
+            }
+            
+            const currentPath = auto.paths[currentPathIndex];
+            
+            if (currentPath.type === 'drive') {
+                // Get the start position from current robot position, not from path data
+                const start = { x: robot.x, y: robot.y, heading: robot.heading };
+                const end = currentPath.end;
+                const distance = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+                const duration = distance / 30;  // ~30 inches per second (realistic FTC speed)
+                
+                currentPathProgress += deltaTime / duration;
+                
+                if (currentPathProgress >= 1.0) {
+                    robot.x = end.x;
+                    robot.y = end.y;
+                    robot.heading = end.heading;
+                    pathHistory.push({ x: robot.x, y: robot.y });
+                    currentPathIndex++;
+                    currentPathProgress = 0;
+                } else {
+                    // Smooth interpolation
+                    const t = currentPathProgress;
+                    robot.x = start.x + (end.x - start.x) * t;
+                    robot.y = start.y + (end.y - start.y) * t;
+                    
+                    // Smooth heading interpolation
+                    let headingDiff = end.heading - start.heading;
+                    if (headingDiff > 180) headingDiff -= 360;
+                    if (headingDiff < -180) headingDiff += 360;
+                    robot.heading = start.heading + headingDiff * t;
+                    
+                    // Apply Limelight correction if AprilTag is visible
+                    if (showLimelight) {
+                        const tagX = 135.24;
+                        const tagY = 47.25;
+                        const dx = tagX - robot.x;
+                        const dy = tagY - robot.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const angleToTag = Math.atan2(dy, dx) * 180 / Math.PI;
+                        const headingDiff = Math.abs(((angleToTag - robot.heading + 180) % 360) - 180);
+                        
+                        // Apply position correction if tag is visible
+                        if (distance < 60 && headingDiff < 30) {
+                            // Simulate 85% Limelight correction weight
+                            const correctionFactor = 0.05 * deltaTime; // Gradual correction
+                            robot.x = robot.x * (1 - correctionFactor) + end.x * correctionFactor;
+                            robot.y = robot.y * (1 - correctionFactor) + end.y * correctionFactor;
+                        }
+                    }
+                    
+                    if (currentPathProgress % 0.05 < deltaTime / duration) {
+                        pathHistory.push({ x: robot.x, y: robot.y });
+                    }
+                }
+            } else if (currentPath.type === 'action') {
+                currentActionTime += deltaTime;
+                if (currentActionTime >= currentPath.duration) {
+                    currentPathIndex++;
+                    currentActionTime = 0;
+                }
+            }
+            
+            document.getElementById('currentAction').textContent = currentPath.action || 'Moving';
+            document.getElementById('pathState').textContent = currentPathIndex;
+        }
+        
+        function animate() {
+            if (!isRunning || isPaused) return;
+            
+            const now = Date.now();
+            const deltaTime = ((now - (startTime || now)) / 1000) * speed;
+            startTime = now;
+            elapsedTime += deltaTime;
+            
+            updateRobot(deltaTime);
+            
+            drawField();
+            drawPathHistory();
+            drawRobot();
+            
+            // Update telemetry
+            document.getElementById('robotX').textContent = robot.x.toFixed(1) + '"';
+            document.getElementById('robotY').textContent = robot.y.toFixed(1) + '"';
+            document.getElementById('robotHeading').textContent = robot.heading.toFixed(1) + '°';
+            document.getElementById('timeElapsed').textContent = elapsedTime.toFixed(1) + 's';
+            
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        function startSimulation() {
+            const auto = autonomousPrograms[currentAuto];
+            robot = { ...auto.startPose };
+            pathHistory = [{ x: robot.x, y: robot.y }];
+            currentPathIndex = 0;
+            currentPathProgress = 0;
+            currentActionTime = 0;
+            elapsedTime = 0;
+            startTime = Date.now();
+            isRunning = true;
+            isPaused = false;
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = false;
+            document.getElementById('autoSelect').disabled = true;
+            
+            animate();
+        }
+        
+        function pauseSimulation() {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+            if (!isPaused) {
+                startTime = Date.now();
+                animate();
+            }
+        }
+        
+        function resetSimulation() {
+            if (animationId) cancelAnimationFrame(animationId);
+            isRunning = false;
+            isPaused = false;
+            const auto = autonomousPrograms[currentAuto];
+            robot = { ...auto.startPose };
+            pathHistory = [];
+            currentPathIndex = 0;
+            currentPathProgress = 0;
+            currentActionTime = 0;
+            elapsedTime = 0;
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸ Pause';
+            document.getElementById('autoSelect').disabled = false;
+            document.getElementById('currentAction').textContent = 'Waiting';
+            document.getElementById('pathState').textContent = '0';
+            
+            drawField();
+            drawRobot();
+        }
+        
+        function stopSimulation() {
+            isRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('autoSelect').disabled = false;
+            document.getElementById('currentAction').textContent = 'Complete';
+        }
+        
+        // Event listeners
+        document.getElementById('startBtn').addEventListener('click', startSimulation);
+        document.getElementById('pauseBtn').addEventListener('click', pauseSimulation);
+        document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+        
+        document.getElementById('autoSelect').addEventListener('change', (e) => {
+            currentAuto = e.target.value;
+            resetSimulation();
+        });
+        
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            speed = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = speed.toFixed(1) + 'x';
+        });
+        
+        document.getElementById('limelightToggle').addEventListener('change', (e) => {
+            showLimelight = e.target.checked;
+        });
+        
+        // Initial draw
+        resetSimulation();
+    </script>
+</body>
+</html>

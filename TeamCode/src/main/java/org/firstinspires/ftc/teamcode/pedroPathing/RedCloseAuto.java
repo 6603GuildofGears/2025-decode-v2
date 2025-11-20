@@ -12,6 +12,13 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 
+// Limelight SDK imports
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+import java.util.List;
+
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 @Autonomous(name = "Red Close Auto", group = "Competition")
@@ -23,10 +30,17 @@ public class RedCloseAuto extends OpMode {
     private int scoreState;  // Track scoring sequence
 
     // Hardware - Use DcMotorEx for all motors for consistency
-    private DcMotorEx frontLeftDrive, frontRightDrive, backLeftDrive, backRightDrive;
     private DcMotorEx shooter;  // Note: in hardware config this is labeled "intakeMotor"
     private DcMotorEx intake;   // Note: in hardware config this is labeled "shooterMotor"
     private Servo blocker;
+    
+    // Limelight for position correction
+    private Limelight3A limelight;
+    
+    // Sensor fusion variables
+    private double lastOdoX = 0;
+    private double lastOdoY = 0;
+    public static double LIMELIGHT_WEIGHT = 0.85;
 
     private final double TICKS_PER_REV = 28;
     
@@ -41,67 +55,75 @@ public class RedCloseAuto extends OpMode {
     // Servo positions
     private static final double BLOCKER_OPEN = 0.175;  // From Rango
     private static final double BLOCKER_CLOSED = 0.3;  // From Rango
+    
+    // AprilTag positions for localization (Red alliance)
+    private static final double[][] RED_TAG_POSITIONS = {
+        {135.24, 47.25},   // Tag 24 - Red Goal
+        {135.24, 70.62},   // Tag 25 - Motif 21
+        {135.24, 93.99},   // Tag 26 - Motif 22
+        {135.24, 117.36}   // Tag 27 - Motif 23
+    };
 
-    // Poses for Red Close starting position
-    private final Pose startPose = new Pose(9, 63.5, Math.toRadians(180)); // Red close start
-    private final Pose scorePose = new Pose(14, 74, Math.toRadians(135)); // Facing basket
-    private final Pose pickup1Pose = new Pose(23.5, 120, Math.toRadians(90)); // First sample
-    private final Pose pickup2Pose = new Pose(23.5, 130, Math.toRadians(90)); // Second sample
-    private final Pose pickup3Pose = new Pose(34, 120, Math.toRadians(135)); // Third sample
-    private final Pose parkPose = new Pose(60, 98, Math.toRadians(90)); // Observation zone
+    // Poses for Red Close starting position (Observation Zone - audience wall)
+    public final Pose startPose = new Pose(81.5, 131.5, Math.toRadians(0));  // Audience wall, facing toward field
+    public final Pose shootPose = new Pose(75, 81, Math.toRadians(45));  // Shooting position near red processor
+    public final Pose intakePose1 = new Pose(130, 84, Math.toRadians(0));  // First sample
+    public final Pose intakePose2 = new Pose(130, 55, Math.toRadians(0));  // Second sample
+    public final Pose intakePose3 = new Pose(85, 37, Math.toRadians(0));  // Third sample (closer to submersible)
+    public final Pose intakePose3b = new Pose(130, 35, Math.toRadians(0));  // Third sample pickup from other side
 
     // Paths
     private Path scorePreload;
-    private PathChain grabSample1, scoreSample1, grabSample2, scoreSample2, grabSample3, scoreSample3, park;
+    private PathChain grabSample1, scoreSample1, grabSample2, scoreSample2, grabSample3, grabSample3b, scoreSample3;
 
     /**
      * Build all autonomous paths
      */
     public void buildPaths() {
         // Score preloaded sample in high basket
-        scorePreload = new Path(new BezierLine(startPose, scorePose));
-        scorePreload.setLinearHeadingInterpolation(startPose.getHeading(), scorePose.getHeading());
+        scorePreload = new Path(new BezierLine(startPose, shootPose));
+        scorePreload.setLinearHeadingInterpolation(startPose.getHeading(), shootPose.getHeading());
 
         // Grab first sample from spike marks
         grabSample1 = follower.pathBuilder()
-                .addPath(new BezierLine(scorePose, pickup1Pose))
-                .setLinearHeadingInterpolation(scorePose.getHeading(), pickup1Pose.getHeading())
+                .addPath(new BezierLine(shootPose, intakePose1))
+                .setTangentHeadingInterpolation()
                 .build();
 
         // Return to score first sample
         scoreSample1 = follower.pathBuilder()
-                .addPath(new BezierLine(pickup1Pose, scorePose))
-                .setLinearHeadingInterpolation(pickup1Pose.getHeading(), scorePose.getHeading())
+                .addPath(new BezierLine(intakePose1, shootPose))
+                .setTangentHeadingInterpolation()
                 .build();
 
         // Grab second sample
         grabSample2 = follower.pathBuilder()
-                .addPath(new BezierLine(scorePose, pickup2Pose))
-                .setLinearHeadingInterpolation(scorePose.getHeading(), pickup2Pose.getHeading())
+                .addPath(new BezierLine(shootPose, intakePose2))
+                .setTangentHeadingInterpolation()
                 .build();
 
         // Score second sample
         scoreSample2 = follower.pathBuilder()
-                .addPath(new BezierLine(pickup2Pose, scorePose))
-                .setLinearHeadingInterpolation(pickup2Pose.getHeading(), scorePose.getHeading())
+                .addPath(new BezierLine(intakePose2, shootPose))
+                .setTangentHeadingInterpolation()
                 .build();
 
-        // Grab third sample
+        // Grab third sample - goes to intermediate position first
         grabSample3 = follower.pathBuilder()
-                .addPath(new BezierLine(scorePose, pickup3Pose))
-                .setLinearHeadingInterpolation(scorePose.getHeading(), pickup3Pose.getHeading())
+                .addPath(new BezierLine(shootPose, intakePose3))
+                .setTangentHeadingInterpolation()
+                .build();
+        
+        // Move to actual sample position
+        grabSample3b = follower.pathBuilder()
+                .addPath(new BezierLine(intakePose3, intakePose3b))
+                .setTangentHeadingInterpolation()
                 .build();
 
         // Score third sample
         scoreSample3 = follower.pathBuilder()
-                .addPath(new BezierLine(pickup3Pose, scorePose))
-                .setLinearHeadingInterpolation(pickup3Pose.getHeading(), scorePose.getHeading())
-                .build();
-
-        // Park in observation zone
-        park = follower.pathBuilder()
-                .addPath(new BezierLine(scorePose, parkPose))
-                .setLinearHeadingInterpolation(scorePose.getHeading(), parkPose.getHeading())
+                .addPath(new BezierLine(intakePose3b, shootPose))
+                .setTangentHeadingInterpolation()
                 .build();
     }
 
@@ -196,104 +218,89 @@ public class RedCloseAuto extends OpMode {
 
             case 1: // Score preload (2 samples)
                 if (!follower.isBusy()) {
-                    resetScoring();
-                    setPathState(2);
-                }
-                scoreSequence();
-                if (scoringComplete()) {
-                    follower.followPath(grabSample1, true);
-                    setPathState(3);
+                    scoreSequence();
+                    if (scoringComplete()) {
+                        resetScoring();
+                        follower.followPath(grabSample1, true);
+                        setPathState(2);
+                    }
                 }
                 break;
 
-            case 2: // Waiting for scoring to complete
-                scoreSequence();
-                break;
-
-            case 3: // Grab first sample
+            case 2: // Grab first sample
                 if (!follower.isBusy()) {
-                    intake.setPower(-0.5);  // Run intake to grab
+                    intake.setPower(0.5);  // Run intake to grab
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {  // Grab for 1 second
                         intake.setPower(0);
+                        shooter.setVelocity(getTickSpeed(SHOOTER_RPM));  // Start revving while driving
                         follower.followPath(scoreSample1, true);
+                        setPathState(3);
+                    }
+                }
+                break;
+
+            case 3: // Score first sample (shooter already revved)
+                if (!follower.isBusy()) {
+                    scoreState = 2;  // Skip settle and rev - already done
+                    scoreSequence();
+                    if (scoringComplete()) {
+                        resetScoring();
+                        follower.followPath(grabSample2, true);
                         setPathState(4);
                     }
                 }
                 break;
 
-            case 4: // Score first sample (2 samples)
+            case 4: // Grab second sample
                 if (!follower.isBusy()) {
-                    resetScoring();
-                    setPathState(5);
-                }
-                scoreSequence();
-                if (scoringComplete()) {
-                    follower.followPath(grabSample2, true);
-                    setPathState(6);
-                }
-                break;
-
-            case 5: // Waiting for scoring to complete
-                scoreSequence();
-                break;
-
-            case 6: // Grab second sample
-                if (!follower.isBusy()) {
-                    intake.setPower(-0.5);  // Run intake to grab
+                    intake.setPower(0.5);  // Run intake to grab
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {  // Grab for 1 second
                         intake.setPower(0);
+                        shooter.setVelocity(getTickSpeed(SHOOTER_RPM));  // Start revving while driving
                         follower.followPath(scoreSample2, true);
-                        setPathState(7);
+                        setPathState(5);
                     }
                 }
                 break;
 
-            case 7: // Score second sample (2 samples)
+            case 5: // Score second sample (shooter already revved)
                 if (!follower.isBusy()) {
-                    resetScoring();
-                    setPathState(8);
-                }
-                scoreSequence();
-                if (scoringComplete()) {
-                    follower.followPath(grabSample3, true);
-                    setPathState(9);
+                    scoreState = 2;  // Skip settle and rev - already done
+                    scoreSequence();
+                    if (scoringComplete()) {
+                        resetScoring();
+                        follower.followPath(grabSample3, true);
+                        setPathState(6);
+                    }
                 }
                 break;
 
-            case 8: // Waiting for scoring to complete
-                scoreSequence();
+            case 6: // Move to intermediate position for third sample
+                if (!follower.isBusy()) {
+                    follower.followPath(grabSample3b, true);
+                    setPathState(7);
+                }
                 break;
 
-            case 9: // Grab third sample
+            case 7: // Grab third sample
                 if (!follower.isBusy()) {
-                    intake.setPower(-0.5);  // Run intake to grab
+                    intake.setPower(0.5);  // Run intake to grab
                     if (pathTimer.getElapsedTimeSeconds() > 1.0) {  // Grab for 1 second
                         intake.setPower(0);
+                        shooter.setVelocity(getTickSpeed(SHOOTER_RPM));  // Start revving while driving
                         follower.followPath(scoreSample3, true);
-                        setPathState(10);
+                        setPathState(8);
                     }
                 }
                 break;
 
-            case 10: // Score third sample (2 samples)
+            case 8: // Score third sample (shooter already revved)
                 if (!follower.isBusy()) {
-                    resetScoring();
-                    setPathState(11);
-                }
-                scoreSequence();
-                if (scoringComplete()) {
-                    follower.followPath(park, true);
-                    setPathState(12);
-                }
-                break;
-
-            case 11: // Waiting for scoring to complete
-                scoreSequence();
-                break;
-
-            case 12: // Park
-                if (!follower.isBusy()) {
-                    setPathState(-1); // Stop
+                    scoreState = 2;  // Skip settle and rev - already done
+                    scoreSequence();
+                    if (scoringComplete()) {
+                        setPathState(-1); // Done - no parking
+                    }
                 }
                 break;
         }
@@ -318,24 +325,9 @@ public class RedCloseAuto extends OpMode {
         follower.setStartingPose(startPose);
 
         // Hardware mapping - NOTE: shooter/intake are swapped in hardware config
-        frontLeftDrive = hardwareMap.get(DcMotorEx.class, "frontLeftDrive");
-        frontRightDrive = hardwareMap.get(DcMotorEx.class, "frontRightDrive");
-        backLeftDrive = hardwareMap.get(DcMotorEx.class, "backLeftDrive");
-        backRightDrive = hardwareMap.get(DcMotorEx.class, "backRightDrive");
         shooter = hardwareMap.get(DcMotorEx.class, "intakeMotor");  // Actual shooter motor
         intake = hardwareMap.get(DcMotorEx.class, "shooterMotor");  // Actual intake motor
         blocker = hardwareMap.get(Servo.class, "blocker");
-
-        // Drivetrain setup (matches Rango configuration)
-        frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        backLeftDrive.setDirection(DcMotorSimple.Direction.FORWARD);
-        frontRightDrive.setDirection(DcMotorSimple.Direction.FORWARD);
-        backRightDrive.setDirection(DcMotorSimple.Direction.FORWARD);
-
-        frontLeftDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        frontRightDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        backLeftDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        backRightDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         // Shooter setup (this is the actual shooter, mapped to "intakeMotor")
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -343,7 +335,12 @@ public class RedCloseAuto extends OpMode {
 
         // Intake setup (this is the actual intake, mapped to "shooterMotor")
         intake.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        intake.setDirection(DcMotorSimple.Direction.FORWARD);
+        intake.setDirection(DcMotorSimple.Direction.REVERSE);
+        
+        // Limelight setup
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        limelight.pipelineSwitch(0);
+        limelight.start();
 
         // Build paths
         buildPaths();
@@ -360,9 +357,47 @@ public class RedCloseAuto extends OpMode {
         setPathState(0);
     }
 
+    /**
+     * Update position using Limelight + Odometry sensor fusion
+     */
+    private void updateLocalization() {
+        double odoX = follower.getPose().getX();
+        double odoY = follower.getPose().getY();
+        
+        LLResult result = limelight.getLatestResult();
+        if (result != null && result.isValid()) {
+            List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
+            if (!fiducials.isEmpty()) {
+                LLResultTypes.FiducialResult tag = fiducials.get(0);
+                int tagId = (int) tag.getFiducialId();
+                
+                // Only use Red Goal tag (24) for position correction in auto
+                if (tagId == 24) {
+                    double[] tagFieldPos = RED_TAG_POSITIONS[0];  // Tag 24
+                    Pose3D robotPose = tag.getRobotPoseFieldSpace();
+                    
+                    // Calculate corrected position
+                    double llX = tagFieldPos[0] + (robotPose.getPosition().x * 39.3701);
+                    double llY = tagFieldPos[1] - (robotPose.getPosition().y * 39.3701);
+                    
+                    // Blend with odometry
+                    double correctedX = (1.0 - LIMELIGHT_WEIGHT) * odoX + LIMELIGHT_WEIGHT * llX;
+                    double correctedY = (1.0 - LIMELIGHT_WEIGHT) * odoY + LIMELIGHT_WEIGHT * llY;
+                    
+                    // Update follower position
+                    follower.setPose(new Pose(correctedX, correctedY, follower.getPose().getHeading()));
+                }
+            }
+        }
+        
+        lastOdoX = odoX;
+        lastOdoY = odoY;
+    }
+    
     @Override
     public void loop() {
         follower.update();
+        updateLocalization();
         autonomousPathUpdate();
 
         // Telemetry

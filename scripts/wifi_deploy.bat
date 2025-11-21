@@ -24,17 +24,7 @@ echo [deploy] Repository: %CD%
 echo [deploy] Target: %TARGET%
 echo.
 
-REM Save all files in VS Code before deploying
-echo [deploy] Saving all files in VS Code...
-code --command workbench.action.files.saveAll 2>nul
-if !errorlevel!==0 (
-    echo [deploy] Files saved successfully
-) else (
-    echo [deploy] VS Code not running or save command failed - continuing anyway
-)
-echo.
-
-REM Locate adb.exe
+REM Connect to device
 set ADB=
 if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
     set ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe

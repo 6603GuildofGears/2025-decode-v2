@@ -249,6 +249,9 @@ public class Mango extends OpMode {
         }
         lastAButtonState = a1;
 
+
+        telemetry.addData("Shooter RPM", shooter.getVelocity());
+
         // Update odometry localization
         follower.update();
         

@@ -5,6 +5,7 @@ import com.pedropathing.geometry.*;
 import com.pedropathing.paths.*;
 import com.pedropathing.util.*;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -22,6 +23,7 @@ import java.util.List;
  * Red Alliance Far Starting Position Autonomous
  * Starts from far tile (near top wall), drives to basket, shoots 3 preloads
  */
+@Disabled
 @Autonomous(name = "Red Far Auto", group = "Red")
 public class RedFarAuto extends OpMode {
 

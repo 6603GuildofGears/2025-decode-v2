@@ -1,275 +1,260 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
-import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.*;
-import com.pedropathing.paths.*;
-import com.pedropathing.util.*;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
-
-// Limelight SDK imports
-import com.qualcomm.hardware.limelightvision.Limelight3A;
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import java.util.List;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
- * Simple Red Alliance Autonomous - Back up and shoot 3 preloaded samples
+ * Simple Red Alliance Autonomous - Drive backwards for 2 seconds
  */
-@Autonomous(name = "Red Simple Auto", group = "Red")
+@Autonomous(name = "RED - Close Auto", group = "Red")
 public class RedSimpleAuto extends OpMode {
 
-    private Follower follower;
-    private Timer pathTimer, opmodeTimer, actionTimer;
-    private int pathState;
-    private int scoreState;
-
-    // Hardware
-    private DcMotorEx shooter;  // Note: in hardware config this is labeled "intakeMotor"
-    private DcMotorEx intake;   // Note: in hardware config this is labeled "shooterMotor"
+    private DcMotor frontLeftDrive;
+    private DcMotor frontRightDrive;
+    private DcMotor backLeftDrive;
+    private DcMotor backRightDrive;
+    
+    // Shooter/Intake hardware - NOTE: swapped in hardware config
+    private DcMotorEx shooter;  // Actually mapped to "intakeMotor"
+    private DcMotorEx intake;   // Actually mapped to "shooterMotor"
     private Servo blocker;
     
-    // Limelight for position correction
-    private Limelight3A limelight;
+    // Constants
+    private static final double SHOOTER_RPM = 100;
+    private static final double TICKS_PER_REV = 28.0;  // GoBilda 5202/5203 encoder
+    private static final double RPM_TOLERANCE = 50;
+    private static final double BLOCKER_UP_POS = 0.2;    // Open position (inverted)
+    private static final double BLOCKER_DOWN_POS = 0.3;  // Closed position (inverted)
     
-    // Sensor fusion variables
-    private double lastOdoX = 0;
-    private double lastOdoY = 0;
-    public static double LIMELIGHT_WEIGHT = 0.85;
-
-    private final double TICKS_PER_REV = 28;
-    
-    // Scoring constants
-    public static double SHOOTER_RPM = 3700;
-    public static double INTAKE_PUSH_POWER = 1.0;
-    private static final double REV_UP_TIME = 3.0;
-    private static final double PUSH_TIME = 3.0;
-    private static final double SETTLE_TIME = 0.5;
-    private static final int SAMPLES_TO_SCORE = 3;  // Score 3 preloaded samples
-    
-    // Servo positions
-    private static final double BLOCKER_OPEN = 0.175;
-    private static final double BLOCKER_CLOSED = 0.3;
-    
-    // AprilTag positions for localization (Red alliance)
-    private static final double[][] RED_TAG_POSITIONS = {
-        {135.24, 47.25},   // Tag 24 - Red Goal
-        {135.24, 70.62},   // Tag 25 - Motif 21
-        {135.24, 93.99},   // Tag 26 - Motif 22
-        {135.24, 117.36}   // Tag 27 - Motif 23
-    };
-
-    // Poses - start position and shooting position (Observation Zone - audience wall)
-    public final Pose startPose = new Pose(105, 135, Math.toRadians(0));  // Audience wall near red side
-    public final Pose shootPose = new Pose(105, 100, Math.toRadians(45));  // Back up slightly, face red processor
-
-    // Path
-    private Path backupToShoot;
-
-    /**
-     * Build the path to shooting position
-     */
-    public void buildPaths() {
-        backupToShoot = new Path(new BezierLine(startPose, shootPose));
-        backupToShoot.setLinearHeadingInterpolation(startPose.getHeading(), shootPose.getHeading());
-    }
-
-    /**
-     * Score samples into basket
-     * Settles, revs shooter, opens blocker, runs intake to push samples through
-     */
-    private void scoreSequence() {
-        switch (scoreState) {
-            case 0: // Settle
-                if (actionTimer.getElapsedTimeSeconds() > SETTLE_TIME) {
-                    actionTimer.resetTimer();
-                    scoreState = 1;
-                }
-                break;
-
-            case 1: // Rev up shooter
-                shooter.setVelocity(getTickSpeed(SHOOTER_RPM));
-                if (actionTimer.getElapsedTimeSeconds() > REV_UP_TIME) {
-                    actionTimer.resetTimer();
-                    scoreState = 2;
-                }
-                break;
-
-            case 2: // Open blocker
-                blocker.setPosition(BLOCKER_OPEN);
-                if (actionTimer.getElapsedTimeSeconds() > 0.3) {
-                    actionTimer.resetTimer();
-                    scoreState = 3;
-                }
-                break;
-
-            case 3: // Push samples through
-                intake.setPower(INTAKE_PUSH_POWER);
-                if (actionTimer.getElapsedTimeSeconds() > PUSH_TIME) {
-                    intake.setPower(0);
-                    shooter.setVelocity(0);
-                    blocker.setPosition(BLOCKER_CLOSED);
-                    scoreState = 4;
-                }
-                break;
-
-            case 4: // Done
-                break;
-        }
-    }
-
-    /**
-     * Check if scoring is complete
-     */
-    private boolean scoringComplete() {
-        return scoreState >= 4;
-    }
-
-    /**
-     * Main autonomous state machine
-     */
-    public void autonomousPathUpdate() {
-        switch (pathState) {
-            case 0: // Back up to shooting position
-                follower.followPath(backupToShoot);
-                setPathState(1);
-                break;
-
-            case 1: // Wait to reach position
-                if (!follower.isBusy()) {
-                    setPathState(2);
-                }
-                break;
-
-            case 2: // Score all 3 preloaded samples
-                scoreSequence();
-                if (scoringComplete()) {
-                    setPathState(-1); // Done
-                }
-                break;
-        }
-    }
-
-    /**
-     * Change path state and reset timer
-     */
-    public void setPathState(int pState) {
-        pathState = pState;
-        pathTimer.resetTimer();
-    }
+    private ElapsedTime runtime = new ElapsedTime();
+    private boolean isDriving = false;
 
     @Override
     public void init() {
-        pathTimer = new Timer();
-        opmodeTimer = new Timer();
-        actionTimer = new Timer();
+        // Initialize drive motors
+        frontLeftDrive = hardwareMap.get(DcMotor.class, "frontLeftDrive");
+        frontRightDrive = hardwareMap.get(DcMotor.class, "frontRightDrive");
+        backLeftDrive = hardwareMap.get(DcMotor.class, "backLeftDrive");
+        backRightDrive = hardwareMap.get(DcMotor.class, "backRightDrive");
 
-        // Initialize follower with Pedro Pathing
-        follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(startPose);
-
-        // Hardware mapping - NOTE: shooter/intake are swapped in hardware config
-        shooter = hardwareMap.get(DcMotorEx.class, "intakeMotor");  // Actual shooter motor
-        intake = hardwareMap.get(DcMotorEx.class, "shooterMotor");  // Actual intake motor
+        // Set motor directions
+        frontLeftDrive.setDirection(DcMotor.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotor.Direction.REVERSE);
+        backLeftDrive.setDirection(DcMotor.Direction.FORWARD);
+        backRightDrive.setDirection(DcMotor.Direction.FORWARD);
+        
+        // Initialize shooter/intake - NOTE: swapped in hardware config
+        shooter = hardwareMap.get(DcMotorEx.class, "intakeMotor");  // Actual shooter
+        intake = hardwareMap.get(DcMotorEx.class, "shooterMotor");  // Actual intake
         blocker = hardwareMap.get(Servo.class, "blocker");
-
+        
         // Shooter setup
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         shooter.setDirection(DcMotorSimple.Direction.REVERSE);
-
+        
         // Intake setup
         intake.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         intake.setDirection(DcMotorSimple.Direction.REVERSE);
         
-        // Limelight setup
-        limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        limelight.pipelineSwitch(0);
-        limelight.start();
+        // Set blocker to closed position
+        blocker.setPosition(BLOCKER_DOWN_POS);
 
-        // Build paths
-        buildPaths();
-
-        telemetry.addLine("Red Simple Auto Initialized");
-        telemetry.addLine("Will backup and shoot 3 preloads");
+        telemetry.addLine("Simple Drive Test Initialized");
+        telemetry.addLine("Will drive backwards for 2 seconds");
         telemetry.update();
     }
 
     @Override
     public void start() {
-        opmodeTimer.resetTimer();
-        blocker.setPosition(BLOCKER_CLOSED);
-        scoreState = 0;
-        setPathState(0);
+        runtime.reset();
+        isDriving = true;
     }
 
-    /**
-     * Update position using Limelight + Odometry sensor fusion
-     */
-    private void updateLocalization() {
-        double odoX = follower.getPose().getX();
-        double odoY = follower.getPose().getY();
-        
-        LLResult result = limelight.getLatestResult();
-        if (result != null && result.isValid()) {
-            List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
-            if (!fiducials.isEmpty()) {
-                LLResultTypes.FiducialResult tag = fiducials.get(0);
-                int tagId = (int) tag.getFiducialId();
-                
-                // Only use Red Goal tag (24) for position correction in auto
-                if (tagId == 24) {
-                    double[] tagFieldPos = RED_TAG_POSITIONS[0];  // Tag 24
-                    Pose3D robotPose = tag.getRobotPoseFieldSpace();
-                    
-                    // Calculate corrected position
-                    double llX = tagFieldPos[0] + (robotPose.getPosition().x * 39.3701);
-                    double llY = tagFieldPos[1] - (robotPose.getPosition().y * 39.3701);
-                    
-                    // Blend with odometry
-                    double correctedX = (1.0 - LIMELIGHT_WEIGHT) * odoX + LIMELIGHT_WEIGHT * llX;
-                    double correctedY = (1.0 - LIMELIGHT_WEIGHT) * odoY + LIMELIGHT_WEIGHT * llY;
-                    
-                    // Update follower position
-                    follower.setPose(new Pose(correctedX, correctedY, follower.getPose().getHeading()));
-                }
+    @Override
+    public void loop() {
+        if (isDriving && runtime.seconds() < 1.75) {
+            // Drive backwards and rotate to 45°
+            double drive = -0.5;    // Backward
+            double turn = 0.25;     // Rotate counterclockwise
+            
+            frontLeftDrive.setPower(drive);  // -0.75
+            frontRightDrive.setPower(drive); // -0.25
+            backLeftDrive.setPower(drive);   // -0.75
+            backRightDrive.setPower(drive);  // -0.25
+
+            //TURN to shoot, from start
+        } else if(isDriving && runtime.seconds() >= 1.75 && runtime.seconds() < 2.375 ) {
+            frontLeftDrive.setPower(0.35);
+            frontRightDrive.setPower(-0.35);
+            backLeftDrive.setPower(0.35);
+            backRightDrive.setPower(-0.35);
+            //SHOOT SEQUENCE
+        } else if(isDriving && runtime.seconds() >= 2.375 && runtime.seconds() < 8.25 ) { // Stop motors after 2 seconds
+            frontLeftDrive.setPower(0);
+            frontRightDrive.setPower(0);
+            backLeftDrive.setPower(0);
+            backRightDrive.setPower(0);
+
+            shooter.setVelocity(getTickSpeed(SHOOTER_RPM));
+            if (isShooterAtSpeed()) {
+                blocker.setPosition(BLOCKER_UP_POS);
+                intake.setPower(0.5);
+            }
+            if(runtime.seconds() >= 7.5 ){
+                shooter.setPower(0);
+                intake.setPower(0);
+                blocker.setPosition(BLOCKER_DOWN_POS);
+            }
+            //ROTATE to INTAKE
+        } else if(isDriving && runtime.seconds() >= 8.25  && runtime.seconds() < 9.25 ) {
+            frontLeftDrive.setPower(-0.6);
+            backLeftDrive.setPower(-0.6);
+            frontRightDrive.setPower(0.6);
+            backRightDrive.setPower(0.6);
+            //DRIVE to INTAKE1
+        } else if(isDriving && runtime.seconds() >= 9.25  && runtime.seconds() < 10.75 ) {
+            frontLeftDrive.setPower(-0.625);
+            frontRightDrive.setPower(-0.625);
+            backLeftDrive.setPower(-0.625);
+            backRightDrive.setPower(-0.625);
+            if(runtime.seconds() >= 9 ){
+                intake.setPower(0.875);
+            }
+            //BACK to shoot
+        } else if(isDriving && runtime.seconds() >= 10.75  && runtime.seconds() < 12.25 ) {
+            frontLeftDrive.setPower(0.625);
+            frontRightDrive.setPower(0.625);
+            backLeftDrive.setPower(0.625);
+            backRightDrive.setPower(0.625);
+            intake.setPower(0);
+            //TURN to shoot, from intake1
+        } else if(isDriving && runtime.seconds() >= 12.25  && runtime.seconds() < 13.25 ) {
+            frontLeftDrive.setPower(0.6);
+            backLeftDrive.setPower(0.6);
+            frontRightDrive.setPower(-0.6);
+            backRightDrive.setPower(-0.6);
+            //Shoot sequence
+        } else if(isDriving && runtime.seconds() >= 13.25  && runtime.seconds() < 19.375 ) {
+            frontLeftDrive.setPower(0);
+            frontRightDrive.setPower(0);
+            backLeftDrive.setPower(0);
+            backRightDrive.setPower(0);
+
+            shooter.setVelocity(getTickSpeed(SHOOTER_RPM));
+            if (isShooterAtSpeed()) {
+                blocker.setPosition(BLOCKER_UP_POS);
+                intake.setPower(0.5);
+            }
+            if(runtime.seconds() >= 8.625 ){
+                shooter.setPower(0);
+                intake.setPower(0);
+                blocker.setPosition(BLOCKER_DOWN_POS);
+            }
+        } else if(isDriving && runtime.seconds() >= 19.375  && runtime.seconds() < 19.75 ) {
+            // Turn to bridge Intake 2
+            frontLeftDrive.setPower(-0.5);
+            backLeftDrive.setPower(-0.5);
+            frontRightDrive.setPower(0.5);
+            backRightDrive.setPower(0.5);
+        } else if(isDriving && runtime.seconds() >= 19.75  && runtime.seconds() < 20.25 ) {
+            // Drive to Intake 2 bridge point
+            frontLeftDrive.setPower(-0.75);
+            frontRightDrive.setPower(-0.75);
+            backLeftDrive.setPower(-0.75);
+            backRightDrive.setPower(-0.75);
+        } else if(isDriving && runtime.seconds() >= 20.25  && runtime.seconds() < 21 ) {
+            // Turn to intake 2, from bridge
+            frontLeftDrive.setPower(-0.65);
+            backLeftDrive.setPower(-0.65);
+            frontRightDrive.setPower(0.65);
+            backRightDrive.setPower(0.65);
+        } else if(isDriving && runtime.seconds() >= 21 && runtime.seconds() < 23.5 ) {
+            // Drive to intake 2
+            frontLeftDrive.setPower(-0.5);
+            frontRightDrive.setPower(-0.5);
+            backLeftDrive.setPower(-0.5);
+            backRightDrive.setPower(-0.5);
+            intake.setPower(0.875);
+            //Turn back to shoot, from intake2 compromised
+        } else if(isDriving && runtime.seconds() >= 23.5  && runtime.seconds() < 24 ) {
+            frontLeftDrive.setPower(0.5);
+            backLeftDrive.setPower(0.5);
+            frontRightDrive.setPower(-0.5);
+            backRightDrive.setPower(-0.5);
+            intake.setPower(0);
+            //Drive back to shoot
+        } else if(isDriving && runtime.seconds() >= 24 && runtime.seconds() < 25.5 ) {
+            frontLeftDrive.setPower(0.5);
+            frontRightDrive.setPower(0.5);
+            backLeftDrive.setPower(0.5);
+            backRightDrive.setPower(0.5);
+            //Turn to shoot
+        } else if(isDriving && runtime.seconds() >= 25.5  && runtime.seconds() < 26.25 ) {
+            frontLeftDrive.setPower(0.45);
+            backLeftDrive.setPower(0.45);
+            frontRightDrive.setPower(-0.45);
+            backRightDrive.setPower(-0.45);
+            //Shoot sequence
+        } else if(isDriving && runtime.seconds() >= 26.25  && runtime.seconds() < 32.625 ) {
+            frontLeftDrive.setPower(0);
+            frontRightDrive.setPower(0);
+            backLeftDrive.setPower(0);
+            backRightDrive.setPower(0);
+
+            shooter.setVelocity(getTickSpeed(SHOOTER_RPM));
+            if (isShooterAtSpeed()) {
+                blocker.setPosition(BLOCKER_UP_POS);
+                intake.setPower(0.5);
+            }
+            if(runtime.seconds() >= 31.875 ){
+                shooter.setPower(0);
+                intake.setPower(0);
+                blocker.setPosition(BLOCKER_DOWN_POS);
             }
         }
         
-        lastOdoX = odoX;
-        lastOdoY = odoY;
-    }
-    
-    @Override
-    public void loop() {
-        follower.update();
-        updateLocalization();
-        autonomousPathUpdate();
+        else if (isDriving) {
+            // Stop motors after 2 seconds
+            frontLeftDrive.setPower(0);
+            frontRightDrive.setPower(0);
+            backLeftDrive.setPower(0);
+            backRightDrive.setPower(0);
+            isDriving = false;
+        }
 
         // Telemetry
-        telemetry.addData("Path State", pathState);
-        telemetry.addData("Score State", scoreState);
-        telemetry.addData("X", follower.getPose().getX());
-        telemetry.addData("Y", follower.getPose().getY());
-        telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
-        telemetry.addData("Shooter RPM", shooter.getVelocity() * 60 / TICKS_PER_REV);
+        telemetry.addData("Status", isDriving ? "Driving" : "Stopped");
+        telemetry.addData("Time", "%.2f s", runtime.seconds());
         telemetry.update();
     }
 
     @Override
     public void stop() {
+        frontLeftDrive.setPower(0);
+        frontRightDrive.setPower(0);
+        backLeftDrive.setPower(0);
+        backRightDrive.setPower(0);
         shooter.setVelocity(0);
         intake.setPower(0);
     }
-
+    
     /**
      * Utility: Convert RPM to ticks per second
      */
-    public double getTickSpeed(double rpm) {
+    private double getTickSpeed(double rpm) {
         return rpm * TICKS_PER_REV / 60;
+    }
+    
+    /**
+     * Check if shooter is at target speed
+     */
+    private boolean isShooterAtSpeed() {
+        double currentRPM = shooter.getVelocity() * 60 / TICKS_PER_REV;
+        return Math.abs(currentRPM - SHOOTER_RPM) < RPM_TOLERANCE;
     }
 }

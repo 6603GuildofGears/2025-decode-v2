@@ -260,7 +260,7 @@
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: #FFD700;"></div>
-                    <span>AprilTags (Limelight)</span>
+                    <span>AprilTags (Goals)</span>
                 </div>
                 <div class="legend-item">
                     <div class="legend-color" style="background: #FF00FF; opacity: 0.3;"></div>
@@ -268,7 +268,7 @@
                 </div>
             </div>
             <p style="margin-top: 10px; font-size: 12px; color: #888;">
-                Note: Limelight uses AprilTags on red wall (24-27) for position correction (85% weight). Pinpoint odometry provides 15% weight.
+                Note: Goal AprilTags in top corners (Tag 20 Blue top-left, Tag 24 Red top-right). Limelight provides 85% position correction, Pinpoint odometry 15%.
             </p>
         </div>
     </div>
@@ -544,21 +544,22 @@
             drawSample(9, 132, '#00FF00');
             drawSample(132, 132, '#00FF00');
             
-            // AprilTags
-            drawAprilTag(135.24, 12, '27');
-            drawAprilTag(135.24, 35.25, '26');
-            drawAprilTag(135.24, 47.25, '24');
-            drawAprilTag(135.24, 70.5, '25');
+            // AprilTags (based on ftc2025DECODE.fmap)
+            // Blue Goal (Tag 20) - top-left corner
+            drawAprilTag(6, 6, '20', '#0000FF');
+            
+            // Red Goal (Tag 24) - top-right corner
+            drawAprilTag(135.24, 6, '24', '#FF0000');
         }
         
-        function drawAprilTag(x, y, id) {
-            ctx.fillStyle = '#FFD700';
+        function drawAprilTag(x, y, id, color = '#FFD700') {
+            ctx.fillStyle = color;
             ctx.fillRect((x - 2) * SCALE, (y - 2) * SCALE, 4 * SCALE, 4 * SCALE);
             ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 2;
             ctx.strokeRect((x - 2) * SCALE, (y - 2) * SCALE, 4 * SCALE, 4 * SCALE);
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 9px Arial';
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(id, x * SCALE, (y + 1) * SCALE);
             ctx.textAlign = 'left';
@@ -623,9 +624,9 @@
                 
                 ctx.restore();
                 
-                // Check if AprilTag 24 (Red Goal) is visible
+                // Check if AprilTag is visible (Tag 24 Red Goal in top-right corner)
                 const tagX = 135.24 * SCALE;
-                const tagY = 47.25 * SCALE;
+                const tagY = 6 * SCALE;
                 const dx = tagX - x;
                 const dy = tagY - y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -649,7 +650,7 @@
                     // Highlight AprilTag
                     ctx.strokeStyle = '#FF00FF';
                     ctx.lineWidth = 3;
-                    ctx.strokeRect((135.24 - 2) * SCALE, (47.25 - 2) * SCALE, 4 * SCALE, 4 * SCALE);
+                    ctx.strokeRect((135.24 - 2) * SCALE, (6 - 2) * SCALE, 4 * SCALE, 4 * SCALE);
                     
                     // Show localization correction indicator
                     ctx.fillStyle = '#FF00FF';

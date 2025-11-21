@@ -5,6 +5,7 @@ import com.pedropathing.geometry.*;
 import com.pedropathing.paths.*;
 import com.pedropathing.util.*;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -19,7 +20,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import java.util.List;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
+@Disabled
 @Autonomous(name = "Red - Far", group = "Competition")
 public class BlueFarAuto extends OpMode {
 
@@ -244,7 +245,9 @@ public class BlueFarAuto extends OpMode {
 
             case 1: // Score preload (2 samples) - skip settle & rev
                 if (!follower.isBusy()) {
-                    scoreState = 2;  // Skip settle and rev - already revving from start()
+                    if (scoreState == 0) {
+                        scoreState = 2;  // Skip settle and rev - already revving from start()
+                    }
                     scoreSequence();
                     if (scoringComplete()) {
                         resetScoring();
@@ -281,7 +284,9 @@ public class BlueFarAuto extends OpMode {
                 break;
 
             case 4: // Score first sample (shooter already at speed)
-                scoreState = 2;  // Skip settle and rev - already done
+                if (scoreState == 0) {
+                    scoreState = 2;  // Skip settle and rev - already done
+                }
                 scoreSequence();
                 if (scoringComplete()) {
                     resetScoring();
@@ -324,7 +329,9 @@ public class BlueFarAuto extends OpMode {
                 break;
 
             case 8: // Score second sample (shooter already at speed)
-                scoreState = 2;  // Skip settle and rev - already done
+                if (scoreState == 0) {
+                    scoreState = 2;  // Skip settle and rev - already done
+                }
                 scoreSequence();
                 if (scoringComplete()) {
                     resetScoring();
@@ -367,7 +374,9 @@ public class BlueFarAuto extends OpMode {
                 break;
 
             case 12: // Score third sample (shooter already revved)
-                scoreState = 2;  // Skip settle and rev - already done
+                if (scoreState == 0) {
+                    scoreState = 2;  // Skip settle and rev - already done
+                }
                 scoreSequence();
                 if (scoringComplete()) {
                     setPathState(-1); // Done

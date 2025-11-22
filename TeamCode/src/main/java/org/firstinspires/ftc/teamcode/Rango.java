@@ -268,10 +268,11 @@ public class Rango extends OpMode {
      */
     private void handleSubsystemControls() {
         // Intake motor control (simplified and corrected)
-        double rpm = 500;
+        double rpm = 3000;
+        
+        // Right bumper = full speed (NOTE: 'intake' variable is actually the shooter motor due to hardware swap)
         if (gamepad2.right_bumper) {
-            // intake.setVelocity(getTickSpeed(rpm));
-            intake.setPower(1.0);
+            intake.setVelocity(getTickSpeed(rpm)); // Full speed
         } else if (gamepad2.right_trigger > 0.1) { // Added a deadzone for the trigger
             intake.setVelocity(getTickSpeed(-rpm));
         } else {
@@ -282,12 +283,12 @@ public class Rango extends OpMode {
         if (gamepad2.a) {
             blocker.setPosition(0.175);
         } else {
-            blocker.setPosition(0.3);
+            blocker.setPosition(0.32);
         }
 
-        // Shooter motor control
-        if (gamepad2.left_bumper && gamepad2.right_bumper && gamepad2.a) {
-            shooter.setPower(-0.375);
+        // Shooter motor control - dpad_up for half speed (NOTE: 'shooter' variable is actually the intake motor due to hardware swap)
+        if (gamepad2.dpad_up) {
+            shooter.setPower(-0.4); // Half speed for feeding balls slowly (reversed)
         } else if (gamepad2.left_bumper) {
             shooter.setPower(-0.8);
         } else if (gamepad2.left_trigger > 0.1) { // Added a deadzone for the trigger

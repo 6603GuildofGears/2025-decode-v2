@@ -268,7 +268,7 @@ public class Rango extends OpMode {
      */
     private void handleSubsystemControls() {
         // Intake motor control (simplified and corrected)
-        double rpm = 3700;
+        double rpm = 500;
         if (gamepad2.right_bumper) {
             // intake.setVelocity(getTickSpeed(rpm));
             intake.setPower(1.0);
@@ -286,7 +286,9 @@ public class Rango extends OpMode {
         }
 
         // Shooter motor control
-        if (gamepad2.left_bumper) {
+        if (gamepad2.left_bumper && gamepad2.right_bumper && gamepad2.a) {
+            shooter.setPower(-0.375);
+        } else if (gamepad2.left_bumper) {
             shooter.setPower(-0.8);
         } else if (gamepad2.left_trigger > 0.1) { // Added a deadzone for the trigger
             shooter.setPower(0.6);

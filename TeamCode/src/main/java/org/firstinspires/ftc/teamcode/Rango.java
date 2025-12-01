@@ -54,9 +54,15 @@ public class Rango extends OpMode {
     private final double TICKS_PER_REV = 28;
     private final double gear = 1.0;  // Gear ratio for rotation speed
     
+    // PID coefficients for shooter stability (reduced P for less overshoot)
+    private static final double SHOOTER_P = 1.5;   // Proportional (lower = less aggressive)
+    private static final double SHOOTER_I = 0.15;  // Integral (helps eliminate steady-state error)
+    private static final double SHOOTER_D = 0.1;   // Derivative (dampens oscillation)
+    private static final double SHOOTER_F = 12.5;  // Feedforward (velocity control)
+    
     // Auto-aim constants (tunable via FTC Dashboard)
     public static double KP_ROTATE = 0.02;
-    public static double ROTATE_DEADBAND = 3.0;
+    public static double ROTATE_DEADBAND = 1.5;
     public static double MAX_AUTO_ROTATE_SPEED = 0.5;
     
     // Auto-aim state
@@ -101,9 +107,7 @@ public class Rango extends OpMode {
     // Red alliance tags (IDs 24, 25, 26, 27)
     private static final double[][] RED_TAG_POSITIONS = {
         {135.24, 47.25},   // Tag 24 - Red Goal
-        {135.24, 70.62},   // Tag 25 - Motif 21
-        {135.24, 93.99},   // Tag 26 - Motif 22
-        {135.24, 117.36}   // Tag 27 - Motif 23
+
     };
     
     private static final String[] RED_TAG_NAMES = {
@@ -158,21 +162,27 @@ public class Rango extends OpMode {
         blocker = hardwareMap.get(Servo.class, "blocker");
         imu = hardwareMap.get(IMU.class, "imu");
 
+
         // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
 
         // Drivetrain setup
-        frontLeftDrive.setDirection(DcMotorSimple.Direction.REVERSE);
-        backLeftDrive.setDirection(DcMotorSimple.Direction.FORWARD);
-
-        frontLeftDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        frontRightDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        backLeftDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        backRightDrive.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-
+        frontLeftDrive.setDirection(DcMotorEx.Direction.FORWARD);
+        backLeftDrive.setDirection(DcMotorEx.Direction.REVERSE);
+        frontRightDrive.setDirection(DcMotorEx.Direction.REVERSE);
+        backRightDrive.setDirection(DcMotorEx.Direction.REVERSE);
+            
+        frontLeftDrive.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+        frontRightDrive.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+        backLeftDrive.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
+        backRightDrive.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
         // Intake and Shooter setup
+        // NOTE: 'intake' variable is actually the shooter motor due to hardware swap
         intake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         intake.setDirection(DcMotorSimple.Direction.REVERSE);
+        
+        // Configure PID coefficients to reduce overshoot and oscillation on shooter
+        intake.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
 
         shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
@@ -268,10 +278,12 @@ public class Rango extends OpMode {
      */
     private void handleSubsystemControls() {
         // Intake motor control (simplified and corrected)
-        double rpm = 3000;
+        double rpm = 3300;
         
         // Right bumper = full speed (NOTE: 'intake' variable is actually the shooter motor due to hardware swap)
-        if (gamepad2.right_bumper) {
+        if(gamepad2.right_bumper && gamepad2.b) {
+            intake.setVelocity(getTickSpeed(rpm + 500)); // far zone
+        } else if (gamepad2.right_bumper) {
             intake.setVelocity(getTickSpeed(rpm)); // Full speed
         } else if (gamepad2.right_trigger > 0.1) { // Added a deadzone for the trigger
             intake.setVelocity(getTickSpeed(-rpm));
@@ -287,12 +299,12 @@ public class Rango extends OpMode {
         }
 
         // Shooter motor control - dpad_up for half speed (NOTE: 'shooter' variable is actually the intake motor due to hardware swap)
-        if (gamepad2.dpad_up) {
-            shooter.setPower(-0.4); // Half speed for feeding balls slowly (reversed)
+        if (gamepad2.left_bumper && gamepad2.a) { // Added a deadzone for the trigger
+            shooter.setPower(-0.4);
         } else if (gamepad2.left_bumper) {
             shooter.setPower(-0.8);
-        } else if (gamepad2.left_trigger > 0.1) { // Added a deadzone for the trigger
-            shooter.setPower(0.6);
+        }  else if (gamepad2.left_trigger > 0.1) { // Added a deadzone for the trigger
+            shooter.setPower(0.75);
         } else {
             shooter.setPower(0);
         }
@@ -302,8 +314,8 @@ public class Rango extends OpMode {
      * Handles the Mecanum drivetrain logic using gamepad 1.
      */
     private void handleDriveControls() {
-        double LStickY = -gamepad1.left_stick_x;  // Reversed forward/back
-        double LStickX = -gamepad1.left_stick_y;  // Reversed strafe
+        double LStickY = -gamepad1.left_stick_y;  // Reversed forward/back
+        double LStickX = -gamepad1.left_stick_x;  // Reversed strafe
         double RStickX = gamepad1.right_stick_x;  // Reversed turn
         
         boolean LBumper1 = gamepad1.left_bumper;
@@ -316,7 +328,7 @@ public class Rango extends OpMode {
         
         double gear = 1;
 
-        if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
+         if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
             double rotation = 0;
 
             double newX = -LStickX * Math.cos(rotation) - -LStickY * Math.sin(rotation);
@@ -324,12 +336,7 @@ public class Rango extends OpMode {
 
             double r = Math.hypot(newX, newY);
             double robotAngle = Math.atan2(newY, newX) - Math.PI / 4;
-            double rightX = RStickX;  // Use the stick value
-            
-            // Auto-aim override: rotate to face AprilTag if enabled and right stick centered
-            if (autoAimEnabled && Math.abs(RStickX) < 0.1) {
-                rightX = getAutoAimRotation();
-            }
+            double rightX = gamepad1.right_stick_x;  // Match RStickX direction
 
             double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
             double v2 = r * Math.sin(robotAngle) + rightX * gear; //rf
@@ -344,16 +351,9 @@ public class Rango extends OpMode {
         } else if (RBumper1) {
             SetPower(gear, -gear, -gear, gear);
 
-        } else if (dpadUp1) {
-            SetPower(1, 1, 1, 1);
-        } else if (dpadRight1) {
-            SetPower(1, -1, -1, 1);
-        } else if (dpadLeft1) {
-            SetPower(-1, 1, 1, -1);
-        } else if (dpadDown1) {
-            SetPower(-1, -1, -1, -1);
+      
 
-        } else {
+        }  else {
             // Auto-aim when joysticks are released - apply auto-rotation
             if (autoAimEnabled) {
                 double autoRotate = getAutoAimRotation();

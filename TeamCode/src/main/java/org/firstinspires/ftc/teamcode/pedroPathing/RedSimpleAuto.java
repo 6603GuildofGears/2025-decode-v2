@@ -5,6 +5,8 @@ package org.firstinspires.ftc.teamcode.pedroPathing;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -14,6 +16,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 /**
  * Simple Red Alliance Autonomous - Drive backwards for 2 seconds
  */
+@Disabled
 @Autonomous(name = "RED - Close Auto", group = "Red")
 public class RedSimpleAuto extends OpMode {
 

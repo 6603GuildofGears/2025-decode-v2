@@ -1,6 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
-// Red Alliance Autonomous
+// Blue Alliance Autonomous
 // NOTE: Uses dynamic voltage compensation for consistent performance
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -12,11 +12,11 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
- * Red Alliance Autonomous - PRIMARY CODE
+ * Blue Alliance Autonomous - PRIMARY CODE
  * Features dynamic voltage compensation for maximum consistency
  */
-@Autonomous(name = "RED - PRIMARY Auto", group = "Red")
-public class RedSimpleAutoAprilTag extends OpMode {
+@Autonomous(name = "BLUE - Far Auto", group = "Blue")
+public class Blue_Far extends OpMode {
 
     private DcMotor frontLeftDrive;
     private DcMotor frontRightDrive;
@@ -29,7 +29,7 @@ public class RedSimpleAutoAprilTag extends OpMode {
     private Servo blocker;
     
     // Constants
-    private static final double SHOOTER_RPM = 2900;
+    private static final double SHOOTER_RPM = 4500;
     private static final double TICKS_PER_REV = 28.0;  // GoBilda 5202/5203 encoder
     private static final double RPM_TOLERANCE = 300;
     private static final double BLOCKER_UP_POS = 0.175;    // Open position (inverted)
@@ -73,7 +73,7 @@ public class RedSimpleAutoAprilTag extends OpMode {
         // Set blocker to closed position
         blocker.setPosition(BLOCKER_DOWN_POS);
 
-        telemetry.addLine("RED PRIMARY Auto Initialized - Dynamic Voltage Compensation Enabled");
+        telemetry.addLine("BLUE PRIMARY Auto Initialized - Dynamic Voltage Compensation Enabled");
         telemetry.addData("Battery Voltage", "%.2f V", hardwareMap.voltageSensor.iterator().next().getVoltage());
         telemetry.addData("Target Voltage", "%.2f V", TARGET_VOLTAGE);
         telemetry.update();
@@ -87,146 +87,98 @@ public class RedSimpleAutoAprilTag extends OpMode {
 
     @Override
     public void loop() {
-        if (isDriving && runtime.seconds() < 1.586) {
-            // Drive backwards
-            frontLeftDrive.setPower(scalePower(-0.3875));
-            frontRightDrive.setPower(scalePower(-0.3875));
-            backLeftDrive.setPower(scalePower(-0.3875));
-            backRightDrive.setPower(scalePower(-0.3875));
+        if (isDriving && runtime.seconds() < 0.566) {
+            // turn to shoot (INVERTED)
 
-            //TURN to shoot, from start
-        } else if(isDriving && runtime.seconds() >= 1.586 && runtime.seconds() < 2.152 ) {
-            frontLeftDrive.setPower(scalePower(0.285));
-            frontRightDrive.setPower(scalePower(-0.285));
-            backLeftDrive.setPower(scalePower(0.285));
-            backRightDrive.setPower(scalePower(-0.285));
-            //SHOOT SEQUENCE
-        } else if(isDriving && runtime.seconds() >= 2.152 && runtime.seconds() < 7.477 ) {
+            frontLeftDrive.setPower(scalePower(-0.285));
+            frontRightDrive.setPower(scalePower(0.285));
+            backLeftDrive.setPower(scalePower(-0.285));
+            backRightDrive.setPower(scalePower(0.285));
+
+        } else if(isDriving && runtime.seconds() >= 0.566 && runtime.seconds() < 5.891 ) {
             frontLeftDrive.setPower(0);
             frontRightDrive.setPower(0);
             backLeftDrive.setPower(0);
             backRightDrive.setPower(0);
 
+//shoot
             shooter.setVelocity(getTickSpeed(SHOOTER_RPM) * getCurrentVoltageScale());
-            if (runtime.seconds() > 4.2) {
+            if (runtime.seconds() > 1.75) {
                 blocker.setPosition(BLOCKER_UP_POS);
-                intake.setPower(scalePower(0.35));
+                intake.setPower(scalePower(0.3));
             }
-            if(runtime.seconds() >= 6.794 ){
+            if(runtime.seconds() >= 5.8 ){
                 shooter.setPower(0);
                 intake.setPower(0);
                 blocker.setPosition(BLOCKER_DOWN_POS);
             }
-            //ROTATE to INTAKE
-        } else if(isDriving && runtime.seconds() >= 7.477  && runtime.seconds() < 8.383 ) {
+            //drive forward
+        } else if(isDriving && runtime.seconds() >= 5.89  && runtime.seconds() < 6.016 ) {
             shooter.setPower(0);
 
-            frontLeftDrive.setPower(scalePower(-0.448));
-            backLeftDrive.setPower(scalePower(-0.448));
+            frontLeftDrive.setPower(scalePower(0.448));
+            backLeftDrive.setPower(scalePower(0.448));
             frontRightDrive.setPower(scalePower(0.448));
             backRightDrive.setPower(scalePower(0.448));
 
-            intake.setPower(scalePower(1));
-            //DRIVE to INTAKE1
-        } else if(isDriving && runtime.seconds() >= 8.383  && runtime.seconds() < 9.742 ) {
+       
+            //rotat to intake 1 (INVERTED)
+        } else if(isDriving && runtime.seconds() >= 6.016 && runtime.seconds() < 6.767 ) {
+            frontLeftDrive.setPower(scalePower(0.4));
+            frontRightDrive.setPower(scalePower(-0.4));
+            backLeftDrive.setPower(scalePower(0.4));
+            backRightDrive.setPower(scalePower(-0.4));
+
+            //drive to intake
+        } else if(isDriving && runtime.seconds() >= 6.767  && runtime.seconds() < 8.767 ) {
             frontLeftDrive.setPower(scalePower(-0.4));
             frontRightDrive.setPower(scalePower(-0.4));
             backLeftDrive.setPower(scalePower(-0.4));
             backRightDrive.setPower(scalePower(-0.4));
-
-            //BACK to shoot
-        } else if(isDriving && runtime.seconds() >= 9.742  && runtime.seconds() < 11.101 ) {
-            frontLeftDrive.setPower(scalePower(0.4));
-            frontRightDrive.setPower(scalePower(0.4));
-            backLeftDrive.setPower(scalePower(0.4));
-            backRightDrive.setPower(scalePower(0.4));
+            intake.setPower(0.75);
+            //back to shoot
+        } else if(isDriving && runtime.seconds() >= 8.767  && runtime.seconds() < 10.767 ) {
             intake.setPower(0);
-            //TURN to shoot, from intake1
-        } else if(isDriving && runtime.seconds() >= 11.101  && runtime.seconds() < 12.007 ) {
-            frontLeftDrive.setPower(scalePower(0.4375));
-            backLeftDrive.setPower(scalePower(0.46));
-            frontRightDrive.setPower(scalePower(-0.46));
-            backRightDrive.setPower(scalePower(-0.4375));
-            //Shoot sequence
-        } else if(isDriving && runtime.seconds() >= 12.007  && runtime.seconds() < 17.551 ) {
+            frontLeftDrive.setPower(scalePower(0.4));
+            backLeftDrive.setPower(scalePower(0.4));
+            frontRightDrive.setPower(scalePower(0.4));
+            backRightDrive.setPower(scalePower(0.4));
+
+
+            //rotae to shoot (INVERTED)
+        } else if (isDriving && runtime.seconds()  >= 10.767  && runtime.seconds() <11.517){
+              frontLeftDrive.setPower(scalePower(-0.4));
+            frontRightDrive.setPower(scalePower(0.4));
+            backLeftDrive.setPower(scalePower(-0.4));
+            backRightDrive.setPower(scalePower(0.4));
+        
+        
+        // shoot 
+        }else if(isDriving && runtime.seconds() >= 11.517  && runtime.seconds() < 16.767 ) {
             frontLeftDrive.setPower(0);
             frontRightDrive.setPower(0);
             backLeftDrive.setPower(0);
             backRightDrive.setPower(0);
 
             shooter.setVelocity(getTickSpeed(SHOOTER_RPM) * getCurrentVoltageScale());
-            if (runtime.seconds() > 13.7) {
+            if (runtime.seconds() > 12) {
                 blocker.setPosition(BLOCKER_UP_POS);
-                intake.setPower(scalePower(0.35));
+                intake.setPower(scalePower(0.4));
             }
-            if(runtime.seconds() >= 16.758 ){
+            if(runtime.seconds() >= 16.67 ){
                 shooter.setPower(0);
                 intake.setPower(0);
                 blocker.setPosition(BLOCKER_DOWN_POS);
             }
-        } else if(isDriving && runtime.seconds() >= 17.551  && runtime.seconds() < 17.891 ) {
-            // Turn to bridge Intake 2
+        } else if(isDriving && runtime.seconds() >= 16.767  && runtime.seconds() < 17.267 ) {
+            // drive Forward 
             shooter.setPower(0);
 
-            frontLeftDrive.setPower(scalePower(-0.355));
-            backLeftDrive.setPower(scalePower(-0.355));
+            frontLeftDrive.setPower(scalePower(0.355));
+            backLeftDrive.setPower(scalePower(0.355));
             frontRightDrive.setPower(scalePower(0.355));
             backRightDrive.setPower(scalePower(0.355));
-        } else if(isDriving && runtime.seconds() >= 17.891  && runtime.seconds() < 18.344 ) {
-            // Drive to Intake 2 bridge point
-            frontLeftDrive.setPower(scalePower(-0.5));
-            frontRightDrive.setPower(scalePower(-0.5));
-            backLeftDrive.setPower(scalePower(-0.5));
-            backRightDrive.setPower(scalePower(-0.5));
-        } else if(isDriving && runtime.seconds() >= 18.344  && runtime.seconds() < 19.023 ) {
-            // Turn to intake 2, from bridge
-            frontLeftDrive.setPower(scalePower(-0.455));
-            backLeftDrive.setPower(scalePower(-0.455));
-            frontRightDrive.setPower(scalePower(0.455));
-            backRightDrive.setPower(scalePower(0.455));
-        } else if(isDriving && runtime.seconds() >= 19.023 && runtime.seconds() < 21.288 ) {
-            // Drive to intake 2
-            frontLeftDrive.setPower(scalePower(-0.3));
-            frontRightDrive.setPower(scalePower(-0.3));
-            backLeftDrive.setPower(scalePower(-0.3));
-            backRightDrive.setPower(scalePower(-0.3));
-            intake.setPower(scalePower(0.875));
-            //Turn back to shoot, from intake2 compromised
-        } else if(isDriving && runtime.seconds() >= 21.288  && runtime.seconds() < 21.741 ) {
-            frontLeftDrive.setPower(scalePower(0.2));
-            backLeftDrive.setPower(scalePower(0.2));
-            frontRightDrive.setPower(scalePower(-0.2));
-            backRightDrive.setPower(scalePower(-0.2));
-            intake.setPower(0);
-            //Drive back to shoot
-        } else if(isDriving && runtime.seconds() >= 21.741 && runtime.seconds() < 23.099 ) {
-            frontLeftDrive.setPower(scalePower(0.42));
-            frontRightDrive.setPower(scalePower(0.42));
-            backLeftDrive.setPower(scalePower(0.42));
-            backRightDrive.setPower(scalePower(0.42));
-            //Turn to shoot
-        } else if(isDriving && runtime.seconds() >= 23.099  && runtime.seconds() < 23.778 ) {
-            frontLeftDrive.setPower(scalePower(0.466));
-            backLeftDrive.setPower(scalePower(0.466));
-            frontRightDrive.setPower(scalePower(-0.466));
-            backRightDrive.setPower(scalePower(-0.466));
-            //Shoot sequence
-        } else if(isDriving && runtime.seconds() >= 23.778  && runtime.seconds() < 29.545 ) {
-            frontLeftDrive.setPower(0);
-            frontRightDrive.setPower(0);
-            backLeftDrive.setPower(0);
-            backRightDrive.setPower(0);
-
-            shooter.setVelocity(getTickSpeed(SHOOTER_RPM) * getCurrentVoltageScale());
-            if (runtime.seconds() > 25.6) {
-                blocker.setPosition(BLOCKER_UP_POS);
-                intake.setPower(scalePower(0.35));
-            }
-            if(runtime.seconds() >= 28.872 ){
-                shooter.setPower(0);
-                intake.setPower(0);
-                blocker.setPosition(BLOCKER_DOWN_POS);
-            }
+        
         } else if (isDriving) {
             // Stop motors after 2 seconds
             frontLeftDrive.setPower(0);

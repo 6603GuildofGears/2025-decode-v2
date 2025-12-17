@@ -24,31 +24,33 @@ public class Servo_Pipeline {
     public Servo_Pipeline(OpMode opMode) {
 
         //turret servo
-        turret = opMode.hardwareMap.get(Servo.class, "turret");
+        try { turret = opMode.hardwareMap.get(Servo.class, "turret"); } catch (Exception e) { opMode.telemetry.addData("Warning", "turret servo not found"); }
 
 
         //Hood servo
-        hood = opMode.hardwareMap.get(Servo.class, "hood");
+        try { hood = opMode.hardwareMap.get(Servo.class, "hood"); } catch (Exception e) { opMode.telemetry.addData("Warning", "hood servo not found"); }
         
 
         //flicker servo's
-        flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1");
-        flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2");
-        flicker3 = opMode.hardwareMap.get(Servo.class, "flicker3");
+        try { flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); } catch (Exception e) { opMode.telemetry.addData("Warning", "flicker1 servo not found"); }
+        try { flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2"); } catch (Exception e) { opMode.telemetry.addData("Warning", "flicker2 servo not found"); }
+        try { flicker3 = opMode.hardwareMap.get(Servo.class, "flicker3"); } catch (Exception e) { opMode.telemetry.addData("Warning", "flicker3 servo not found"); }
 
 
         //turret servo direction
-        turret.setDirection(Servo.Direction.FORWARD);
+        if (turret != null) turret.setDirection(Servo.Direction.FORWARD);
 
 
         //hood servo direction
-        hood.setDirection(Servo.Direction.FORWARD);
+        if (hood != null) hood.setDirection(Servo.Direction.FORWARD);
 
 
         //flicker servo directions
-        flicker1.setDirection(Servo.Direction.FORWARD); 
-        flicker2.setDirection(Servo.Direction.FORWARD);
-        flicker3.setDirection(Servo.Direction.FORWARD);
+        if (flicker1 != null) flicker1.setDirection(Servo.Direction.FORWARD); 
+        if (flicker2 != null) flicker2.setDirection(Servo.Direction.FORWARD);
+        if (flicker3 != null) flicker3.setDirection(Servo.Direction.FORWARD);
 
 
     }
+
+}

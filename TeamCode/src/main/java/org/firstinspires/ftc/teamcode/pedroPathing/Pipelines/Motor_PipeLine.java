@@ -11,70 +11,70 @@ public class Motor_PipeLine {
 
 
     //drive motors
-    static DcMotorEx frontLeft;
-    static DcMotorEx frontRight;
-    static DcMotorEx backRight;
-    static DcMotorEx backLeft;
+    public static DcMotorEx frontLeft;
+    public static DcMotorEx frontRight;
+    public static DcMotorEx backRight;
+    public static DcMotorEx backLeft;
 
     // flywheel/intake motors
-    static DcMotorEx flywheel;
-    static DcMotorEx intake;
+    public static DcMotorEx flywheel;
+    public static DcMotorEx intake;
 
     //lift motors
-    static DcMotorEx liftLeft;
-    static DcMotorEx liftRight;
+    public static DcMotorEx liftLeft;
+    public static DcMotorEx liftRight;
 
 
     public Motor_PipeLine(OpMode opMode) {
 
         //drive motors
-        frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft");
-        frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
-        backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
-        backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
+        try { frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft"); } catch (Exception e) { opMode.telemetry.addData("Warning", "frontLeft motor not found"); }
+        try { frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight"); } catch (Exception e) { opMode.telemetry.addData("Warning", "frontRight motor not found"); }
+        try { backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight"); } catch (Exception e) { opMode.telemetry.addData("Warning", "backRight motor not found"); }
+        try { backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft"); } catch (Exception e) { opMode.telemetry.addData("Warning", "backLeft motor not found"); }
 
         // flywheel/intake motors
-        flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
-        intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+        try { flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel"); } catch (Exception e) { opMode.telemetry.addData("Warning", "flywheel motor not found"); }
+        try { intake = opMode.hardwareMap.get(DcMotorEx.class, "intake"); } catch (Exception e) { opMode.telemetry.addData("Warning", "intake motor not found"); }
 
         //lift motors
-        liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
-        liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
+        try { liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft"); } catch (Exception e) { opMode.telemetry.addData("Warning", "liftLeft motor not found"); }
+        try { liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight"); } catch (Exception e) { opMode.telemetry.addData("Warning", "liftRight motor not found"); }
 
 
         //drive motor directions
-        frontLeft.setDirection(DcMotor.Direction.FORWARD); 
-        frontRight.setDirection(DcMotor.Direction.REVERSE);
-        backRight.setDirection(DcMotor.Direction.REVERSE);
-        backLeft.setDirection(DcMotor.Direction.FORWARD);
+        if (frontLeft != null) frontLeft.setDirection(DcMotor.Direction.FORWARD); 
+        if (frontRight != null) frontRight.setDirection(DcMotor.Direction.FORWARD);
+        if (backRight != null) backRight.setDirection(DcMotor.Direction.FORWARD);
+        if (backLeft != null) backLeft.setDirection(DcMotor.Direction.FORWARD);
 
    
 
         //flywheel and intake motor directions
-        flywheel.setDirection(DcMotor.Direction.FORWARD);
-        intake.setDirection(DcMotor.Direction.FORWARD);
+        if (flywheel != null) flywheel.setDirection(DcMotor.Direction.FORWARD);
+        if (intake != null) intake.setDirection(DcMotor.Direction.FORWARD);
 
 
        //lift motor directions
-        liftLeft.setDirection(DcMotor.Direction.FORWARD);   
-        liftRight.setDirection(DcMotor.Direction.REVERSE);
+        if (liftLeft != null) liftLeft.setDirection(DcMotor.Direction.FORWARD);   
+        if (liftRight != null) liftRight.setDirection(DcMotor.Direction.REVERSE);
 
 
         //set all motors to zero power behavior to BRAKE
-        frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
-        backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (frontLeft != null) frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (frontRight != null) frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        if (backRight != null) backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (backLeft != null) backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
         //flywheel and intake
-        flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (flywheel != null) flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (intake != null) intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
         //lift motors
-        liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
-        liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        if (liftLeft != null) liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        if (liftRight != null) liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
     }
 

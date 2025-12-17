@@ -3,8 +3,8 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Motor_PipeLine;
-import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Servo_Pipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 
 
 @TeleOp(name="V2 TeleOp", group="TeleOp")
@@ -13,12 +13,15 @@ public class V2Teleop extends LinearOpMode {
 
 
     @Override 
-    public void runOpMode() thrpows InterruptedException {
+    public void runOpMode() throws InterruptedException {
 
-        Motor_PipeLine motors = new Motor_PipeLine(this);
+        // piplines 
+
+        Motor_PipeLine motors = new Motor_PipeLine(this);   
         Servo_Pipeline servos = new Servo_Pipeline(this);
-        intMotors(this);
 
+        telemetry.addData("Status", "Hardware initialized");
+        telemetry.update();
 
 
         // put all initlization code here
@@ -93,43 +96,62 @@ public class V2Teleop extends LinearOpMode {
                 }
                 */
 
-                    double newX = -LStickX * Math.cos(rotation) - -LStickY * Math.sin(rotation); //Angle Difference Identity
-                    double newY = LStickY * Math.cos(rotation) - -LStickX * Math.sin(rotation); //Trigonometry
+                    double newX = -RStickX * Math.cos(rotation) - -LStickY * Math.sin(rotation); //Angle Difference Identity
+                    double newY = LStickY * Math.cos(rotation) - -RStickX * Math.sin(rotation); //Trigonometry
 
                     double r = Math.hypot(newX, newY);
                     double robotAngle = Math.atan2(newY, newX) - Math.PI / 4;
-                    double rightX = -gamepad1.right_stick_x;
+                    double LeftX = LStickX;
+                    double rightX = RStickX;
 
-                    double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
-                    double v2 = r * Math.sin(robotAngle) + rightX * gear; //rf
-                    double v3 = r * Math.sin(robotAngle) - rightX * gear; //lb
-                    double v4 = r * Math.cos(robotAngle) - rightX * gear; //rb
+                    double v1 = r * Math.cos(robotAngle) + LeftX * gear; //lf
+                    double v2 = r * Math.sin(robotAngle) + LeftX * gear; //rf
+                    double v3 = r * Math.sin(robotAngle) - LeftX * gear; //lb
+                    double v4 = r * Math.cos(robotAngle) - LeftX * gear; //rb
+
+                    double v5 = r * Math.cos(robotAngle) + rightX * gear; //lf
+                    double v6 = r * Math.sin(robotAngle) + rightX * gear; //rf
+                    double v7 = r * Math.sin(robotAngle) - rightX * gear; //lb
+                    double v8 = r * Math.cos(robotAngle) - rightX * gear; //rb
 
 
-                    SetPower(v1, v2, v3, v4);
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v1);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(v2);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v3);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v4);
 
-
-                } else if (LBumper1) {
-                    SetPower(-gear, gear, gear, -gear);
-
-                } else if (RBumper1) {
-                    SetPower(gear, -gear, -gear, gear);
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v5);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(v6);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v7);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v8);
 
                 }  else if (dpadUp1) {
-                    SetPower(1 , 1 , 1 , 1 ); //0.3
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(1);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(1);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(1);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(1); //0.3
                 } else if (dpadRight1) {
-                    SetPower(1, -1, -1, 1); //0.5
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(-1);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(-1);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(-1);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(-1); //0.5
                 } else if (dpadLeft1) {
-                    SetPower(-1, 1, 1, -1);
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(1);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(1);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(1);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(1);
                 } else if (dpadDown1) {
-                    SetPower(-1, -1, -1, -1);
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(-1);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(-1);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(-1);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(-1);
 
 
                 } else {
-                    frontLeft.setPower(0);
-                    backLeft.setPower(0);
-                    frontRight.setPower(0);
-                    backRight.setPower(0);
+                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(0);
+                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(0);
+                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(0);
+                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(0);
                 }
 
 
@@ -137,12 +159,13 @@ public class V2Teleop extends LinearOpMode {
                 // AUXILIARY CODE
 
 
-              
-
 
 
  
  
- 
+        }
+
+    }
+
  }
 

@@ -84,7 +84,7 @@ public class V2Teleop extends LinearOpMode {
             // Drive code 
 
             
-                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
+                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0) {
                     //Orientation angles = imu.getAngularOrientation();
                     double rotation = 0; //Math.toRadians(angles.firstAngle);
                 /*
@@ -109,10 +109,6 @@ public class V2Teleop extends LinearOpMode {
                     double v3 = r * Math.sin(robotAngle) - LeftX * gear; //lb
                     double v4 = r * Math.cos(robotAngle) - LeftX * gear; //rb
 
-                    double v5 = r * Math.cos(robotAngle) + rightX * gear; //lf
-                    double v6 = r * Math.sin(robotAngle) + rightX * gear; //rf
-                    double v7 = r * Math.sin(robotAngle) - rightX * gear; //lb
-                    double v8 = r * Math.cos(robotAngle) - rightX * gear; //rb
 
 
                     if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v1);
@@ -120,12 +116,21 @@ public class V2Teleop extends LinearOpMode {
                     if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v3);
                     if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v4);
 
+                } else if (Math.abs(RStickX) > 0) {
+                    // Pure turning with right stick X
+                    double rightX = RStickX;0
+
+                    double v5 = rightX * gear; //lf
+                    double v6 = -rightX * gear; //rf
+                    double v7 = rightX * gear; //lb
+                    double v8 = -rightX * gear; //rb
+
                     if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v5);
                     if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(v6);
                     if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v7);
                     if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v8);
 
-                }  else if (dpadUp1) {
+                } else if (dpadUp1) {
                     if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(1);
                     if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(1);
                     if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(1);

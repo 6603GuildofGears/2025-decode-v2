@@ -7,8 +7,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 
 
-@TeleOp(name="V2 TeleOp", group="TeleOp")
-public class V2Teleop extends LinearOpMode {
+@TeleOp(name="RIOT", group="TeleOp")
+public class RIOT extends LinearOpMode {
 
 
 
@@ -118,7 +118,7 @@ public class V2Teleop extends LinearOpMode {
 
                 } else if (Math.abs(RStickX) > 0) {
                     // Pure turning with right stick X
-                    double rightX = RStickX;0
+                    double rightX = RStickX;
 
                     double v5 = rightX * gear; //lf
                     double v6 = -rightX * gear; //rf
@@ -173,4 +173,3 @@ public class V2Teleop extends LinearOpMode {
     }
 
  }
-

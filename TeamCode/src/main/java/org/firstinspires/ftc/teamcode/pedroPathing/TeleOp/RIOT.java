@@ -84,7 +84,7 @@ public class RIOT extends LinearOpMode {
             // Drive code 
 
             
-                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0) {
+                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
                     //Orientation angles = imu.getAngularOrientation();
                     double rotation = 0; //Math.toRadians(angles.firstAngle);
                 /*
@@ -107,57 +107,37 @@ public class RIOT extends LinearOpMode {
                     double v1 = r * Math.cos(robotAngle) + LeftX * gear; //lf
                     double v2 = r * Math.sin(robotAngle) + LeftX * gear; //rf
                     double v3 = r * Math.sin(robotAngle) - LeftX * gear; //lb
-                    double v4 = r * Math.cos(robotAngle) - LeftX * gear; //rb
+                    double v4 = r * Math.cos(robotAngle) -LeftX * gear; //rb
 
 
 
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v1);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(v2);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v3);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v4);
+                  Motor_PipeLine.SetPower(v1, v3, v2, v4);
 
-                } else if (Math.abs(RStickX) > 0) {
-                    // Pure turning with right stick X
-                    double rightX = RStickX;
 
-                    double v5 = rightX * gear; //lf
-                    double v6 = -rightX * gear; //rf
-                    double v7 = rightX * gear; //lb
-                    double v8 = -rightX * gear; //rb
 
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(v5);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(v6);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(v7);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(v8);
+                } else if (LBumper1) {
+                    SetPower(-gear, gear, gear, -gear);
 
-                } else if (dpadUp1) {
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(1);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(1);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(1);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(1); //0.3
+                } else if (RBumper1) {
+                    SetPower(gear, -gear, -gear, gear);
+
+                }  else if (dpadUp1) {
+                    SetPower(1 , 1 , 1 , 1 ); //0.3
                 } else if (dpadRight1) {
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(-1);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(-1);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(-1);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(-1); //0.5
+                    SetPower(1, -1, -1, 1); //0.5
                 } else if (dpadLeft1) {
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(1);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(1);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(1);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(1);
+                    SetPower(-1, 1, 1, -1);
                 } else if (dpadDown1) {
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(-1);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(-1);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(-1);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(-1);
+                    SetPower(-1, -1, -1, -1);
 
 
                 } else {
-                    if (Motor_PipeLine.frontLeft != null) Motor_PipeLine.frontLeft.setPower(0);
-                    if (Motor_PipeLine.backLeft != null) Motor_PipeLine.backLeft.setPower(0);
-                    if (Motor_PipeLine.frontRight != null) Motor_PipeLine.frontRight.setPower(0);
-                    if (Motor_PipeLine.backRight != null) Motor_PipeLine.backRight.setPower(0);
+                    frontLeft.setPower(0);
+                    backLeft.setPower(0);
+                    frontRight.setPower(0);
+                    backRight.setPower(0);
                 }
+
 
 
 

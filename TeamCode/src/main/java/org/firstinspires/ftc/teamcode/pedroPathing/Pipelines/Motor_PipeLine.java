@@ -113,6 +113,15 @@ public class Motor_PipeLine {
 
     }
 
+     public static void SetPower(double LFPower, double LBPower, double RFPower, double RBPower) {
+
+        //the names are right but it was buging
+        frontLeft.setPower(LFPower);
+        backLeft.setPower(LBPower);
+        frontRight.setPower(RFPower);
+        backRight.setPower(RBPower);
+    }
+
 
 
 }

@@ -100,13 +100,12 @@ public class RIOT extends LinearOpMode {
 
                     double r = Math.hypot(LStickX, LStickY);
                     double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
-                    double LeftX = LStickX;
                     double rightX = RStickX;
 
-                    double v1 = r * Math.cos(robotAngle) + LeftX * gear; //lf
-                    double v2 = r * Math.sin(robotAngle) + LeftX * gear; //rf
-                    double v3 = r * Math.sin(robotAngle) - LeftX * gear; //lb
-                    double v4 = r * Math.cos(robotAngle) -LeftX * gear; //rb
+                    double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
+                    double v2 = r * Math.sin(robotAngle) + rightX * gear; //rf
+                    double v3 = r * Math.sin(robotAngle) - rightX * gear; //lb
+                    double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
 
 

@@ -43,7 +43,7 @@ public class RIOT extends LinearOpMode {
                 boolean RBumper1 = gamepad1.right_bumper;
 
                 double LStickY = gamepad1.left_stick_y;
-                double LStickX = gamepad1.left_stick_x;
+                double LStickX = -gamepad1.left_stick_x;
                 double RStickY = -gamepad1.right_stick_y;
                 double RStickX = -gamepad1.right_stick_x;
 
@@ -103,9 +103,9 @@ public class RIOT extends LinearOpMode {
                     double rightX = RStickX;
 
                     double v1 = r * Math.sin(robotAngle) + rightX * gear; //lf
-                    double v2 = r * Math.cos(robotAngle) - rightX * gear; //rf
+                    double v2 = r * Math.sin(robotAngle) - rightX * gear; //rf
                     double v3 = r * Math.cos(robotAngle) + rightX * gear; //lb
-                    double v4 = r * Math.sin(robotAngle) -rightX * gear; //rb
+                    double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
 
 

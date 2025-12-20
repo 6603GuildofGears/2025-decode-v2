@@ -43,10 +43,10 @@ public class Motor_PipeLine {
 
 
         //drive motor directions
-       frontLeft.setDirection(DcMotor.Direction.FORWARD); 
-       frontRight.setDirection(DcMotor.Direction.FORWARD);
-       backRight.setDirection(DcMotor.Direction.FORWARD);
-       backLeft.setDirection(DcMotor.Direction.FORWARD);
+       frontLeft.setDirection(DcMotor.Direction.REVERSE); 
+       frontRight.setDirection(DcMotor.Direction.REVERSE);
+       backRight.setDirection(DcMotor.Direction.REVERSE);
+       backLeft.setDirection(DcMotor.Direction.REVERSE);
 
    
 

@@ -17,9 +17,8 @@ public class RIOT extends LinearOpMode {
 
         // piplines 
 
-        int Motor_PipeLine.
-        int Servo_Pipeline.
-        int(this);
+        intMotors(this);
+        intServos(this);
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();

@@ -19,6 +19,7 @@ public class RIOT extends LinearOpMode {
 
         Motor_PipeLine motors = new Motor_PipeLine(this);   
         Servo_Pipeline servos = new Servo_Pipeline(this);
+        int(this);
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();
@@ -111,7 +112,7 @@ public class RIOT extends LinearOpMode {
 
 
 
-                  Motor_PipeLine.SetPower(v1, v3, v2, v4);
+                  SetPower(v1, v3, v2, v4);
 
 
 

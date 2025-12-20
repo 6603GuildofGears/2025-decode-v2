@@ -16,13 +16,13 @@ public class Motor_PipeLine {
     public static DcMotorEx backRight;
     public static DcMotorEx backLeft;
 
-    // flywheel/intake motors
-    public static DcMotorEx flywheel;
-    public static DcMotorEx intake;
+    // // flywheel/intake motors
+    // public static DcMotorEx flywheel;
+    // public static DcMotorEx intake;
 
-    //lift motors
-    public static DcMotorEx liftLeft;
-    public static DcMotorEx liftRight;
+    // //lift motors
+    // public static DcMotorEx liftLeft;
+    // public static DcMotorEx liftRight;
 
 
     public Motor_PipeLine(OpMode opMode) {
@@ -33,13 +33,13 @@ public class Motor_PipeLine {
        backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
        backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
 
-        // flywheel/intake motors
-        flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
-        intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+        // // flywheel/intake motors
+        // flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
+        // intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
 
-        //lift motors
-        liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
-        liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
+        // //lift motors
+        // liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
+        // liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
 
 
         //drive motor directions
@@ -50,14 +50,14 @@ public class Motor_PipeLine {
 
    
 
-        //flywheel and intake motor directions
-       flywheel.setDirection(DcMotor.Direction.FORWARD);
-       intake.setDirection(DcMotor.Direction.FORWARD);
+    //     //flywheel and intake motor directions
+    //    flywheel.setDirection(DcMotor.Direction.FORWARD);
+    //    intake.setDirection(DcMotor.Direction.FORWARD);
 
 
-       //lift motor directions
-       liftLeft.setDirection(DcMotor.Direction.FORWARD);   
-       liftRight.setDirection(DcMotor.Direction.REVERSE);
+    //    //lift motor directions
+    //    liftLeft.setDirection(DcMotor.Direction.FORWARD);   
+    //    liftRight.setDirection(DcMotor.Direction.REVERSE);
 
 
         //set all motors to zero power behavior to BRAKE
@@ -67,14 +67,14 @@ public class Motor_PipeLine {
         backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
-        //flywheel and intake
-        flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // //flywheel and intake
+        // flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
-        //lift motors
-        liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
-        liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // //lift motors
+        // liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        // liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
     }
 
@@ -87,13 +87,13 @@ public class Motor_PipeLine {
         backLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
 
-        // flywheel and intake motors
-        flywheel.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);  
-        intake.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        // // flywheel and intake motors
+        // flywheel.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);  
+        // intake.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        // lift motors
-        liftLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);   
-        liftRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        // // lift motors
+        // liftLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);   
+        // liftRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
 
         // set all motors to run using encoders
@@ -104,12 +104,12 @@ public class Motor_PipeLine {
 
 
         // flywheel and intake motors
-        flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        intake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // intake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        // lift motors
-        liftLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        liftRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // // lift motors
+        // liftLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // liftRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
     }
 
@@ -130,13 +130,13 @@ public class Motor_PipeLine {
        backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
        backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
 
-        // flywheel/intake motors
-        flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
-        intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+        // // flywheel/intake motors
+        // flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
+        // intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
 
-        //lift motors
-        liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
-        liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
+        // //lift motors
+        // liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
+        // liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
 
 
         //drive motor directions
@@ -147,14 +147,14 @@ public class Motor_PipeLine {
 
    
 
-        //flywheel and intake motor directions
-       flywheel.setDirection(DcMotor.Direction.FORWARD);
-       intake.setDirection(DcMotor.Direction.FORWARD);
+    //     //flywheel and intake motor directions
+    //    flywheel.setDirection(DcMotor.Direction.FORWARD);
+    //    intake.setDirection(DcMotor.Direction.FORWARD);
 
 
-       //lift motor directions
-       liftLeft.setDirection(DcMotor.Direction.FORWARD);   
-       liftRight.setDirection(DcMotor.Direction.REVERSE);
+    //    //lift motor directions
+    //    liftLeft.setDirection(DcMotor.Direction.FORWARD);   
+    //    liftRight.setDirection(DcMotor.Direction.REVERSE);
 
 
         //set all motors to zero power behavior to BRAKE
@@ -164,14 +164,14 @@ public class Motor_PipeLine {
         backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
-        //flywheel and intake
-        flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // //flywheel and intake
+        // flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
-        //lift motors
-        liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
-        liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // //lift motors
+        // liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        // liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
     }
 

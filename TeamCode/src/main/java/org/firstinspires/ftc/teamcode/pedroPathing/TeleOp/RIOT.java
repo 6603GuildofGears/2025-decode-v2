@@ -103,8 +103,8 @@ public class RIOT extends LinearOpMode {
                     double rightX = RStickX;
 
                     double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
-                    double v2 = r * Math.sin(robotAngle) + rightX * gear; //rf
-                    double v3 = r * Math.sin(robotAngle) - rightX * gear; //lb
+                    double v2 = r * Math.sin(robotAngle) - rightX * gear; //rf
+                    double v3 = r * Math.sin(robotAngle) + rightX * gear; //lb
                     double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
 

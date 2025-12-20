@@ -96,11 +96,10 @@ public class RIOT extends LinearOpMode {
                 }
                 */
 
-                    double newX = -RStickX * Math.cos(rotation) - -LStickY * Math.sin(rotation); //Angle Difference Identity
-                    double newY = LStickY * Math.cos(rotation) - -RStickX * Math.sin(rotation); //Trigonometry
+                  
 
-                    double r = Math.hypot(newX, newY);
-                    double robotAngle = Math.atan2(newY, newX) - Math.PI / 4;
+                    double r = Math.hypot(LStickX, LStickY);
+                    double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
                     double LeftX = LStickX;
                     double rightX = RStickX;
 

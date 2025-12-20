@@ -122,11 +122,60 @@ public class Motor_PipeLine {
         backRight.setPower(RBPower);
     }
 
-    public static void intMotors() {
+    public static void intMotors(OpMode opMode) {
         int Motor_PipeLine;
 
+        
 
-    
+        //drive motors
+       frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft"); 
+       frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
+       backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
+       backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
+
+        // flywheel/intake motors
+        flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
+        intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+
+        //lift motors
+        liftLeft = opMode.hardwareMap.get(DcMotorEx.class, "liftLeft");
+        liftRight = opMode.hardwareMap.get(DcMotorEx.class, "liftRight");
+
+
+        //drive motor directions
+       frontLeft.setDirection(DcMotor.Direction.FORWARD); 
+       frontRight.setDirection(DcMotor.Direction.FORWARD);
+       backRight.setDirection(DcMotor.Direction.FORWARD);
+       backLeft.setDirection(DcMotor.Direction.FORWARD);
+
+   
+
+        //flywheel and intake motor directions
+       flywheel.setDirection(DcMotor.Direction.FORWARD);
+       intake.setDirection(DcMotor.Direction.FORWARD);
+
+
+       //lift motor directions
+       liftLeft.setDirection(DcMotor.Direction.FORWARD);   
+       liftRight.setDirection(DcMotor.Direction.REVERSE);
+
+
+        //set all motors to zero power behavior to BRAKE
+        frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+
+        //flywheel and intake
+        flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+
+        //lift motors
+        liftLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); 
+        liftRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
     }
 
 

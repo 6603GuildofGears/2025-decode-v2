@@ -123,10 +123,7 @@ public class Motor_PipeLine {
     }
 
     public static void intMotors(OpMode opMode) {
-        int Motor_PipeLine;
-
-        
-
+     
         //drive motors
        frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft"); 
        frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");

@@ -3,8 +3,8 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 
 
 @TeleOp(name="RIOT", group="TeleOp")
@@ -17,8 +17,8 @@ public class RIOT extends LinearOpMode {
 
         // piplines 
 
-        Motor_PipeLine motors = new Motor_PipeLine(this);   
-        Servo_Pipeline servos = new Servo_Pipeline(this);
+        int Motor_PipeLine.
+        int Servo_Pipeline.
         int(this);
 
         telemetry.addData("Status", "Hardware initialized");

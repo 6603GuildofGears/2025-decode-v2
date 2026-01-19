@@ -7,18 +7,20 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLi
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 
 
-@TeleOp(name="RIOT", group="TeleOp")
-public class RIOT extends LinearOpMode {
+@TeleOp(name="Cassius", group="TeleOp")
+public class Cassius extends LinearOpMode {
 
 
 
     @Override 
     public void runOpMode() throws InterruptedException {
 
-        // piplines 
+        // pipelines 
 
         intMotors(this);
         intServos(this);
+        
+  
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();
@@ -83,8 +85,7 @@ public class RIOT extends LinearOpMode {
 
             // Drive code 
 
-            
-                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
+               if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
                     //Orientation angles = imu.getAngularOrientation();
                     double rotation = 0; //Math.toRadians(angles.firstAngle);
                 /*
@@ -102,14 +103,15 @@ public class RIOT extends LinearOpMode {
                     double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
                     double rightX = RStickX;
 
-                    double v1 = r * Math.sin(robotAngle) + rightX * gear; //lf
+                    double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
                     double v2 = r * Math.sin(robotAngle) - rightX * gear; //rf
-                    double v3 = r * Math.cos(robotAngle) + rightX * gear; //lb
+                    double v3 = r * Math.sin(robotAngle) + rightX * gear; //lb
                     double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
 
 
                   SetPower(v1, v3, v2, v4);
+
 
 
 
@@ -139,9 +141,37 @@ public class RIOT extends LinearOpMode {
 
 
 
+
                 // AUXILIARY CODE
 
 
+
+            //intake
+
+            if (LBumper2){
+                intake.setPower(1);
+            }else if (LTrigger2 > 0.1){
+                intake.setPower(-1);
+            }else{
+                intake.setPower(0);
+            }
+
+
+            // shoot mode as many as possible
+             if ( a2){
+
+
+
+             }
+             
+
+
+            //shoot mode motife
+             if ( b2){
+
+
+
+              }
 
 
  

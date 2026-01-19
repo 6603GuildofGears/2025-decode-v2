@@ -7,8 +7,8 @@ import com.qualcomm.robotcore.hardware.CRServo;
 
 public class Servo_Pipeline {
 
-    // //turret servo
-    // static Servo turret;
+    //turret servo
+    public static Servo turret;
 
 
     // //Hood servo
@@ -17,14 +17,16 @@ public class Servo_Pipeline {
 
     // //flicker servo's
     // static Servo flicker1;
-    // static Servo flicker2;
-    // static Servo flicker3;
+    
 
+    // spindexer
+    // static CRServo spindexer;
+   
 
     public Servo_Pipeline(OpMode opMode) {
 
-        // //turret servo
-        // turret = opMode.hardwareMap.get(Servo.class, "turret"); 
+        //turret servo
+       // turret = opMode.hardwareMap.get(Servo.class, "turret"); 
 
 
         // //Hood servo
@@ -33,12 +35,12 @@ public class Servo_Pipeline {
 
         // //flicker servo's
         // flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
-        // flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2"); 
-        // flicker3 = opMode.hardwareMap.get(Servo.class, "flicker3"); 
 
-
-        // //turret servo direction
-        //  turret.setDirection(Servo.Direction.FORWARD);
+        // spindexer
+        // spindexer = opMode.hardwareMap.get(CRServo.class, "spindexer");
+     
+        //turret servo direction
+        // turret.setDirection(Servo.Direction.FORWARD);
 
 
         // //hood servo direction
@@ -47,16 +49,19 @@ public class Servo_Pipeline {
 
         // //flicker servo directions
         //  flicker1.setDirection(Servo.Direction.FORWARD); 
-        //  flicker2.setDirection(Servo.Direction.FORWARD);
-        //  flicker3.setDirection(Servo.Direction.FORWARD);
+
+
+    // spindexer direction
+    // spindexer.setDirection(CRServo.Direction.FORWARD);
+ 
 
 
     }
 
     public static void intServos(OpMode opMode) {
 
-//  //turret servo
-//         turret = opMode.hardwareMap.get(Servo.class, "turret"); 
+        //turret servo
+       // turret = opMode.hardwareMap.get(Servo.class, "turret"); 
 
 
 //         //Hood servo
@@ -65,12 +70,12 @@ public class Servo_Pipeline {
 
 //         //flicker servo's
 //         flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
-//         flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2"); 
-//         flicker3 = opMode.hardwareMap.get(Servo.class, "flicker3"); 
 
-
-//         //turret servo direction
-//          turret.setDirection(Servo.Direction.FORWARD);
+        // spindexer
+        // spindexer = opMode.hardwareMap.get(CRServo.class, "spindexer");
+//      
+        //turret servo direction
+        // turret.setDirection(Servo.Direction.FORWARD);
 
 
 //         //hood servo direction
@@ -79,8 +84,13 @@ public class Servo_Pipeline {
 
 //         //flicker servo directions
 //          flicker1.setDirection(Servo.Direction.FORWARD); 
-//          flicker2.setDirection(Servo.Direction.FORWARD);
-//          flicker3.setDirection(Servo.Direction.FORWARD);
-    }
+
+    // spindexer direction
+    // spindexer.setDirection(CRServo.Direction.FORWARD);
+//       
+   
+    
+}
 
 }
+

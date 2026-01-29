@@ -1,152 +1,158 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.Pipelines;
 
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.LLStatus;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-
-import java.util.List;
-
-/**
- * Limelight Pipeline
- * 
- * This pipeline initializes and manages a Limelight 3A camera
- * configured for AprilTag detection.
- */
 public class Limelight_Pipeline {
 
-    // Limelight camera
     public static Limelight3A limelight;
-    
-    private OpMode opMode;
+    private static boolean isInitialized = false;
 
     /**
-     * Constructor - initializes the Limelight 3A and starts it automatically
-     * @param opMode The OpMode using this pipeline
+     * Initialize the Limelight during the init period
+     * Sets it to AprilTag mode (pipeline 0) and turns off LEDs to save power
+     * If already initialized from a previous OpMode, reconfigures it
      */
-    public Limelight_Pipeline(OpMode opMode) {
-        this.opMode = opMode;
+    public static void initLimelight(OpMode opMode) {
+        if (!isInitialized) {
+            // Get the Limelight from hardware map
+            limelight = opMode.hardwareMap.get(Limelight3A.class, "limelight");
+            limelight.start();
+            isInitialized = true;
+        }
         
-        // Initialize and start Limelight
-        initLimelight(opMode);
+        // Always configure settings (even if already initialized from auto)
+        // Set to AprilTag pipeline (typically pipeline 0)
+        limelight.pipelineSwitch(0);
+
+        // Turn off LEDs to save power
+        limelight.stop(); // Stop updates temporarily
+        limelight.start(); // Restart with new settings
+
+        opMode.telemetry.addData("Limelight", "Configured - AprilTag Mode");
+        opMode.telemetry.addData("LED Status", "OFF (power saving)");
+        opMode.telemetry.update();
     }
 
     /**
      * Get the latest result from the Limelight
-     * @return LLResult containing detection data
+     * Call this during TeleOp to get AprilTag detection data
      */
-    public LLResult getLatestResult() {
-        return limelight.getLatestResult();
-    }
-
-    /**
-     * Get the Limelight status
-     * @return LLStatus containing camera status
-     */
-    public LLStatus getStatus() {
-        return limelight.getStatus();
-    }
-
-    /**
-     * Get AprilTag (fiducial) detections from latest result
-     * @return List of detected AprilTags, or null if no valid data
-     */
-    public List<LLResultTypes.FiducialResult> getAprilTags() {
-        LLResult result = limelight.getLatestResult();
-        if (result != null && result.isValid()) {
-            return result.getFiducialResults();
+    public static LLResult getLatestResult() {
+        if (limelight != null) {
+            return limelight.getLatestResult();
         }
         return null;
     }
 
     /**
-     * Check if any AprilTags are detected
-     * @return true if at least one AprilTag is visible
+     * Check if a target is detected
      */
-    public boolean hasAprilTags() {
-        List<LLResultTypes.FiducialResult> tags = getAprilTags();
-        return tags != null && !tags.isEmpty();
+    public static boolean hasTarget() {
+        LLResult result = getLatestResult();
+        return result != null && result.isValid();
     }
 
     /**
-     * Get a specific AprilTag by ID
-     * @param tagId The AprilTag ID to find
-     * @return The FiducialResult for the tag, or null if not found
+     * Display telemetry showing detected AprilTag ID and pattern
+     * Call this in your TeleOp loop to see what the Limelight detects
      */
-    public LLResultTypes.FiducialResult getAprilTagById(int tagId) {
-        List<LLResultTypes.FiducialResult> tags = getAprilTags();
-        if (tags != null) {
-            for (LLResultTypes.FiducialResult tag : tags) {
-                if (tag.getFiducialId() == tagId) {
-                    return tag;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Switch to a different Limelight pipeline
-     * @param pipelineIndex Pipeline number (0-9)
-     */
-    public void switchPipeline(int pipelineIndex) {
-        limelight.pipelineSwitch(pipelineIndex);
-    }
-
-    /**
-     * Update telemetry with Limelight status and AprilTag detections
-     */
-    public void updateTelemetry() {
-        LLStatus status = limelight.getStatus();
-        opMode.telemetry.addData("Limelight", status.getName());
-        opMode.telemetry.addData("LL Temp", "%.1f°C", status.getTemp());
-        opMode.telemetry.addData("LL CPU", "%.1f%%", status.getCpu());
-        opMode.telemetry.addData("LL FPS", "%d", (int)status.getFps());
-        opMode.telemetry.addData("Pipeline", "%d (%s)", status.getPipelineIndex(), status.getPipelineType());
-
-        LLResult result = limelight.getLatestResult();
+    public static void displayTelemetry(OpMode opMode) {
+        LLResult result = getLatestResult();
+        
         if (result != null && result.isValid()) {
-            List<LLResultTypes.FiducialResult> tags = result.getFiducialResults();
-            
-            if (tags != null && !tags.isEmpty()) {
-                opMode.telemetry.addData("AprilTags Detected", tags.size());
+            // Check if we have any fiducial (AprilTag) detections
+            if (result.getFiducialResults() != null && !result.getFiducialResults().isEmpty()) {
+                // Get the first detected tag
+                int tagId = (int) result.getFiducialResults().get(0).getFiducialId();
+                String pattern = getColorPattern(tagId);
                 
-                for (LLResultTypes.FiducialResult tag : tags) {
-                    opMode.telemetry.addData("Tag " + tag.getFiducialId(), 
-                        "X: %.1f°, Y: %.1f°", 
-                        tag.getTargetXDegrees(), 
-                        tag.getTargetYDegrees());
+                opMode.telemetry.addData("Limelight", "Target Detected");
+                
+                // Display differently for motif vs goal tags
+                if (tagId >= 21 && tagId <= 23) {
+                    // Motif tags - show the color order prominently
+                    opMode.telemetry.addData("Motif Pattern", pattern);
+                    opMode.telemetry.addData("Obelisk ID", tagId);
+                } else if (tagId == 20 || tagId == 24) {
+                    // Goal tags
+                    opMode.telemetry.addData("Goal", pattern);
+                    opMode.telemetry.addData("Tag ID", tagId);
+                } else {
+                    // Other tags
+                    opMode.telemetry.addData("AprilTag ID", tagId);
                 }
             } else {
-                opMode.telemetry.addData("AprilTags", "None detected");
+                opMode.telemetry.addData("Limelight", "No AprilTag Detected");
             }
-            
-            opMode.telemetry.addData("Latency", "%.1f ms", 
-                result.getCaptureLatency() + result.getTargetingLatency());
         } else {
-            opMode.telemetry.addData("Limelight", "No valid data");
+            opMode.telemetry.addData("Limelight", "No Target");
         }
     }
 
     /**
-     * Stop the Limelight (call in OpMode stop())
+     * Stop the Limelight (optional - call at end of OpMode if needed)
      */
-    public void stop() {
+    public static void stopLimelight() {
         if (limelight != null) {
             limelight.stop();
+            isInitialized = false;
         }
     }
 
     /**
-     * Static method to initialize Limelight
-     * @param opMode The OpMode
+     * Reset the initialization flag (useful for switching between OpModes)
      */
-    public static void initLimelight(OpMode opMode) {
-        limelight = opMode.hardwareMap.get(Limelight3A.class, "limelight");
-        limelight.pipelineSwitch(0);
-        limelight.start();
+    public static void reset() {
+        isInitialized = false;
+    }
+
+    /**
+     * Get the specimen motif color pattern for a given AprilTag ID
+     * Returns a string describing the color order: Green (G) and Purple (P)
+     * NOTE: This is ONLY the motif pattern, not scoring instructions
+     * 
+     * @param tagId The AprilTag ID detected
+     * @return String describing motif color pattern, or "Unknown" if ID not recognized
+     */
+    public static String getColorPattern(int tagId) {
+        switch (tagId) {
+            case 20:
+                return "Blue Goal"; // Blue alliance goal
+            case 21:
+                return "Green-Purple-Purple"; // Motif only
+            case 22:
+                return "Purple-Green-Purple"; // Motif only
+            case 23:
+                return "Purple-Purple-Green"; // Motif only
+            case 24:
+                return "Red Goal"; // Red alliance goal
+            default:
+                return "Unknown ID";
+        }
+    }
+
+    /**
+     * Get specimen motif color pattern as array for easier programmatic access
+     * NOTE: This is ONLY the motif pattern, not scoring instructions
+     * @param tagId The AprilTag ID detected
+     * @return Array of color strings ["Green", "Purple", etc.] or empty array if unknown
+     */
+    public static String[] getColorPatternArray(int tagId) {
+        switch (tagId) {
+            case 20:
+                return new String[]{"Blue", "Goal"}; // Blue alliance goal
+            case 21:
+                return new String[]{"Green", "Purple", "Purple"}; // Motif only
+            case 22:
+                return new String[]{"Purple", "Green", "Purple"}; // Motif only
+            case 23:
+                return new String[]{"Purple", "Purple", "Green"}; // Motif only
+            case 24:
+                return new String[]{"Red", "Goal"}; // Red alliance goal
+            default:
+                return new String[]{};
+        }
     }
 }

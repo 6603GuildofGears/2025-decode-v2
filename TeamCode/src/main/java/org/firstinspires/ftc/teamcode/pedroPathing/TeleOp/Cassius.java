@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 
 
 @TeleOp(name="Cassius", group="TeleOp")
@@ -19,6 +20,7 @@ public class Cassius extends LinearOpMode {
 
         intMotors(this);
         intServos(this);
+        initLimelight(this);  // Initialize Limelight in AprilTag mode with LEDs off
         
   
 
@@ -29,8 +31,18 @@ public class Cassius extends LinearOpMode {
         // put all initlization code here
 
         double gear = 1.0; // speed modifier for drive train
+        double F1Rest = 0.0; // flicker 1 rest position
+        double F2Rest = 0.0; // flicker 2 rest position
+        double F1Shoot = 0.3; // flicker 1 shoot position
+        double F2Shoot = 0.3 ; // flicker 2 shoot position
 
 
+        flicker1.setPosition(F1Rest);
+        flicker2.setPosition(F2Rest);
+
+
+        double rpm = 3300; // target RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
+      
 
         waitForStart();
         while (opModeIsActive()) {
@@ -146,38 +158,75 @@ public class Cassius extends LinearOpMode {
 
 
 
-            //intake
 
-            if (LBumper2){
-                intake.setPower(1);
-            }else if (LTrigger2 > 0.1){
-                intake.setPower(-1);
-            }else{
+            // intake 
+
+            if (LBumper2) { // Added a deadzone for the trigger
+                intake.setPower(1); // intake in
+            } else if (LTrigger2 > 0.1) { // Added a deadzone for the trigger
+                intake.setPower(-1); // intake out
+            } else {
                 intake.setPower(0);
             }
 
 
-            // shoot mode as many as possible
-             if ( a2){
+            // flywheel (shooter) control
+            if (dpadUp2) {
+                flywheel.setVelocity(getTickSpeed(rpm)); // far zone
+        
+            } else {
+                flywheel.setVelocity(0); // idle speed to keep wheel spinning
+            }
 
 
+            // shoot mode - flicker1 fires first, then flicker2 after 0.25 sec
+            if (a2) {
+                flicker1.setPosition(F1Shoot);
+                flicker2.setPosition(F2Shoot);
+            }
+            if (b2) {
+                flicker1.setPosition(F1Rest);
+                flicker2.setPosition(F2Rest);
+            }
 
-             }
              
 
+                if (dpadRight2){
+                     spindexer.setPower(1); // spindexer forward
+                } else if (dpadLeft2){
+                     spindexer.setPower(-1); // spindexer reverse
+                } else {
+                     spindexer.setPower(0); // spindexer stop
+                }
 
-            //shoot mode motife
-             if ( b2){
+                if (y2 ){
+                     hood.setPosition(1); // hood up
+                 } else if (x2 ){
+                     hood.setPosition(0.25); // hood down
+                 } 
+
+          
 
 
+            if (LStickX2 > 0.1 ){
+                turret.setPower(LStickX2 * 0.75); // half power for finer control
+             } else if  (LStickX2 < -0.1 ){
+                turret.setPower(LStickX2 * 0.75); // half power for finer control
+                }else {
+                turret.setPower(0);
+             }
 
-              }
-
-
- 
+            // Display Limelight telemetry
+            displayTelemetry(this);
+            telemetry.update();
  
         }
 
+    }
+
+    // Helper method to convert RPM to ticks per second
+    private double getTickSpeed(double rpm) {
+        return rpm * 28 / 60; // 28 ticks per revolution, 60 seconds per minute
     }
 
  }

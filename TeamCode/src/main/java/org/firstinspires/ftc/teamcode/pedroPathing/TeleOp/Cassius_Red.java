@@ -40,7 +40,7 @@ public class Cassius_Red extends LinearOpMode {
 
            double gear = 1.25; // speed modifier for drive train
         double F1Rest = 0.0; // flicker 1 rest position
-        double F2Rest = 0.0; // flicker 2 rest position
+        double F2Rest = 0.0; // flicker 2 rest position      
         double F1Shoot = 0.45; // flicker 1 shoot position
         double F2Shoot = 0.35;
 

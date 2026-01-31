@@ -257,7 +257,9 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 3: // Spinning spindexer 60 degrees
-                        if (shootTimer.milliseconds() > 167) { // ~167ms at 0.5 power for 60 degrees (1/6th rotation)
+                        // Servo spec: 0.14 sec/60° at 6V full power
+                        // At half power (0.5): ~280ms, plus load factor for 600g spindexer
+                        if (shootTimer.milliseconds() > 300) { // 300ms at 0.5 power for accurate 60° rotation
                             spindexer.setPower(0);
                             shootState = 1; // Go back to firing
                             shootTimer.reset();

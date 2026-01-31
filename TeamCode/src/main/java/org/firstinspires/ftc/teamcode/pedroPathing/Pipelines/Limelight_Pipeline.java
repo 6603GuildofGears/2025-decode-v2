@@ -18,19 +18,14 @@ public class Limelight_Pipeline {
         if (!isInitialized) {
             // Get the Limelight from hardware map
             limelight = opMode.hardwareMap.get(Limelight3A.class, "limelight");
-            limelight.start();
             isInitialized = true;
         }
         
         // Always configure settings (even if already initialized from auto)
-        // Set to AprilTag pipeline (typically pipeline 0)
-        limelight.pipelineSwitch(0);
+        limelight.pipelineSwitch(0); // Set to AprilTag pipeline
+        limelight.start(); // Ensure streaming is active for real-time updates
 
-        // Turn off LEDs to save power
-        limelight.stop(); // Stop updates temporarily
-        limelight.start(); // Restart with new settings
-
-        opMode.telemetry.addData("Limelight", "Configured - AprilTag Mode");
+        opMode.telemetry.addData("Limelight", "Configured - AprilTag Mode (Live Streaming)");
         opMode.telemetry.addData("LED Status", "OFF (power saving)");
         opMode.telemetry.update();
     }
@@ -38,9 +33,11 @@ public class Limelight_Pipeline {
     /**
      * Get the latest result from the Limelight
      * Call this during TeleOp to get AprilTag detection data
+     * Forces an update to ensure fresh data every call
      */
     public static LLResult getLatestResult() {
         if (limelight != null) {
+            limelight.updateRobotOrientation(0); // Force update with current orientation
             return limelight.getLatestResult();
         }
         return null;
@@ -64,24 +61,27 @@ public class Limelight_Pipeline {
         if (result != null && result.isValid()) {
             // Check if we have any fiducial (AprilTag) detections
             if (result.getFiducialResults() != null && !result.getFiducialResults().isEmpty()) {
-                // Get the first detected tag
-                int tagId = (int) result.getFiducialResults().get(0).getFiducialId();
-                String pattern = getColorPattern(tagId);
+                int numTags = result.getFiducialResults().size();
+                opMode.telemetry.addData("Limelight", numTags + " Target(s) Detected");
                 
-                opMode.telemetry.addData("Limelight", "Target Detected");
-                
-                // Display differently for motif vs goal tags
-                if (tagId >= 21 && tagId <= 23) {
-                    // Motif tags - show the color order prominently
-                    opMode.telemetry.addData("Motif Pattern", pattern);
-                    opMode.telemetry.addData("Obelisk ID", tagId);
-                } else if (tagId == 20 || tagId == 24) {
-                    // Goal tags
-                    opMode.telemetry.addData("Goal", pattern);
-                    opMode.telemetry.addData("Tag ID", tagId);
-                } else {
-                    // Other tags
-                    opMode.telemetry.addData("AprilTag ID", tagId);
+                // Loop through all detected tags
+                for (int i = 0; i < numTags; i++) {
+                    int tagId = (int) result.getFiducialResults().get(i).getFiducialId();
+                    String pattern = getColorPattern(tagId);
+                    
+                    // Display differently for motif vs goal tags
+                    if (tagId >= 21 && tagId <= 23) {
+                        // Motif tags - show the color order prominently
+                        opMode.telemetry.addData("Tag " + (i+1) + " Motif", pattern);
+                        opMode.telemetry.addData("Tag " + (i+1) + " ID", tagId);
+                    } else if (tagId == 20 || tagId == 24) {
+                        // Goal tags
+                        opMode.telemetry.addData("Tag " + (i+1) + " Goal", pattern);
+                        opMode.telemetry.addData("Tag " + (i+1) + " ID", tagId);
+                    } else {
+                        // Other tags
+                        opMode.telemetry.addData("Tag " + (i+1) + " ID", tagId);
+                    }
                 }
             } else {
                 opMode.telemetry.addData("Limelight", "No AprilTag Detected");

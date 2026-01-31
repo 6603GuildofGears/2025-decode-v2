@@ -2,14 +2,16 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.hardware.limelightvision.LLResult;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 
 
-@TeleOp(name="Cassius", group="TeleOp")
-public class Cassius extends LinearOpMode {
+@TeleOp(name="Cassius Red", group="TeleOp")
+public class Cassius_Red extends LinearOpMode {
 
 
 
@@ -22,6 +24,12 @@ public class Cassius extends LinearOpMode {
         intServos(this);
         initLimelight(this);  // Initialize Limelight in AprilTag mode with LEDs off
         
+        // Reset turret encoder to 0 at current position (should be centered manually before init)
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        
+        
   
 
         telemetry.addData("Status", "Hardware initialized");
@@ -30,19 +38,26 @@ public class Cassius extends LinearOpMode {
 
         // put all initlization code here
 
-        double gear = 1.0; // speed modifier for drive train
+           double gear = 1.25; // speed modifier for drive train
         double F1Rest = 0.0; // flicker 1 rest position
         double F2Rest = 0.0; // flicker 2 rest position
-        double F1Shoot = 0.3; // flicker 1 shoot position
-        double F2Shoot = 0.3 ; // flicker 2 shoot position
-
+        double F1Shoot = 0.45; // flicker 1 shoot position
+        double F2Shoot = 0.35;
 
         flicker1.setPosition(F1Rest);
         flicker2.setPosition(F2Rest);
 
 
+       
+
+
+
         double rpm = 3300; // target RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
       
+        // Turret safety limits (FOUND FROM TESTING!)
+        int turretMinLimit = -275; // Left limit
+        int turretMaxLimit = 630;  // Right limit
+        boolean limitsEnabled = true; // Limits are now active
 
         waitForStart();
         while (opModeIsActive()) {
@@ -171,7 +186,7 @@ public class Cassius extends LinearOpMode {
 
 
             // flywheel (shooter) control
-            if (dpadUp2) {
+            if (b2) {
                 flywheel.setVelocity(getTickSpeed(rpm)); // far zone
         
             } else {
@@ -180,15 +195,16 @@ public class Cassius extends LinearOpMode {
 
 
             // shoot mode - flicker1 fires first, then flicker2 after 0.25 sec
-            if (a2) {
+              if (a2) {
                 flicker1.setPosition(F1Shoot);
-                flicker2.setPosition(F2Shoot);
-            }
-            if (b2) {
+               if(flicker1.getPosition() > 0.075){
+                flicker2.setPosition(F2Shoot-0.05);
+                    }
+            } else {
                 flicker1.setPosition(F1Rest);
                 flicker2.setPosition(F2Rest);
             }
-
+            
              
 
                 if (dpadRight2){
@@ -207,16 +223,69 @@ public class Cassius extends LinearOpMode {
 
           
 
+            // Turret auto-tracking for RED alliance (tracks red goal tag 24 and motif tags 21-23, ignores blue goal tag 20)
+            int turretPosition = turret.getCurrentPosition();
+            double turretPower = 0;
+            
+            LLResult limelightResult = getLatestResult();
+            boolean autoTracking = false;
+            
+            // Check for valid targets
+            if (limelightResult != null && limelightResult.isValid() && 
+                limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
+                
+                // Find red goal only (ignore motif tags and blue goal)
+                for (int i = 0; i < limelightResult.getFiducialResults().size(); i++) {
+                    int tagId = (int) limelightResult.getFiducialResults().get(i).getFiducialId();
+                    
+                    // Track red goal (24) ONLY
+                    if (tagId == 24) {
+                        double tx = limelightResult.getFiducialResults().get(i).getTargetXDegrees();
+                        
+                        // Small deadzone to prevent micro-adjustments and jitter
+                        if (Math.abs(tx) < 2.0) {
+                            turretPower = 0;
+                            autoTracking = true;
+                        } else {
+                            // Very smooth proportional control
+                            double kP = 0.005; // Lower for smoother, less jittery movement
+                            turretPower = tx * kP;
+                            
+                            // Reduced power limit for smoother control
+                            turretPower = Math.max(-0.2, Math.min(0.2, turretPower));
+                            autoTracking = true;
+                        }
+                        break; // Use first valid target
+                    }
+                }
+            }
+            
+            // Manual control overrides auto-tracking
+            if (!autoTracking) {
+                if (LStickX2 > 0.1) {
+                    turretPower = LStickX2 * 1; // rotate right
+                } else if (LStickX2 < -0.1) {
+                    turretPower = LStickX2 * 1; // rotate left
+                }
+            }
 
-            if (LStickX2 > 0.1 ){
-                turret.setPower(LStickX2 * 0.75); // half power for finer control
-             } else if  (LStickX2 < -0.1 ){
-                turret.setPower(LStickX2 * 0.75); // half power for finer control
-                }else {
-                turret.setPower(0);
-             }
+            // Apply safety limits to prevent wire damage
+            if (limitsEnabled) {
+                if (turretPosition <= turretMinLimit && turretPower < 0) {
+                    turretPower = 0; // Stop at left limit
+                }
+                if (turretPosition >= turretMaxLimit && turretPower > 0) {
+                    turretPower = 0; // Stop at right limit
+                }
+            }
+
+            turret.setPower(turretPower);
 
             // Display Limelight telemetry
+            telemetry.addData("turret position", turret.getCurrentPosition());
+            telemetry.addData("Auto-Tracking", autoTracking ? "ACTIVE" : "Manual");
+            telemetry.addData("flicker1 pos", flicker1.getPosition());
+            telemetry.addData("flicker2 pos", flicker2.getPosition());
             displayTelemetry(this);
             telemetry.update();
  

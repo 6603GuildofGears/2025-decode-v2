@@ -17,6 +17,7 @@ apply from: '../build.dependencies.gradle'
 
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
+    compileSdkVersion 34
 
     packagingOptions {
         jniLibs.useLegacyPackaging true

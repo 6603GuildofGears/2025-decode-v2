@@ -1,6 +1,9 @@
 repositories {
     mavenCentral()
     google() // Needed for androidx
+    maven { url 'https://jitpack.io' } // Needed for full-panels
+    maven { url = "https://mymaven.bylazar.com/releases" } // Needed for bylazar libraries
+    maven { url = 'https://maven.brott.dev/' } // Needed for FTC Dashboard
 }
 
 dependencies {
@@ -13,5 +16,16 @@ dependencies {
     implementation 'org.firstinspires.ftc:FtcCommon:11.1.0'
     implementation 'org.firstinspires.ftc:Vision:11.1.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
-}
 
+    // Full-panels library from bylazar maven repository
+    implementation 'com.bylazar:fullpanels:1.0.9'
+
+    // FTC Dashboard
+    implementation 'com.acmerobotics.dashboard:dashboard:0.4.16'
+
+    implementation 'com.pedropathing:ftc:2.0.4'
+    implementation 'com.pedropathing:telemetry:1.0.0'
+
+    // DELETED: This line was conflicting with the correct one above.
+    // implementation 'com.bylazar:fullpanels:1.0.9'
+}

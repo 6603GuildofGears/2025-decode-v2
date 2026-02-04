@@ -105,6 +105,7 @@ public class Cassius_Blue extends LinearOpMode {
         waitForStart();
         while (opModeIsActive()) {
 
+           
             // put all TeleOp code here
 
             //buttons and joysticks
@@ -218,6 +219,18 @@ public class Cassius_Blue extends LinearOpMode {
                 // AUXILIARY CODE
 
 
+            if(x2){
+                spindexer.setPosition(p1);
+                
+            }
+            telemetry.addData("spindexer pos", spindexer.getPosition());
+            if(dpadRight2){
+                double CPoS = spindexer.getPosition();
+                spindexer.setPosition(CPoS + 0.005);;
+            } else if (dpadLeft2){
+                double CPoS = spindexer.getPosition();
+                spindexer.setPosition(CPoS - 0.005);;
+            }
 
 
             // intake with spindexer slow rotation

@@ -50,7 +50,6 @@ public class Servo_Pipeline {
 
     // spindexer direction
     spindexer.setDirection(Servo.Direction.FORWARD);
- 
 
 
     }

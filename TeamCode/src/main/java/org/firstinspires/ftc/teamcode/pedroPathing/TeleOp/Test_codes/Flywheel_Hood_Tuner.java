@@ -15,10 +15,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.HoodTestConfig.
 @TeleOp(name="Flywheel & Hood Tuner", group="Testing")
 public class Flywheel_Hood_Tuner extends LinearOpMode {
 
-    // Values now controlled by HoodTestConfig for live tuning via Pedro Pathing Panels
-    
-    private ElapsedTime buttonTimer = new ElapsedTime();
-    private final double BUTTON_DELAY = 0.15; // Delay between button presses (seconds)
+    // All values controlled ONLY by HoodTestConfig via Pedro Pathing Panels
     
     @Override
     public void runOpMode() throws InterruptedException {
@@ -32,50 +29,19 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
         
         telemetry.addData("Status", "Initialized");
         telemetry.addData("=== CONTROLS ===", "");
-        telemetry.addData("D-Pad UP/DOWN", "Hood Position");
-        telemetry.addData("Y/A Buttons", "Flywheel RPM");
-        telemetry.addData("B Button", "Reset All to Config Values");
-        telemetry.addData("", "");
-        telemetry.addData("TIP:", "Use Pedro Pathing Panels for live tuning!");
+        telemetry.addData("ALL ADJUSTMENTS", "Use Pedro Pathing Panels");
+        telemetry.addData("", "Open Panels to tune:");
+        telemetry.addData("- HOOD_POSITION", "0.0 to 1.0");
+        telemetry.addData("- TARGET_RPM", "0 to 6000");
+        telemetry.addData("- HOOD_INCREMENT", "Adjustment step");
+        telemetry.addData("- RPM_INCREMENT", "Adjustment step");
         telemetry.update();
         
         waitForStart();
-        buttonTimer.reset();
         
         while (opModeIsActive()) {
             
-            // Hood position control (D-pad Up/Down) - modifies the config value
-            if (buttonTimer.seconds() > BUTTON_DELAY) {
-                if (gamepad1.dpad_up) {
-                    HOOD_POSITION += HOOD_INCREMENT;
-                    if (HOOD_POSITION > 1.0) HOOD_POSITION = 1.0;
-                    buttonTimer.reset();
-                }
-                if (gamepad1.dpad_down) {
-                    HOOD_POSITION -= HOOD_INCREMENT;
-                    if (HOOD_POSITION < 0.0) HOOD_POSITION = 0.0;
-                    buttonTimer.reset();
-                }
-                
-                // Flywheel RPM control (Y/A buttons) - modifies the config value
-                if (gamepad1.y) {
-                    TARGET_RPM += RPM_INCREMENT;
-                    if (TARGET_RPM > 6000) TARGET_RPM = 6000; // Safety limit
-                    buttonTimer.reset();
-                }
-                if (gamepad1.a) {
-                    TARGET_RPM -= RPM_INCREMENT;
-                    if (TARGET_RPM < 0) TARGET_RPM = 0;
-                    buttonTimer.reset();
-                }
-                
-                // Reset all to config baseline values (B button)
-                if (gamepad1.b) {
-                    HOOD_POSITION = 0.0;
-                    TARGET_RPM = 3000.0;
-                    buttonTimer.reset();
-                }
-            }
+            // All values read directly from HoodTestConfig (updated live via Panels)
             
             // Apply hood position from config
             hood.setPosition(HOOD_POSITION);
@@ -91,19 +57,29 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             LLResult limelightResult = getLatestResult();
             double distance = 0.0;
             int detectedTagId = 0;
+            double ty = 0.0;
+            double tx = 0.0;
+            
+            // Camera configuration
+            double cameraHeight = 11.125; // Camera lens center height in inches
+            double cameraMountAngle = 24.0; // Camera angle from horizontal (90 - 66 = 24 degrees)
+            double targetHeight = 29.5; // AprilTag center height in inches
             
             if (limelightResult != null && limelightResult.isValid() && 
                 limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
                 // Get the first detected tag
                 detectedTagId = (int) limelightResult.getFiducialResults().get(0).getFiducialId();
+                ty = limelightResult.getFiducialResults().get(0).getTargetYDegrees();
+                tx = limelightResult.getFiducialResults().get(0).getTargetXDegrees();
                 
-                // Calculate distance using ty (vertical offset) - typical calculation for AprilTag
-                // You may need to adjust this formula based on your camera mounting
-                double ty = limelightResult.getFiducialResults().get(0).getTargetYDegrees();
+                // Distance calculation with angled camera
+                // For upward-angled camera, subtract ty from mount angle
+                double totalAngle = cameraMountAngle - ty;
+                double heightDifference = targetHeight - cameraHeight;
                 
-                // Simple distance estimation (adjust constants for your setup)
-                // distance = height_difference / tan(angle)
-                distance = 20.0 / Math.tan(Math.toRadians(ty)); // Rough estimation, adjust as needed
+                if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) { // Avoid extreme angles
+                    distance = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                }
             }
             
             // Display telemetry
@@ -111,6 +87,8 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             if (detectedTagId > 0) {
                 telemetry.addData("Target Detected", "ID: %d", detectedTagId);
                 telemetry.addData("Distance", "%.2f inches", distance);
+                telemetry.addData("TY Angle", "%.2f°", ty);
+                telemetry.addData("Total Angle", "%.2f°", cameraMountAngle - ty);
             } else {
                 telemetry.addData("Target Detected", "None");
             }
@@ -126,12 +104,10 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             telemetry.addData("Error", "%.0f RPM", TARGET_RPM - currentRPM);
             telemetry.addData("", "");
             
-            telemetry.addData("=== CONTROLS ===", "");
-            telemetry.addData("D-Pad Up/Down", "Hood ±%.3f", HOOD_INCREMENT);
-            telemetry.addData("Y/A", "RPM ±%.0f", RPM_INCREMENT);
-            telemetry.addData("B", "Reset to Baseline");
-            telemetry.addData("", "");
-            telemetry.addData("TIP:", "Use Pedro Pathing Panels for live tuning!");
+            telemetry.addData("=== ADJUSTMENTS ===", "");
+            telemetry.addData("Control Method", "Pedro Pathing Panels ONLY");
+            telemetry.addData("Hood Increment", "±%.3f", HOOD_INCREMENT);
+            telemetry.addData("RPM Increment", "±%.0f", RPM_INCREMENT);
             telemetry.update();
         }
     }

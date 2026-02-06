@@ -3,6 +3,9 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 
@@ -14,8 +17,8 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
 
 
-@TeleOp(name="Cassius Blue", group="TeleOp")
-public class Cassius_Blue extends LinearOpMode {
+@TeleOp(name="Cassius Blue (Field Oriented)", group="TeleOp")
+public class Cassius_Blue_FieldOriented extends LinearOpMode {
 
 
 
@@ -28,6 +31,13 @@ public class Cassius_Blue extends LinearOpMode {
         intServos(this);
         initLimelight(this);
         initSensors(this);
+        
+        // Initialize IMU for field-oriented drive
+        IMU imu = hardwareMap.get(IMU.class, "imu");
+        IMU.Parameters imuParameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+            RevHubOrientationOnRobot.LogoFacingDirection.UP,
+            RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
+        imu.initialize(imuParameters);
         
         // Reset turret encoder to 0 at current position (should be centered manually before init)
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -60,6 +70,11 @@ public class Cassius_Blue extends LinearOpMode {
         // Turret tracking toggle
         boolean autoTrackingEnabled = true; // Default to manual
         boolean y2Pressed = false; // Debounce for Y button
+        
+        // Field-oriented drive
+        boolean fieldOriented = true; // Start with field-oriented enabled
+        double headingOffset = 0; // Stores the heading when reset is pressed
+        
         flicker1.setPosition(F1Rest);
         flicker2.setPosition(F2Rest);
 
@@ -81,10 +96,6 @@ public class Cassius_Blue extends LinearOpMode {
         // Mag sensor calibration position
         int magSensorPosition = -149; // Turret position when mag sensor triggers (-145 to -153 range)
         boolean lastMagState = false; // Track mag sensor state changes
-
-        // double p1 = 0.25;
-        // double p2 = 0.425;
-        // double p3 = 1;
 
         double p1 = 0;
         double p2 = 0.375;
@@ -172,9 +183,20 @@ public class Cassius_Blue extends LinearOpMode {
                 */
 
                   
+                    // Field-oriented drive transformation
+                    double stickX = LStickX;
+                    double stickY = LStickY;
+                    
+                    if (fieldOriented) {
+                        double botHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - headingOffset;
+                        double rotX = stickX * Math.cos(-botHeading) - stickY * Math.sin(-botHeading);
+                        double rotY = stickX * Math.sin(-botHeading) + stickY * Math.cos(-botHeading);
+                        stickX = rotX;
+                        stickY = rotY;
+                    }
 
-                    double r = Math.hypot(LStickX, LStickY);
-                    double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
+                    double r = Math.hypot(stickX, stickY);
+                    double robotAngle = Math.atan2(stickY, stickX) - Math.PI / 4;
                     double rightX = RStickX;
 
                     double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
@@ -218,7 +240,10 @@ public class Cassius_Blue extends LinearOpMode {
 
                 // AUXILIARY CODE
 
-
+            // Reset field-oriented heading (Back button on gamepad1)
+            if (gamepad1.back) {
+                headingOffset = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+            }
             
             telemetry.addData("spindexer pos", spindexer.getPosition());
             if(dpadRight2){
@@ -272,8 +297,7 @@ public class Cassius_Blue extends LinearOpMode {
                 // Start sequence
                 sShot = 1;
                 shootTimer.reset();
-
-                spindexer.setPosition(p3);
+                spindexer.setPosition(p1);
             }
             
             // Run shooting sequence based purely on sShot and timer
@@ -316,7 +340,7 @@ public class Cassius_Blue extends LinearOpMode {
                     break;
                     
                 case 2: // Second shot at p2
-                    flywheel.setVelocity(getTickSpeed(rpm+200));
+                    flywheel.setVelocity(getTickSpeed(rpm));
                     if (shootTimer.milliseconds() < 600) {
                         // Fire - command servos
                         flicker1.setPosition(F1Shoot);
@@ -333,7 +357,7 @@ public class Cassius_Blue extends LinearOpMode {
                         }
                     } else if (shootTimer.milliseconds() < 2500) {
                         // Move spindexer to p3
-                        spindexer.setPosition(p1);
+                        spindexer.setPosition(p3);
                     } else if (shootTimer.milliseconds() < 3200) {
                         // Wait for spindexer to finish
                     } else {
@@ -344,7 +368,7 @@ public class Cassius_Blue extends LinearOpMode {
                     break;
                     
                 case 3: // Third shot at p3
-                    flywheel.setVelocity(getTickSpeed(rpm+200));
+                    flywheel.setVelocity(getTickSpeed(rpm));
                     if (shootTimer.milliseconds() < 300) {
                         // Fire - command servos
                         flicker1.setPosition(F1Shoot);
@@ -414,22 +438,9 @@ public class Cassius_Blue extends LinearOpMode {
             int turretPosition = turret.getCurrentPosition();
             double turretPower = 0;
             
-            // Manual turret control with dpad left/right on gamepad 2
-            // if (dpadLeft2) {
-            //     turretPower = -0.5; // Turn left
-            //     // Reset tracking when manual override
-            //     lastTurretError = 0;
-            //     filteredTurretError = 0;
-            // } else if (dpadRight2) {
-            //     turretPower = 0.5; // Turn right
-            //     // Reset tracking when manual override
-            //     lastTurretError = 0;
-            //     filteredTurretError = 0;
-            // } else 
             if (autoTrackingEnabled && hasBlueGoal()) {
                 // Automatic tracking control (PID control with filtering)
-                // Motor direction: RIGHT = POSITIVE, LEFT = NEGATIVE
-                double tx = getBlueGoalX(); // Target X offset in degrees
+                double tx = getBlueGoalX();
                 
                 // Initialize filter on first reading to avoid lag
                 if (filteredTurretError == 0 && lastTurretError == 0) {
@@ -440,26 +451,22 @@ public class Cassius_Blue extends LinearOpMode {
                 }
                 
                 if (Math.abs(filteredTurretError) > TURRET_DEADBAND) {
-                    // Apply gear ratio compensation - motor must turn 6.55x more than turret angle
+                    // Apply gear ratio compensation
                     double compensatedError = filteredTurretError * turretGearRatio;
                     
-                    // Proportional term: power proportional to error (with gear compensation)
+                    // Proportional term
                     double pTerm = compensatedError * KP_TURRET;
                     
-                    // Derivative term: dampens based on rate of change
+                    // Derivative term
                     double dt = turretTimer.seconds();
                     double dTerm = 0;
                     
-                    // Only calculate derivative if we have a valid time delta
                     if (dt > 0.01 && dt < 1.0) {
                         double errorChange = (filteredTurretError - lastTurretError) / dt;
-                        // Clamp derivative to prevent spikes
-                      //  if (Math.abs(errorChange) < 100) {
-                            dTerm = errorChange * KD_TURRET;
-                      //  }
+                        dTerm = errorChange * KD_TURRET;
                     }
                     
-                    // Integral term: accumulate error over time (with anti-windup)
+                    // Integral term with anti-windup
                     integratedError += filteredTurretError * dt;
                     integratedError = Math.max(-MAX_INTEGRAL, Math.min(MAX_INTEGRAL, integratedError));
                     double iTerm = integratedError * KI_TURRET;
@@ -480,23 +487,28 @@ public class Cassius_Blue extends LinearOpMode {
             } else {
                 // No tracking or no target
                 lastTurretError = 0;
-                integratedError = 0; // Reset integral when target lost
+                integratedError = 0;
                 filteredTurretError = 0;
             }
 
-            // Apply safety limits to prevent wire damage
+            // Apply safety limits
             if (limitsEnabled) {
                 if (turretPosition <= turretMinLimit && turretPower < 0) {
-                    turretPower = 0; // Stop at left limit
+                    turretPower = 0;
                 }
                 if (turretPosition >= turretMaxLimit && turretPower > 0) {
-                    turretPower = 0; // Stop at right limit
+                    turretPower = 0;
                 }
             }
 
             turret.setPower(turretPower);
 
             // Display telemetry
+            telemetry.addData("=== DRIVE ===", "");
+            telemetry.addData("Field Oriented", fieldOriented ? "ON (Back to reset)" : "OFF");
+            telemetry.addData("Heading", String.format("%.1f°", Math.toDegrees(imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS) - headingOffset)));
+            telemetry.addData("", "");
+            
             telemetry.addData("=== LIMELIGHT STATUS ===", "");
             telemetry.addData("LL Connected", hasTarget() ? "YES" : "CHECKING...");
             telemetry.addData("Blue Goal Visible", hasBlueGoal() ? "YES" : "NO");
@@ -525,7 +537,7 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("Flicker1", String.format("%.2f", flicker1.getPosition()));
             telemetry.addData("Flicker2", String.format("%.2f", flicker2.getPosition()));
             
-            displayTelemetry(this); // Shows Limelight FPS and additional info
+            displayTelemetry(this);
             telemetry.update();
  
         }

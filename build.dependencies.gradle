@@ -4,6 +4,7 @@ repositories {
     maven { url 'https://jitpack.io' } // Needed for full-panels
     maven { url = "https://mymaven.bylazar.com/releases" } // Needed for bylazar libraries
     maven { url = 'https://maven.brott.dev/' } // Needed for FTC Dashboard
+    maven { url 'https://maven.openftc.org/artifactory/all' } // Needed for EasyOpenCV
 }
 
 dependencies {
@@ -25,6 +26,9 @@ dependencies {
 
     implementation 'com.pedropathing:ftc:2.0.4'
     implementation 'com.pedropathing:telemetry:1.0.0'
+
+    // EasyOpenCV for vision processing
+    implementation 'org.openftc:easyopencv:1.7.3'
 
     // DELETED: This line was conflicting with the correct one above.
     // implementation 'com.bylazar:fullpanels:1.0.9'

@@ -50,6 +50,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             ((DcMotorEx) flywheel).setVelocity(TARGET_RPM * 28 / 60.0); // Convert RPM to ticks/sec
             
             // Get current flywheel RPM
+            intake.setPower(0.5);
             double currentVelocity = ((DcMotorEx) flywheel).getVelocity(); // ticks per second
             double currentRPM = currentVelocity * 60.0 / 28.0; // Convert to RPM (assuming 28 ticks per revolution)
             

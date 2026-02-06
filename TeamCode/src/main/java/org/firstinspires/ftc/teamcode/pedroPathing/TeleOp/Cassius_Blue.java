@@ -23,7 +23,6 @@ public class Cassius_Blue extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
 
         // pipelines 
-
         intMotors(this);
         intServos(this);
         initLimelight(this);
@@ -56,6 +55,9 @@ public class Cassius_Blue extends LinearOpMode {
         
         // Spindexer rotation during intake
         boolean spindexerForward = true; // Direction of rotation
+        
+        // Spindexer gradual movement during shooting
+        double spindexerIncrementSpeed = 0.075; // How fast spindexer moves (lower = slower)
         
         // Turret tracking toggle
         boolean autoTrackingEnabled = true; // Default to manual
@@ -92,6 +94,9 @@ public class Cassius_Blue extends LinearOpMode {
 
         int startSpindexer = 0;
 
+        double spindexerTargetPos = p3; // Target position for spindexer
+
+
         // Turret PID values are now in TurretConfig.java for live tuning via Pedro Pathing Panels
         
         // Turret tracking state variables
@@ -100,22 +105,16 @@ public class Cassius_Blue extends LinearOpMode {
         double filteredTurretError = 0;
         ElapsedTime turretTimer = new ElapsedTime();
 
+        boolean sfpo = true; //p1 of p3 for start
+
 
 
         waitForStart();
         while (opModeIsActive()) {
-
-           
-            // put all TeleOp code here
-
-            //buttons and joysticks
-
                boolean LStickIn2 = gamepad2.left_stick_button;
                 boolean RStickIn2 = gamepad2.right_stick_button;
                 boolean LBumper1 = gamepad1.left_bumper;
                 boolean RBumper1 = gamepad1.right_bumper;
-
-
 // talk withe parker abou how to fix controls
                 double LStickY =- gamepad1.right_stick_x;       //   inverted
                 double LStickX = -gamepad1.left_stick_x;
@@ -154,7 +153,6 @@ public class Cassius_Blue extends LinearOpMode {
                 boolean dpadDown2 = gamepad2.dpad_down;
                 boolean dpadRight2 = gamepad2.dpad_right;
                 boolean dpadLeft2 = gamepad2.dpad_left;
-
 
             // Drive code 
 
@@ -272,100 +270,219 @@ public class Cassius_Blue extends LinearOpMode {
                 // Start sequence
                 sShot = 1;
                 shootTimer.reset();
-
-                spindexer.setPosition(p3);
+                
+                if(spindexer.getPosition() < p2){
+                    spindexerTargetPos = p1; // Set target, will move gradually
+                    sfpo = true;
+                } else {
+                    spindexerTargetPos = p3; // Set target, will move gradually
+                    sfpo = false;
+                }
             }
             
             // Run shooting sequence based purely on sShot and timer
             // FAIL-SAFE: Each case has a maximum timeout to prevent jamming from breaking the sequence
-            switch(sShot) {
-                case 0: // Idle
-                    flywheel.setVelocity(0);
-                    flicker1.setPosition(F1Rest);
-                    flicker2.setPosition(F2Rest);
-                    break;
-                    
-                case 1: // First shot at p1
-                    flywheel.setVelocity(getTickSpeed(rpm));
-                    if (shootTimer.milliseconds() < 1500) {
-                        // Wait for flywheel to spin up
-                    } else if (shootTimer.milliseconds() < 1900) {
-                        // Fire - command servos
-                        flicker1.setPosition(F1Shoot);
-                        flicker2.setPosition(F2Shoot);
-                    } else if (shootTimer.milliseconds() < 2100) {
-                        // Check if flickers reached target OR timeout
-                        boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                        boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+
+            if(sfpo){
+                //p1, p2, p3
+                switch(sShot) {
+                    case 0: // Idle
+                        flywheel.setVelocity(0);
+                        flicker1.setPosition(F1Rest);
+                        flicker2.setPosition(F2Rest);
+                        break;
                         
-                        if (f1Ready && f2Ready || shootTimer.milliseconds() > 2000) {
-                            // Reset flickers (either reached target or timed out)
-                            flicker1.setPosition(F1Rest);
-                            flicker2.setPosition(F2Rest);
+                    case 1: // First shot at p1
+                        flywheel.setVelocity(getTickSpeed(rpm));
+                        if (shootTimer.milliseconds() < 1500) {
+                            // Wait for flywheel to spin up
+                        } else if (shootTimer.milliseconds() < 1900) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 2100) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 2000) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 3200) {
+                            // Set target to move spindexer to p2
+                            spindexerTargetPos = p2;
+                        } else if (shootTimer.milliseconds() < 4000) {
+                            // Wait for spindexer to finish
+                        } else {
+                            // Next shot OR timeout fail-safe (4 seconds max)
+                            sShot = 2;
+                            shootTimer.reset();
                         }
-                    } else if (shootTimer.milliseconds() < 3200) {
-                        // Move spindexer to p2
-                        spindexer.setPosition(p2);
-                    } else if (shootTimer.milliseconds() < 4000) {
-                        // Wait for spindexer to finish
-                    } else {
-                        // Next shot OR timeout fail-safe (4 seconds max)
-                        sShot = 2;
-                        shootTimer.reset();
-                    }
-                    break;
-                    
-                case 2: // Second shot at p2
-                    flywheel.setVelocity(getTickSpeed(rpm+200));
-                    if (shootTimer.milliseconds() < 600) {
-                        // Fire - command servos
-                        flicker1.setPosition(F1Shoot);
-                        flicker2.setPosition(F2Shoot);
-                    } else if (shootTimer.milliseconds() < 1000) {
-                        // Check if flickers reached target OR timeout
-                        boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                        boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                        break;
                         
-                        if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
-                            // Reset flickers (either reached target or timed out)
-                            flicker1.setPosition(F1Rest);
-                            flicker2.setPosition(F2Rest);
+                    case 2: // Second shot at p2
+                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        if (shootTimer.milliseconds() < 600) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 1000) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 2500) {
+                            // Set target to move spindexer to p1
+                            spindexerTargetPos = p3;
+                        } else if (shootTimer.milliseconds() < 3200) {
+                            // Wait for spindexer to finish
+                        } else {
+                            // Next shot OR timeout fail-safe (3.5 seconds max)
+                            sShot = 3;
+                            shootTimer.reset();
                         }
-                    } else if (shootTimer.milliseconds() < 2500) {
-                        // Move spindexer to p3
-                        spindexer.setPosition(p1);
-                    } else if (shootTimer.milliseconds() < 3200) {
-                        // Wait for spindexer to finish
-                    } else {
-                        // Next shot OR timeout fail-safe (3.5 seconds max)
-                        sShot = 3;
-                        shootTimer.reset();
-                    }
-                    break;
-                    
-                case 3: // Third shot at p3
-                    flywheel.setVelocity(getTickSpeed(rpm+200));
-                    if (shootTimer.milliseconds() < 300) {
-                        // Fire - command servos
-                        flicker1.setPosition(F1Shoot);
-                        flicker2.setPosition(F2Shoot);
-                    } else if (shootTimer.milliseconds() < 1000) {
-                        // Check if flickers reached target OR timeout
-                        boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                        boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                        break;
                         
-                        if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
-                            // Reset flickers (either reached target or timed out)
-                            flicker1.setPosition(F1Rest);
-                            flicker2.setPosition(F2Rest);
+                    case 3: // Third shot at p3
+                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        if (shootTimer.milliseconds() < 300) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 1000) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 2000) {
+                            // Extra time buffer for final shot
+                        } else {
+                            // Sequence complete OR timeout fail-safe (2 seconds max)
+                            sShot = 0;
                         }
-                    } else if (shootTimer.milliseconds() < 2000) {
-                        // Extra time buffer for final shot
+                        break;
+                }
+            } else {
+                //p3, p2, p1
+                switch(sShot) {
+                    case 0: // Idle
+                        flywheel.setVelocity(0);
+                        flicker1.setPosition(F1Rest);
+                        flicker2.setPosition(F2Rest);
+                        break;
+                        
+                    case 1: // First shot at p1
+                        flywheel.setVelocity(getTickSpeed(rpm));
+                        if (shootTimer.milliseconds() < 1500) {
+                            // Wait for flywheel to spin up
+                        } else if (shootTimer.milliseconds() < 1900) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 2100) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 2000) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 3200) {
+                            // Set target to move spindexer to p2
+                            spindexerTargetPos = p2;
+                        } else if (shootTimer.milliseconds() < 4000) {
+                            // Wait for spindexer to finish
+                        } else {
+                            // Next shot OR timeout fail-safe (4 seconds max)
+                            sShot = 2;
+                            shootTimer.reset();
+                        }
+                        break;
+                        
+                    case 2: // Second shot at p2
+                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        if (shootTimer.milliseconds() < 600) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 1000) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 2500) {
+                            // Set target to move spindexer to p1
+                            spindexerTargetPos = p1;
+                        } else if (shootTimer.milliseconds() < 3200) {
+                            // Wait for spindexer to finish
+                        } else {
+                            // Next shot OR timeout fail-safe (3.5 seconds max)
+                            sShot = 3;
+                            shootTimer.reset();
+                        }
+                        break;
+                        
+                    case 3: // Third shot at p3
+                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        if (shootTimer.milliseconds() < 300) {
+                            // Fire - command servos
+                            flicker1.setPosition(F1Shoot);
+                            flicker2.setPosition(F2Shoot);
+                        } else if (shootTimer.milliseconds() < 1000) {
+                            // Check if flickers reached target OR timeout
+                            boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
+                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
+                            
+                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                                // Reset flickers (either reached target or timed out)
+                                flicker1.setPosition(F1Rest);
+                                flicker2.setPosition(F2Rest);
+                            }
+                        } else if (shootTimer.milliseconds() < 2000) {
+                            // Extra time buffer for final shot
+                        } else {
+                            // Sequence complete OR timeout fail-safe (2 seconds max)
+                            sShot = 0;
+                        }
+                        break;
+                }
+            }
+            
+            // Gradual spindexer movement - slowly move towards target position
+            if (sShot != 0) { // Only during shooting sequence
+                double currentSpindexerPos = spindexer.getPosition();
+                double error = spindexerTargetPos - currentSpindexerPos;
+                
+                if (Math.abs(error) > 0.01) { // If not at target
+                    double newPosition;
+                    if (error > 0) {
+                        // Move forward - don't overshoot
+                        newPosition = Math.min(currentSpindexerPos + spindexerIncrementSpeed, spindexerTargetPos);
                     } else {
-                        // Sequence complete OR timeout fail-safe (2 seconds max)
-                        sShot = 0;
+                        // Move backward - don't overshoot
+                        newPosition = Math.max(currentSpindexerPos - spindexerIncrementSpeed, spindexerTargetPos);
                     }
-                    break;
+                    spindexer.setPosition(newPosition);
+                }
             }
 
                 // Hood control - slide up/down incrementally
@@ -374,7 +491,7 @@ public class Cassius_Blue extends LinearOpMode {
                      hood.setPosition(Math.min(1.0, currentHoodPos + 0.01)); // Slide up
                  } else if (dpadDown2){
                      hood.setPosition(Math.max(0.0, currentHoodPos - 0.01)); // Slide down
-                 } 
+                } 
 
             // Toggle turret auto-tracking with Y button (gamepad2)
             if (y2 && !y2Pressed) {
@@ -426,6 +543,7 @@ public class Cassius_Blue extends LinearOpMode {
             //     lastTurretError = 0;
             //     filteredTurretError = 0;
             // } else 
+            
             if (autoTrackingEnabled && hasBlueGoal()) {
                 // Automatic tracking control (PID control with filtering)
                 // Motor direction: RIGHT = POSITIVE, LEFT = NEGATIVE
@@ -532,9 +650,12 @@ public class Cassius_Blue extends LinearOpMode {
 
     }
 
+    
+
     // Helper method to convert RPM to ticks per second
     private double getTickSpeed(double rpm) {
         return rpm * 28 / 60; // 28 ticks per revolution, 60 seconds per minute
     }
 
- }
+}
+

@@ -304,9 +304,11 @@ public class Cassius_Blue extends LinearOpMode {
                 
                 if(spindexer.getPosition() < p2){
                     spindexerTargetPos = p1; // Set target, will move gradually
+                    spindexer.setPosition(p1); // Snap to closed position immediately
                     sfpo = true;
                 } else {
                     spindexerTargetPos = p3; // Set target, will move gradually
+                    spindexer.setPosition(p3); // Snap to closed position immediately
                     sfpo = false;
                 }
             }
@@ -383,7 +385,7 @@ public class Cassius_Blue extends LinearOpMode {
                         
                     case 3: // Third shot at p3
                         flywheel.setVelocity(getTickSpeed(targetRpm + 200));
-                        if (shootTimer.milliseconds() < 300) {
+                        if (shootTimer.milliseconds() < 600) {
                             // Fire - command servos
                             flicker1.setPosition(F1Shoot);
                             flicker2.setPosition(F2Shoot);

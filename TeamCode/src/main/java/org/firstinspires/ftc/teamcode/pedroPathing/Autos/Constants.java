@@ -18,12 +18,14 @@ public class Constants {
 
     public static FollowerConstants followerConstants = new FollowerConstants()
             .mass(7.71)
-            .forwardZeroPowerAcceleration(-41.442107879168766)
-            .lateralZeroPowerAcceleration(-59.49823903490934)
-            .translationalPIDFCoefficients(new PIDFCoefficients(0.1125, 0, 0.01, 0.055))
-            .headingPIDFCoefficients(new PIDFCoefficients(0.5, 0, 0.3, 0.0625))
-            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.075, 0, 0.0003, 0.6, 0.015))
-            .centripetalScaling(0.0009);
+        //     .forwardZeroPowerAcceleration(-41.442107879168766)
+        //     .lateralZeroPowerAcceleration(-59.49823903490934)
+        //     .translationalPIDFCoefficients(new PIDFCoefficients(0.1125, 0, 0.01, 0.055))
+        //     .headingPIDFCoefficients(new PIDFCoefficients(0.5, 0, 0.3, 0.0625))
+        //     .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.075, 0, 0.0003, 0.6, 0.015))
+        //     .centripetalScaling(0.0009)
+   ;
+
     
     public static PathConstraints pathConstraints = new PathConstraints(
             0.99, // T Value constraint 
@@ -42,16 +44,16 @@ public class Constants {
 
     public static MecanumConstants driveConstants = new MecanumConstants()
             .maxPower(1)
-            .rightFrontMotorName("frontRightDrive")
-            .rightRearMotorName("backRightDrive")
-            .leftFrontMotorName("frontLeftDrive")
-            .leftRearMotorName("backLeftDrive")
+            .rightFrontMotorName("frontRight")
+            .rightRearMotorName("backRight")
+            .leftFrontMotorName("frontLeft")
+            .leftRearMotorName("backLeft")
             .leftFrontMotorDirection(DcMotor.Direction.REVERSE)
-            .leftRearMotorDirection(DcMotor.Direction.FORWARD)
-            .rightRearMotorDirection(DcMotor.Direction.FORWARD)
-            .rightFrontMotorDirection(DcMotor.Direction.REVERSE)
-            .xVelocity(83.28172915000616)
-            .yVelocity(60.98097337137057)
+            .leftRearMotorDirection(DcMotor.Direction.REVERSE)
+            .rightRearMotorDirection(DcMotor.Direction.REVERSE)
+            .rightFrontMotorDirection(DcMotor.Direction.FORWARD)
+       //     .xVelocity(80.59091066375493)
+        //     .yVelocity(60.98097337137057)
 
             ;
 
@@ -61,8 +63,8 @@ public class Constants {
             .encoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
             .forwardEncoderDirection(GoBildaPinpointDriver.EncoderDirection.REVERSED) // is x
             .strafeEncoderDirection(GoBildaPinpointDriver.EncoderDirection.REVERSED) // is y
-            .forwardPodY(5.875)
-            .strafePodX(8);
+            .forwardPodY(7.324556)  // forward pod is 7.324556 inches left of center
+            .strafePodX(0);         // strafe pod has no forward/backward offset
 
 
 

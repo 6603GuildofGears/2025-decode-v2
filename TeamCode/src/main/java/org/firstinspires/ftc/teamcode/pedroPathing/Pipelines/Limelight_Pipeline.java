@@ -133,6 +133,21 @@ public class Limelight_Pipeline {
     }
 
     /**
+     * Get vertical offset (ty) for blue goal (ID 20)
+     */
+    public static double getBlueGoalY() {
+        LLResult result = getLatestResult();
+        if (result != null && result.isValid() && result.getFiducialResults() != null) {
+            for (int i = 0; i < result.getFiducialResults().size(); i++) {
+                if ((int) result.getFiducialResults().get(i).getFiducialId() == 20) {
+                    return result.getFiducialResults().get(i).getTargetYDegrees();
+                }
+            }
+        }
+        return 0.0;
+    }
+
+    /**
      * Get horizontal offset (tx) for red goal (ID 24)
      */
     public static double getRedGoalX() {
@@ -141,6 +156,21 @@ public class Limelight_Pipeline {
             for (int i = 0; i < result.getFiducialResults().size(); i++) {
                 if ((int) result.getFiducialResults().get(i).getFiducialId() == 24) {
                     return result.getFiducialResults().get(i).getTargetXDegrees();
+                }
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Get vertical offset (ty) for red goal (ID 24)
+     */
+    public static double getRedGoalY() {
+        LLResult result = getLatestResult();
+        if (result != null && result.isValid() && result.getFiducialResults() != null) {
+            for (int i = 0; i < result.getFiducialResults().size(); i++) {
+                if ((int) result.getFiducialResults().get(i).getFiducialId() == 24) {
+                    return result.getFiducialResults().get(i).getTargetYDegrees();
                 }
             }
         }

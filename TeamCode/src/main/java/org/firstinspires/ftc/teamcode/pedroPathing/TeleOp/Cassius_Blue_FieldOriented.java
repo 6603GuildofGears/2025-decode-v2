@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
@@ -16,7 +17,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
 
-
+@Disabled
 @TeleOp(name="Cassius Blue (Field Oriented)", group="TeleOp")
 public class Cassius_Blue_FieldOriented extends LinearOpMode {
 

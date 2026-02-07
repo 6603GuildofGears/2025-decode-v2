@@ -12,8 +12,8 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.AprilTagCentererConfig.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
 
-@TeleOp(name = "AprilTag Centerer", group = "Testing")
-public class AprilTag_Centerer extends LinearOpMode {
+@TeleOp(name = "AprilTag Centerer Red", group = "Testing")
+public class AprilTag_Centerer_Red extends LinearOpMode {
 
     private static final int TURRET_MIN_LIMIT = -45;
     private static final int TURRET_MAX_LIMIT = 860;
@@ -95,7 +95,7 @@ public class AprilTag_Centerer extends LinearOpMode {
             // }
 
             double turretPower = 0.0;
-            boolean hasTarget = hasBlueGoal();
+            boolean hasTarget = hasRedGoal();
             double rotationComp = LStickY * ROTATION_COMP;
 
             if (wrapMode) {
@@ -126,7 +126,7 @@ public class AprilTag_Centerer extends LinearOpMode {
                     lastError = 0.0;
                 }
             } else if (hasTarget) {
-                double tx = getBlueGoalX();
+                double tx = getRedGoalX();
                 double txSign = Math.signum(tx);
                 if (txSign != 0 && lastTxSign != 0 && txSign != lastTxSign) {
                     overshootSlow = true; // crossed center
@@ -167,7 +167,7 @@ public class AprilTag_Centerer extends LinearOpMode {
                 targetLostTimer.reset();
 
                 // Distance-based hood adjustment
-                double ty = getBlueGoalY();
+                double ty = getRedGoalY();
                 double totalAngle = CAMERA_MOUNT_ANGLE - ty;
                 double heightDiff = TARGET_HEIGHT - CAMERA_HEIGHT;
                 if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
@@ -239,10 +239,10 @@ public class AprilTag_Centerer extends LinearOpMode {
 
             turret.setPower(turretPower);
 
-            telemetry.addData("=== APRILTAG CENTERER ===", "");
+            telemetry.addData("=== APRILTAG CENTERER RED ===", "");
             telemetry.addData("Mode", wrapMode ? "WHIP " + (wrapDirectionRight ? "→" : "←") : (hasTarget ? "TRACK" : "SCAN"));
-            telemetry.addData("Target", hasTarget ? "BLUE" : "NO");
-            telemetry.addData("TX", hasTarget ? String.format("%.2f°", getBlueGoalX()) : "--");
+            telemetry.addData("Target", hasTarget ? "RED" : "NO");
+            telemetry.addData("TX", hasTarget ? String.format("%.2f°", getRedGoalX()) : "--");
             telemetry.addData("Filtered", String.format("%.2f°", filteredError));
             telemetry.addData("KP", String.format("%.4f", KP));
             telemetry.addData("Alpha", String.format("%.2f", FILTER_ALPHA));
@@ -251,7 +251,7 @@ public class AprilTag_Centerer extends LinearOpMode {
             telemetry.addData("Rot Comp", String.format("%.2f", RStickX * ROTATION_COMP));
             telemetry.addData("Turret Pos", turretPosition);
             if (hasTarget) {
-                double tyDbg = getBlueGoalY();
+                double tyDbg = getRedGoalY();
                 double totalAngleDbg = CAMERA_MOUNT_ANGLE - tyDbg;
                 double heightDiffDbg = TARGET_HEIGHT - CAMERA_HEIGHT;
                 double distDbg = (Math.abs(totalAngleDbg) > 0.5 && Math.abs(totalAngleDbg) < 89.5)

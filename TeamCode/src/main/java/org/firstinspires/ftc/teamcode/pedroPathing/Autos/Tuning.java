@@ -1,3 +1,4 @@
+
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Tuning.changes;
@@ -15,6 +16,7 @@ import com.bylazar.field.PanelsField;
 import com.bylazar.field.Style;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import com.pedropathing.ErrorCalculator;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.*;
 import com.pedropathing.math.*;
@@ -154,7 +156,7 @@ class LocalizationTest extends OpMode {
      */
     @Override
     public void loop() {
-        follower.setTeleOpDrive(-gamepad1.right_stick_x, gamepad1.left_stick_x, -gamepad1.left_stick_y, true);
+        follower.setTeleOpDrive(-gamepad1.left_stick_y, -gamepad1.left_stick_x, -gamepad1.right_stick_x, true);
         follower.update();
 
         telemetryM.debug("x:" + follower.getPose().getX());
@@ -206,7 +208,7 @@ class ForwardTuner extends OpMode {
     public void loop() {
         follower.update();
 
-        telemetryM.debug("Distance Moved: " + follower.getPose().getX());
+        telemetryM.debug("Distance Moved: " + (follower.getPose().getX() - 72));
         telemetryM.debug("The multiplier will display what your forward ticks to inches should be to scale your current distance to " + DISTANCE + " inches.");
         telemetryM.debug("Multiplier: " + (DISTANCE / ((follower.getPose().getX() - 72) / follower.getPoseTracker().getLocalizer().getForwardMultiplier())));
         telemetryM.update(telemetry);
@@ -254,7 +256,7 @@ class LateralTuner extends OpMode {
     public void loop() {
         follower.update();
 
-        telemetryM.debug("Distance Moved: " + follower.getPose().getY());
+        telemetryM.debug("Distance Moved: " + (follower.getPose().getY() - 72));
         telemetryM.debug("The multiplier will display what your strafe ticks to inches should be to scale your current distance to " + DISTANCE + " inches.");
         telemetryM.debug("Multiplier: " + (DISTANCE / ((follower.getPose().getY() - 72) / follower.getPoseTracker().getLocalizer().getLateralMultiplier())));
         telemetryM.update(telemetry);
@@ -369,15 +371,9 @@ class ForwardVelocityTuner extends OpMode {
      * velocities, and when the robot has run forward enough, these last velocities recorded are
      * averaged and printed.
      */
-    private boolean previousB = false;
-    private boolean previousA = false;
-
     @Override
     public void loop() {
-        boolean bPressed = gamepad1.b && !previousB;
-        previousB = gamepad1.b;
-        
-        if (bPressed) {
+        if (gamepad1.bWasPressed()) {
             stopRobot();
             requestOpModeStop();
         }
@@ -415,10 +411,7 @@ class ForwardVelocityTuner extends OpMode {
             telemetryM.update(telemetry);
             telemetry.update();
 
-            boolean aPressed = gamepad1.a && !previousA;
-            previousA = gamepad1.a;
-            
-            if (aPressed) {
+            if (gamepad1.aWasPressed()) {
                 follower.setXVelocity(average);
                 String message = "XMovement: " + average;
                 changes.add(message);
@@ -449,8 +442,6 @@ class LateralVelocityTuner extends OpMode {
     public static double RECORD_NUMBER = 10;
 
     private boolean end;
-    private boolean previousB = false;
-    private boolean previousA = false;
 
     @Override
     public void init() {
@@ -490,10 +481,7 @@ class LateralVelocityTuner extends OpMode {
      */
     @Override
     public void loop() {
-        boolean bPressed = gamepad1.b && !previousB;
-        previousB = gamepad1.b;
-        
-        if (bPressed) {
+        if (gamepad1.bWasPressed()) {
             stopRobot();
             requestOpModeStop();
         }
@@ -524,10 +512,7 @@ class LateralVelocityTuner extends OpMode {
             telemetryM.debug("Press A to set the Lateral Velocity temporarily (while robot remains on).");
             telemetryM.update(telemetry);
 
-            boolean aPressed = gamepad1.a && !previousA;
-            previousA = gamepad1.a;
-            
-            if (aPressed) {
+            if (gamepad1.aWasPressed()) {
                 follower.setYVelocity(average);
                 String message = "YMovement: " + average;
                 changes.add(message);
@@ -560,8 +545,6 @@ class ForwardZeroPowerAccelerationTuner extends OpMode {
 
     private boolean stopping;
     private boolean end;
-    private boolean previousB = false;
-    private boolean previousA = false;
 
     @Override
     public void init() {
@@ -597,10 +580,7 @@ class ForwardZeroPowerAccelerationTuner extends OpMode {
      */
     @Override
     public void loop() {
-        boolean bPressed = gamepad1.b && !previousB;
-        previousB = gamepad1.b;
-        
-        if (bPressed) {
+        if (gamepad1.bWasPressed()) {
             stopRobot();
             requestOpModeStop();
         }
@@ -638,10 +618,7 @@ class ForwardZeroPowerAccelerationTuner extends OpMode {
             telemetryM.debug("Press A to set the Forward Zero Power Acceleration temporarily (while robot remains on).");
             telemetryM.update(telemetry);
 
-            boolean aPressed = gamepad1.a && !previousA;
-            previousA = gamepad1.a;
-            
-            if (aPressed) {
+            if (gamepad1.aWasPressed()) {
                 follower.getConstants().setForwardZeroPowerAcceleration(average);
                 String message = "Forward Zero Power Acceleration: " + average;
                 changes.add(message);
@@ -672,8 +649,6 @@ class LateralZeroPowerAccelerationTuner extends OpMode {
     private long previousTimeNano;
     private boolean stopping;
     private boolean end;
-    private boolean previousB = false;
-    private boolean previousA = false;
 
     @Override
     public void init() {
@@ -747,10 +722,7 @@ class LateralZeroPowerAccelerationTuner extends OpMode {
             telemetryM.debug("Press A to set the Lateral Zero Power Acceleration temporarily (while robot remains on).");
             telemetryM.update(telemetry);
 
-            boolean aPressed = gamepad1.a && !previousA;
-            previousA = gamepad1.a;
-            
-            if (aPressed) {
+            if (gamepad1.aWasPressed()) {
                 follower.getConstants().setLateralZeroPowerAcceleration(average);
                 String message = "Lateral Zero Power Acceleration: " + average;
                 changes.add(message);
@@ -820,6 +792,9 @@ class TranslationalTuner extends OpMode {
         }
 
         telemetryM.debug("Push the robot laterally to test the Translational PIDF(s).");
+        telemetryM.addData("Zero Line", 0);
+        telemetryM.addData("Error X", follower.errorCalculator.getTranslationalError().getXComponent());
+        telemetryM.addData("Error Y", follower.errorCalculator.getTranslationalError().getYComponent());
         telemetryM.update(telemetry);
     }
 }
@@ -892,6 +867,8 @@ class HeadingTuner extends OpMode {
         }
 
         telemetryM.debug("Turn the robot manually to test the Heading PIDF(s).");
+        telemetryM.addData("Zero Line", 0);
+        telemetryM.addData("Error", follower.errorCalculator.getHeadingError());
         telemetryM.update(telemetry);
     }
 }
@@ -935,7 +912,7 @@ class DriveTuner extends OpMode {
     public void start() {
         follower.deactivateAllPIDFs();
         follower.activateDrive();
-        
+
         forwards = follower.pathBuilder()
                 .setGlobalDeceleration()
                 .addPath(new BezierLine(new Pose(72,72), new Pose(DISTANCE + 72,72)))
@@ -971,6 +948,8 @@ class DriveTuner extends OpMode {
         }
 
         telemetryM.debug("Driving forward?: " + forward);
+        telemetryM.addData("Zero Line", 0);
+        telemetryM.addData("Error", follower.errorCalculator.getDriveErrors()[1]);
         telemetryM.update(telemetry);
     }
 }
@@ -986,7 +965,7 @@ class DriveTuner extends OpMode {
  * @version 1.0, 3/12/2024
  */
 class Line extends OpMode {
-    public static double DISTANCE = 12;
+    public static double DISTANCE = 40;
     private boolean forward = true;
 
     private Path forwards;

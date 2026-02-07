@@ -4,6 +4,8 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResult;
 
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
@@ -70,7 +72,13 @@ public class Cassius_Blue extends LinearOpMode {
 
 
 
-        double rpm = 3000; // target RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
+    double baseRpm = 3000; // default RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
+    double targetRpm = baseRpm; // updated from Limelight lookup when available
+    double targetHoodPos = hood.getPosition();
+    // Limelight distance config (inches/degrees)
+    double cameraHeight = 11.125; // Camera lens center height in inches
+    double cameraMountAngle = 24.0; // Camera angle from horizontal
+    double targetHeight = 29.5; // AprilTag center height in inches
       
         // Turret gear ratio - Motor has 20 teeth, Turret gear has 131 teeth
         double turretGearRatio = 131.0 / 20.0; // = 6.55:1 (motor turns 6.55x for each turret rotation)
@@ -234,19 +242,19 @@ public class Cassius_Blue extends LinearOpMode {
                 intake.setPower(0.75); // intake in
                 
                 // Oscillate spindexer back and forth
-                double currentPos = spindexer.getPosition();
+                // double currentPos = spindexer.getPosition();
 
-                if(spindexerForward){
-                spindexer.setPosition(currentPos + 0.005);
-                    if(currentPos >= 0.995) {
-                        spindexerForward = false; // Reverse direction
-                    }
-                } else {
-                    spindexer.setPosition(currentPos - 0.005);
-                    if(currentPos <= 0.005) {
-                        spindexerForward = true; // Reverse direction
-                    }
-                }
+                // if(spindexerForward){
+                // spindexer.setPosition(currentPos + 0.005);
+                //     if(currentPos >= 0.995) {
+                //         spindexerForward = false; // Reverse direction
+                //     }
+                // } else {
+                //     spindexer.setPosition(currentPos - 0.005);
+                //     if(currentPos <= 0.005) {
+                //         spindexerForward = true; // Reverse direction
+                //     }
+                // }
 
             } else if (RBumper1) {
                 intake.setPower(-1); // intake out
@@ -254,6 +262,29 @@ public class Cassius_Blue extends LinearOpMode {
                 intake.setPower(0);
             }
 
+
+            // Limelight-based shooter tuning (distance -> rpm + hood)
+            LLResult limelightResult = getLatestResult();
+            double distanceInches = 0.0;
+            boolean hasDistance = false;
+            if (limelightResult != null && limelightResult.isValid() &&
+                limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
+                double ty = limelightResult.getFiducialResults().get(0).getTargetYDegrees();
+                double totalAngle = cameraMountAngle - ty;
+                double heightDifference = targetHeight - cameraHeight;
+                if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
+                    distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                    hasDistance = true;
+                }
+            }
+            if (hasDistance && (sShot != 0 || RBumper2) && !(dpadUp2 || dpadDown2)) {
+                ShooterLookup.Result tuned = ShooterLookup.lookup(distanceInches);
+                targetRpm = tuned.rpm;
+                targetHoodPos = tuned.hoodPos;
+                hood.setPosition(targetHoodPos);
+            } else if (!hasDistance) {
+                targetRpm = baseRpm;
+            }
 
             // Shooting sequence - fully timer based, no state variables
             // RBumper2 to start, runs through all 3 shots automatically
@@ -293,7 +324,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 1: // First shot at p1
-                        flywheel.setVelocity(getTickSpeed(rpm));
+                        flywheel.setVelocity(getTickSpeed(targetRpm));
                         if (shootTimer.milliseconds() < 1500) {
                             // Wait for flywheel to spin up
                         } else if (shootTimer.milliseconds() < 1900) {
@@ -323,7 +354,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 2: // Second shot at p2
-                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 600) {
                             // Fire - command servos
                             flicker1.setPosition(F1Shoot);
@@ -351,7 +382,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 3: // Third shot at p3
-                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 300) {
                             // Fire - command servos
                             flicker1.setPosition(F1Shoot);
@@ -384,7 +415,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 1: // First shot at p1
-                        flywheel.setVelocity(getTickSpeed(rpm));
+                        flywheel.setVelocity(getTickSpeed(targetRpm));
                         if (shootTimer.milliseconds() < 1500) {
                             // Wait for flywheel to spin up
                         } else if (shootTimer.milliseconds() < 1900) {
@@ -414,7 +445,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 2: // Second shot at p2
-                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 600) {
                             // Fire - command servos
                             flicker1.setPosition(F1Shoot);
@@ -442,7 +473,7 @@ public class Cassius_Blue extends LinearOpMode {
                         break;
                         
                     case 3: // Third shot at p3
-                        flywheel.setVelocity(getTickSpeed(rpm+200));
+                        flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 300) {
                             // Fire - command servos
                             flicker1.setPosition(F1Shoot);
@@ -642,6 +673,23 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("Spindexer Pos", String.format("%.2f", spindexer.getPosition()));
             telemetry.addData("Flicker1", String.format("%.2f", flicker1.getPosition()));
             telemetry.addData("Flicker2", String.format("%.2f", flicker2.getPosition()));
+            
+            telemetry.addData("=== LIMELIGHT DEBUG ===", "");
+            LLResult llResult = getLatestResult();
+            if (llResult != null && llResult.isValid() && llResult.getFiducialResults() != null && !llResult.getFiducialResults().isEmpty()) {
+                int tagId = (int) llResult.getFiducialResults().get(0).getFiducialId();
+                double tx = llResult.getFiducialResults().get(0).getTargetXDegrees();
+                double ty = llResult.getFiducialResults().get(0).getTargetYDegrees();
+                telemetry.addData("Tag ID", tagId);
+                telemetry.addData("TX", String.format("%.2f°", tx));
+                telemetry.addData("TY", String.format("%.2f°", ty));
+                telemetry.addData("Targets", llResult.getFiducialResults().size());
+            } else {
+                telemetry.addData("Tag ID", "NONE");
+                telemetry.addData("TX", "--");
+                telemetry.addData("TY", "--");
+                telemetry.addData("Targets", 0);
+            }
             
             displayTelemetry(this); // Shows Limelight FPS and additional info
             telemetry.update();

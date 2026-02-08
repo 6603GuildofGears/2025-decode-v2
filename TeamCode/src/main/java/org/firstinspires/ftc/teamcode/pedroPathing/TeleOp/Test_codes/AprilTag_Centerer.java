@@ -24,7 +24,7 @@ public class AprilTag_Centerer extends LinearOpMode {
 
     // Camera constants for distance calculation
     private static final double CAMERA_HEIGHT = 11.125; // inches
-    private static final double CAMERA_MOUNT_ANGLE = 24.0; // degrees from horizontal
+    private static final double CAMERA_MOUNT_ANGLE = 22.85; // degrees from horizontal (calibrated)
     private static final double TARGET_HEIGHT = 29.5; // AprilTag center height in inches
 
     @Override
@@ -180,7 +180,7 @@ public class AprilTag_Centerer extends LinearOpMode {
 
                 // Distance-based hood adjustment
                 double ty = getBlueGoalY();
-                double totalAngle = CAMERA_MOUNT_ANGLE - ty;
+                double totalAngle = CAMERA_MOUNT_ANGLE + ty;
                 double heightDiff = TARGET_HEIGHT - CAMERA_HEIGHT;
                 if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
                     double distanceInches = heightDiff / Math.tan(Math.toRadians(totalAngle));
@@ -264,7 +264,7 @@ public class AprilTag_Centerer extends LinearOpMode {
             telemetry.addData("Turret Pos", turretPosition);
             if (hasTarget) {
                 double tyDbg = getBlueGoalY();
-                double totalAngleDbg = CAMERA_MOUNT_ANGLE - tyDbg;
+                double totalAngleDbg = CAMERA_MOUNT_ANGLE + tyDbg;
                 double heightDiffDbg = TARGET_HEIGHT - CAMERA_HEIGHT;
                 double distDbg = (Math.abs(totalAngleDbg) > 0.5 && Math.abs(totalAngleDbg) < 89.5)
                         ? heightDiffDbg / Math.tan(Math.toRadians(totalAngleDbg)) : 0.0;

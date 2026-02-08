@@ -150,10 +150,10 @@ public class SpindexerController {
             case WAITING_FOR_BALL:
                 intakeActive = true;
                 // Check color sensor for ball arrival
-                if (isBallPresent(BALL_PRESENCE_THRESHOLD)) {
+                if (isBallPresent()) {
                     // Ball detected! Log it
                     slotLoaded[currentSlot] = true;
-                    slotColor[currentSlot] = detectBallColor(BALL_PRESENCE_THRESHOLD);
+                    slotColor[currentSlot] = detectBallColor();
                     ballCount++;
 
                     if (ballCount >= 3) {

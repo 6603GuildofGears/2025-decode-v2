@@ -24,7 +24,7 @@ public class Sensor {
     public static void initSensors(OpMode opMode) {
         mag = opMode.hardwareMap.get(TouchSensor.class, "mag");
         ballSensor = opMode.hardwareMap.get(NormalizedColorSensor.class, "ballSensor");
-        ballSensor.setGain(2.0f); // adjust if readings are too dim/bright
+        ballSensor.setGain(4.0f); // higher gain so purple balls read stronger
     }
     
     /**
@@ -43,29 +43,49 @@ public class Sensor {
     }
 
     /**
-     * Check if a ball is present in the active spindexer slot.
-     * Uses proximity/alpha channel — a ball close to the sensor reflects more light.
-     * @param threshold alpha value above which a ball is considered present (tune this)
+     * Convert normalized RGB (0-1) to HSV hue in degrees (0-360).
      */
-    public static boolean isBallPresent(double threshold) {
-        NormalizedRGBA color = ballSensor.getNormalizedColors();
-        return color.alpha > threshold;
+    public static float rgbToHue(float r, float g, float b) {
+        float max = Math.max(r, Math.max(g, b));
+        float min = Math.min(r, Math.min(g, b));
+        float delta = max - min;
+
+        if (delta < 0.0001f) return 0; // grey / no color
+
+        float hue;
+        if (max == r) {
+            hue = 60 * (((g - b) / delta) % 6);
+        } else if (max == g) {
+            hue = 60 * (((b - r) / delta) + 2);
+        } else {
+            hue = 60 * (((r - g) / delta) + 4);
+        }
+        if (hue < 0) hue += 360;
+        return hue;
     }
 
     /**
-     * Detect the dominant color of the ball currently in the slot.
-     * @return "RED", "BLUE", "YELLOW", or "NONE"
+     * Check if a ball is present — true if hue falls in green or purple range.
      */
-    public static String detectBallColor(double presenceThreshold) {
+    public static boolean isBallPresent() {
         NormalizedRGBA c = ballSensor.getNormalizedColors();
-        if (c.alpha < presenceThreshold) return "NONE";
+        float hue = rgbToHue(c.red, c.green, c.blue);
+        return (hue >= 160 && hue < 310);
+    }
 
-        float r = c.red, g = c.green, b = c.blue;
+    /**
+     * Detect the ball color using HSV hue only.
+     * Green balls ~170°, Purple balls ~220°, split at 195°.
+     * @return "GREEN", "PURPLE", or "NONE"
+     */
+    public static String detectBallColor() {
+        NormalizedRGBA c = ballSensor.getNormalizedColors();
+        float hue = rgbToHue(c.red, c.green, c.blue);
 
-        // Yellow shows as high red + high green, low blue
-        if (r > b && g > b && g > 0.3f) return "YELLOW";
-        if (r > g && r > b) return "RED";
-        if (b > r && b > g) return "BLUE";
+        // Green: hue 160-195 (~170)
+        // Purple: hue 195-310 (~220)
+        if (hue >= 160 && hue < 195) return "GREEN";
+        if (hue >= 195 && hue < 310) return "PURPLE";
 
         return "NONE";
     }

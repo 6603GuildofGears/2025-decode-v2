@@ -60,7 +60,7 @@ public class Cassius_Blue_Simple extends LinearOpMode {
         double targetRpm = baseRpm;
         double targetHoodPos = hood.getPosition();
         double cameraHeight = 11.125;
-        double cameraMountAngle = 24.0;
+        double cameraMountAngle = 22.85; // calibrated
         double targetHeight = 29.5;
       
         double turretGearRatio = 131.0 / 20.0;
@@ -210,7 +210,7 @@ public class Cassius_Blue_Simple extends LinearOpMode {
             if (limelightResult != null && limelightResult.isValid() &&
                 limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
                 double ty = limelightResult.getFiducialResults().get(0).getTargetYDegrees();
-                double totalAngle = cameraMountAngle - ty;
+                double totalAngle = cameraMountAngle + ty;
                 double heightDifference = targetHeight - cameraHeight;
                 if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
                     distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));

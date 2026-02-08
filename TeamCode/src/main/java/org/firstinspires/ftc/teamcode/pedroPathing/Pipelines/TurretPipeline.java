@@ -19,7 +19,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLi
 public class TurretPipeline {
 
     private double KP = 0.01300;
-    private double KI = 0.00092;
+    private double KI = 0.00100;
     private double KD = 0.00110;
 
     private double lastError = 0;

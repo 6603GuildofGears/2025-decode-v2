@@ -65,7 +65,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             
             // Camera configuration
             double cameraHeight = 11.125; // Camera lens center height in inches
-            double cameraMountAngle = 24.0; // Camera angle from horizontal (90 - 66 = 24 degrees)
+            double cameraMountAngle = 22.85; // Camera angle from horizontal (calibrated)
             double targetHeight = 29.5; // AprilTag center height in inches
             
             if (limelightResult != null && limelightResult.isValid() && 
@@ -76,8 +76,8 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                 tx = limelightResult.getFiducialResults().get(0).getTargetXDegrees();
                 
                 // Distance calculation with angled camera
-                // For upward-angled camera, subtract ty from mount angle
-                double totalAngle = cameraMountAngle - ty;
+                // For upward-angled camera, ADD ty (ty is negative when target is below crosshair)
+                double totalAngle = cameraMountAngle + ty;
                 double heightDifference = targetHeight - cameraHeight;
                 
                 if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) { // Avoid extreme angles
@@ -91,7 +91,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                 telemetry.addData("Target Detected", "ID: %d", detectedTagId);
                 telemetry.addData("Distance", "%.2f inches", distance);
                 telemetry.addData("TY Angle", "%.2f°", ty);
-                telemetry.addData("Total Angle", "%.2f°", cameraMountAngle - ty);
+                telemetry.addData("Total Angle", "%.2f°", cameraMountAngle + ty);
             } else {
                 telemetry.addData("Target Detected", "None");
             }

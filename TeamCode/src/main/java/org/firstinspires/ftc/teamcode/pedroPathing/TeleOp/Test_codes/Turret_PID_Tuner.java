@@ -15,6 +15,11 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLi
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
+import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
+
+import com.pedropathing.follower.Follower;
+import com.pedropathing.geometry.Pose;
+import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 /**
  * Turret PID Auto-Tuner (Blue Alliance)
@@ -43,7 +48,7 @@ public class Turret_PID_Tuner extends LinearOpMode {
 
     // --- Camera constants ---
     private static final double CAMERA_HEIGHT      = 11.125;
-    private static final double CAMERA_MOUNT_ANGLE = 24.0;
+    private static final double CAMERA_MOUNT_ANGLE = 22.85; // calibrated
     private static final double TARGET_HEIGHT      = 29.5;
 
     // --- Twiddle tuning settings ---
@@ -62,16 +67,16 @@ public class Turret_PID_Tuner extends LinearOpMode {
     private static final double D_FILTER_ALPHA  = 0.5;    // less lag on derivative too
 
     // ========== PID + feedforward state ==========
-    private double kP   = 0.01300;
-    private double kI   = 0.00092;
-    private double kD   = 0.00110;
-    private double kRot = 0.00300;  // IMU yaw-rate feedforward gain (power per °/s)
+    private double kP   = 0.01630;
+    private double kI   = 0.00090;
+    private double kD   = 0.00210;
+    private double kRot = 0.00410;  // IMU yaw-rate feedforward gain (power per °/s)
 
     // Best found so far
-    private double bestKP   = 0.01300;
-    private double bestKI   = 0.00092;
-    private double bestKD   = 0.00110;
-    private double bestKRot = 0.00300;
+    private double bestKP   = 0.01630;
+    private double bestKI   = 0.00090;
+    private double bestKD   = 0.00210;
+    private double bestKRot = 0.00410;
     private double bestError = Double.MAX_VALUE;
 
     // IMU
@@ -119,6 +124,10 @@ public class Turret_PID_Tuner extends LinearOpMode {
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD)));
         imu.resetYaw();
 
+        // Odometry for turret field-relative aiming when Limelight loses target
+        Follower follower = Constants.createFollower(hardwareMap);
+        follower.setStartingPose(new Pose(72, 72, 0)); // adjust to actual start position
+
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
@@ -128,10 +137,6 @@ public class Turret_PID_Tuner extends LinearOpMode {
 
         // Filtered error for smooth tracking
         double filteredError = 0.0;
-        boolean scanDirectionRight = true;
-        double lastSeenError = 0.0;
-        double lastSeenTime  = 0.0;
-        int lastSeenTurretPos = 0;  // turret position when target was last seen
         ElapsedTime targetLostTimer = new ElapsedTime();
 
         while (!isStarted() && !isStopRequested()) {
@@ -161,10 +166,13 @@ public class Turret_PID_Tuner extends LinearOpMode {
         settling = true; // initial settle
 
         while (opModeIsActive()) {
+            // Update odometry every loop for turret field-relative aiming
+            follower.update();
+
             // ========== DRIVE ==========
-            double drive  = gamepad1.left_stick_y;
-            double strafe = -gamepad1.left_stick_x;
-            double turn   = -gamepad1.right_stick_x;
+            double drive  = -gamepad1.left_stick_y;
+            double strafe = gamepad1.left_stick_x;
+            double turn   = gamepad1.right_stick_x;
 
             if (Math.abs(drive) > 0.05 || Math.abs(strafe) > 0.05 || Math.abs(turn) > 0.05) {
                 double lf = (drive + strafe + turn) * gear;
@@ -219,10 +227,6 @@ public class Turret_PID_Tuner extends LinearOpMode {
                     filteredError = FILTER_ALPHA * tx + (1.0 - FILTER_ALPHA) * filteredError;
                 }
 
-                lastSeenError = tx;
-                lastSeenTime  = getRuntime();
-                lastSeenTurretPos = turretPosition;
-
                 if (Math.abs(filteredError) > DEADBAND_DEG) {
                     // PID calculation
                     double error = filteredError;
@@ -264,47 +268,42 @@ public class Turret_PID_Tuner extends LinearOpMode {
                     windowTrackFrames++;
                 }
             } else {
-                // No target — scan to reacquire
+                // No target — use odometry to aim turret at predicted goal angle
                 integral = 0.0;
                 previousError = 0.0;
                 filteredDeriv = 0.0;
-                filterInited = false;  // re-initialize filter on next acquisition
+                filterInited = false;
 
-                // Start with just yaw-rate compensation while deciding direction
+                // Start with yaw-rate compensation
                 turretPower = rotationFF;
 
                 double timeLost = targetLostTimer.seconds();
                 if (timeLost > 0.15) {
-                    // --- Pick scan direction ---
-                    if (getRuntime() - lastSeenTime < 2.0) {
-                        // Recently saw target: scan toward where it was drifting
-                        // If target was at tx>0 (right in camera) the turret needs to
-                        // keep going in the same motor direction it was going.
-                        // Also factor in IMU: if robot is spinning right, target moves left
-                        // in camera, so turret should follow the spin direction.
-                        double predictedShift = lastSeenError + yawRate * 0.1; // rough 100ms prediction
-                        scanDirectionRight = predictedShift < 0;
-                    } else {
-                        // Target lost for a while — scan toward the center of travel range
-                        int midpoint = (TURRET_MIN_LIMIT + TURRET_MAX_LIMIT) / 2;
-                        scanDirectionRight = turretPosition < midpoint;
+                    // Odometry-guided aim: calculate field-relative angle to goal
+                    Pose pose = follower.getPose();
+                    double dx = BLUE_GOAL_X - pose.getX();
+                    double dy = BLUE_GOAL_Y - pose.getY();
+                    double fieldAngleRad = Math.atan2(dy, dx);
+
+                    // Robot-relative angle (subtract robot heading)
+                    double robotRelRad = fieldAngleRad - pose.getHeading();
+                    robotRelRad = Math.atan2(Math.sin(robotRelRad), Math.cos(robotRelRad));
+                    double robotRelDeg = Math.toDegrees(robotRelRad);
+
+                    // Convert to target turret encoder ticks
+                    double targetTicks = TURRET_FORWARD_TICKS + (robotRelDeg * TICKS_PER_TURRET_DEG);
+                    targetTicks = Math.max(TURRET_MIN_LIMIT, Math.min(TURRET_MAX_LIMIT, targetTicks));
+
+                    double tickError = targetTicks - turretPosition;
+
+                    if (Math.abs(tickError) > 3) {
+                        // Proportional slew toward predicted position
+                        turretPower = Math.signum(tickError) * Math.min(ODO_AIM_POWER,
+                                Math.abs(tickError) * 0.005);
+                        turretPower += rotationFF;
                     }
 
-                    // Gradual ramp-up: don't jump to full scan speed instantly
-                    double ramp = Math.min(1.0, (timeLost - 0.15) / SCAN_RAMP_SEC);
-                    double scanSpeed = SCAN_POWER * ramp;
-
-                    turretPower = scanDirectionRight ? scanSpeed : -scanSpeed;
-                    turretPower += rotationFF;
                     turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-
-                    // Reverse at limits
-                    if (scanDirectionRight && turretPosition >= TURRET_MAX_LIMIT - 300) {
-                        scanDirectionRight = false;
-                    }
-                    if (!scanDirectionRight && turretPosition <= TURRET_MIN_LIMIT + LIMIT_SLOW_ZONE) {
-                        scanDirectionRight = true;
-                    }
                 } else {
                     // Brief grace period — just hold with yaw compensation
                     turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
@@ -369,8 +368,11 @@ public class Turret_PID_Tuner extends LinearOpMode {
             telemetry.addData("Delta Sum", String.format("%.6f (tol: %.4f)", deltaSum, TWIDDLE_TOLERANCE));
             telemetry.addData("", "--- Live ---");
             telemetry.addData("Yaw Rate", String.format("%.1f °/s", yawRate));
-            telemetry.addData("Target", hasTarget ? "BLUE" : "SCANNING");
+            telemetry.addData("Target", hasTarget ? "BLUE" : "ODO AIM");
             telemetry.addData("TX", hasTarget ? String.format("%.2f°", getBlueGoalX()) : "--");
+            Pose tPose = follower.getPose();
+            telemetry.addData("Odo Pose", String.format("(%.1f, %.1f) %.1f°",
+                    tPose.getX(), tPose.getY(), Math.toDegrees(tPose.getHeading())));
             telemetry.addData("Filtered Err", String.format("%.2f°", filteredError));
             telemetry.addData("Turret Power", String.format("%.3f", turretPower));
             telemetry.addData("Turret Pos", turretPosition);

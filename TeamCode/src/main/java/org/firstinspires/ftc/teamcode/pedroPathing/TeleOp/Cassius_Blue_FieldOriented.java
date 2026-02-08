@@ -128,11 +128,10 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                 boolean RBumper1 = gamepad1.right_bumper;
 
 
-// talk withe parker abou how to fix controls
-                double LStickY =- gamepad1.right_stick_x;       //   inverted
-                double LStickX = -gamepad1.left_stick_x;
+                double LStickY = gamepad1.left_stick_y;
+                double LStickX = gamepad1.left_stick_x;
                 double RStickY = -gamepad1.right_stick_y;
-                double RStickX = gamepad1.left_stick_y;//inverted
+                double RStickX = -gamepad1.right_stick_x;
 
                 double LTrigger1 = gamepad1.left_trigger; // need to be a value between 0 and 1
                 double RTrigger1 = gamepad1.right_trigger; // need to be a value between 0 and 1

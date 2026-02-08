@@ -30,8 +30,8 @@ public class Motor_PipeLine {
 
         //drive motors
        frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft"); 
-       frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
-       backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
+       frontRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
+       backRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
        backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
 
         // // flywheel/intake motors
@@ -126,8 +126,8 @@ public class Motor_PipeLine {
      
         //drive motors
        frontLeft = opMode.hardwareMap.get(DcMotorEx.class, "frontLeft"); 
-       frontRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
-       backRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
+       frontRight = opMode.hardwareMap.get(DcMotorEx.class, "backRight");
+       backRight = opMode.hardwareMap.get(DcMotorEx.class, "frontRight");
        backLeft = opMode.hardwareMap.get(DcMotorEx.class, "backLeft");
 
         // // flywheel/intake motors

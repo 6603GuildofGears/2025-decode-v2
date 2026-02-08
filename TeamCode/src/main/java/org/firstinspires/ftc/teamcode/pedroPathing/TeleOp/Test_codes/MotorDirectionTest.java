@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -30,6 +31,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
  * 
  * This uses the SAME motor names and directions as Pedro Pathing Constants.java
  */
+@Disabled
 @TeleOp(name="!! Motor Direction Test !!", group="Test")
 public class MotorDirectionTest extends LinearOpMode {
 

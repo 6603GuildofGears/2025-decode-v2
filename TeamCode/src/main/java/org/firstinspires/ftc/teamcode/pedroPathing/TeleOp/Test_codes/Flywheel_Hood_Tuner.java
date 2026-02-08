@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -12,6 +13,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.HoodTestConfig.*;
 
+@Disabled
 @TeleOp(name="Flywheel & Hood Tuner", group="Testing")
 public class Flywheel_Hood_Tuner extends LinearOpMode {
 

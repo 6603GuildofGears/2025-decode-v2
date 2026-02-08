@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -12,6 +13,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.AprilTagCentererConfig.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
 
+@Disabled
 @TeleOp(name = "AprilTag Centerer", group = "Testing")
 public class AprilTag_Centerer extends LinearOpMode {
 
@@ -67,22 +69,32 @@ public class AprilTag_Centerer extends LinearOpMode {
         double gear = 1.25; // speed modifier for drive train
 
         while (opModeIsActive()) {
-            // Drive code (copied from Cassius)
-            double LStickY = -gamepad1.right_stick_x;       // inverted
-            double LStickX = -gamepad1.left_stick_x;
-            double RStickX = gamepad1.left_stick_y; // inverted
+            // Drive code - simple mecanum
+                double drive  = gamepad1.left_stick_y;
+                double strafe = -gamepad1.left_stick_x;
+                double turn   = -gamepad1.right_stick_x;
 
-            if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
-                double r = Math.hypot(LStickX, LStickY);
-                double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
-                double rightX = RStickX;
+            if (Math.abs(drive) > 0.05 || Math.abs(strafe) > 0.05 || Math.abs(turn) > 0.05) {
+                double leftFrontPower  = (drive + strafe + turn) * gear;
+                double leftBackPower   = (drive - strafe + turn) * gear;
+                double rightFrontPower = (drive - strafe - turn) * gear;
+                double rightBackPower  = (drive + strafe - turn) * gear;
 
-                double v1 = r * Math.cos(robotAngle) + rightX * gear; // lf
-                double v2 = r * Math.sin(robotAngle) - rightX * gear; // rf
-                double v3 = r * Math.sin(robotAngle) + rightX * gear; // lb
-                double v4 = r * Math.cos(robotAngle) - rightX * gear; // rb
+                double max = Math.max(Math.abs(leftFrontPower),
+                             Math.max(Math.abs(leftBackPower),
+                             Math.max(Math.abs(rightFrontPower),
+                                      Math.abs(rightBackPower))));
+                if (max > 1.0) {
+                    leftFrontPower  /= max;
+                    leftBackPower   /= max;
+                    rightFrontPower /= max;
+                    rightBackPower  /= max;
+                }
 
-                SetPower(v1, v3, v2, v4);
+                frontLeft.setPower(leftFrontPower);
+                backLeft.setPower(leftBackPower);
+                frontRight.setPower(rightFrontPower);
+                backRight.setPower(rightBackPower);
             } else {
                 SetPower(0, 0, 0, 0);
             }
@@ -96,7 +108,7 @@ public class AprilTag_Centerer extends LinearOpMode {
 
             double turretPower = 0.0;
             boolean hasTarget = hasBlueGoal();
-            double rotationComp = LStickY * ROTATION_COMP;
+            double rotationComp = drive * ROTATION_COMP;
 
             if (wrapMode) {
                 // Whiparound takes precedence over search/tracking
@@ -247,8 +259,8 @@ public class AprilTag_Centerer extends LinearOpMode {
             telemetry.addData("KP", String.format("%.4f", KP));
             telemetry.addData("Alpha", String.format("%.2f", FILTER_ALPHA));
             telemetry.addData("Turret Power", String.format("%.2f", turretPower));
-            telemetry.addData("Rot Input", String.format("%.2f", RStickX));
-            telemetry.addData("Rot Comp", String.format("%.2f", RStickX * ROTATION_COMP));
+            telemetry.addData("Rot Input", String.format("%.2f", turn));
+            telemetry.addData("Rot Comp", String.format("%.2f", turn * ROTATION_COMP));
             telemetry.addData("Turret Pos", turretPosition);
             if (hasTarget) {
                 double tyDbg = getBlueGoalY();

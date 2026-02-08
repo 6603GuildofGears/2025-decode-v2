@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -10,6 +11,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pi
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretTunerConfig.*;
 
+@Disabled
 @TeleOp(name = "Turret PID Assistant", group = "Testing")
 public class Turret_PID_Assistant extends LinearOpMode {
 

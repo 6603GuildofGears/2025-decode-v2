@@ -1,88 +1,102 @@
-// package org.firstinspires.ftc.teamcode.pedroPathing.Pipelines;
+package org.firstinspires.ftc.teamcode.pedroPathing.Pipelines;
 
-// import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
-// import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.LimelightPipeline;
-// import com.qualcomm.robotcore.hardware.HardwareMap; 
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.turret;
 
-// public class TurretPipeline {
+/**
+ * Turret PID controller for AprilTag tracking.
+ * Uses the static turret motor from Motor_PipeLine.
+ *
+ * Prerequisites — call these BEFORE using this class:
+ *   Motor_PipeLine.intMotors(opMode);
+ *   Limelight_Pipeline.initLimelight(opMode);
+ *
+ * Usage in loop:
+ *   turretPID.update(hasBlueGoal(), getBlueGoalX());
+ */
+public class TurretPipeline {
 
-   
-//     private double KP = 0.0001;
+    private double KP = 0.01300;
+    private double KI = 0.00092;
+    private double KD = 0.00110;
 
-//     private double KD = 0.0;
+    private double lastError = 0;
+    private double integral = 0;
+    private double errorTolerance = 0.35;
 
-//     private double GoalX = 0;
+    private final double MAX_POWER = 0.6;
 
-//     private double lastError = 0;
+    private double power = 0;
 
-//     private double errorTolorance = 0.2;
+    private final ElapsedTime timer = new ElapsedTime();
 
-//     private final double MAX_POWER = 0.8;
+    public TurretPipeline() {
+        timer.reset();
+    }
 
-//     private double power = 0;
+    // --- Setters / Getters ---
 
-//     private final ElapsedTime timer = new ElapsedTime();
+    public void setKP(double newKP) { KP = newKP; }
+    public double getKP() { return KP; }
 
-//     public void int(HardwareMap HwMap){
+    public void setKI(double newKI) { KI = newKI; }
+    public double getKI() { return KI; }
 
-//             Motor_PipeLine motors = new Motor_PipeLine(HwMap); 
-//             LimelightPipeline limelight = new LimelightPipeline(HwMap);
+    public void setKD(double newKD) { KD = newKD; }
+    public double getKD() { return KD; }
 
-//             turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    public void setErrorTolerance(double tol) { errorTolerance = tol; }
+    public double getErrorTolerance() { return errorTolerance; }
 
-//     }
+    public double getPower() { return power; }
 
-//     public void setKP (Double newKP){
-//         KP = newKP;
-//     }
+    public void resetTimer() {
+        timer.reset();
+    }
 
-//     public double getKP(){
-//         return KP;
-//     }
+    /**
+     * Call every loop iteration.
+     * @param hasTarget  true if Limelight sees the target
+     * @param targetTX   horizontal offset in degrees (0 = centered)
+     */
+    public void update(boolean hasTarget, double targetTX) {
+        double deltaTime = timer.seconds();
+        timer.reset();
 
-//      public void setKD (Double newKD){
-//         KD = newKD;
-//     }
+        if (!hasTarget) {
+            power = 0;
+            lastError = 0;
+            integral = 0;
+            return;
+        }
 
-//     public double getKD(){
-//         return KD;
-//     }
-    
-//     public void resetTimer(){
-//         timer.reset();
-//     }   
+        double error = targetTX;
 
-//     public void update(limelightResult result){
-//         double deltaTime = timer.seconds();
-//         timer.reset();
+        // P term
+        double pTerm = KP * error;
 
-//         if(result == null){
-//             power = 0;
-//             lastError = 0;  
-//             return;
-//         }
+        // I term with anti-windup
+        integral += error * deltaTime;
+        double maxIntegral = (KI != 0) ? MAX_POWER / Math.max(Math.abs(KI), 0.0001) : 0;
+        integral = Range.clip(integral, -maxIntegral, maxIntegral);
+        double iTerm = KI * integral;
 
-//         double error = GoalX - result.x;
+        // D term
+        double dTerm = 0;
+        if (deltaTime > 0) {
+            dTerm = KD * ((error - lastError) / deltaTime);
+        }
 
-//         double pTerm = KP * error;
+        if (Math.abs(error) < errorTolerance) {
+            power = 0;
+            integral *= 0.95; // decay integral when on target
+        } else {
+            power = Range.clip(pTerm + iTerm + dTerm, -MAX_POWER, MAX_POWER);
+        }
 
-//         double dTerm = 0;
-//         if(deltaTime > 0){
-//             dTerm = KD * ((error - lastError) / deltaTime *KD);
-//         }
-
-
-
-//         if (Math.abs(error) < errorTolorance){
-//             power = 0;
-//         } else {
-//             power = Range.clip(pTerm + dTerm, -MAX_POWER, MAX_POWER);
-//         }
-
-//         turret.setPower(power);
-
-//         lastError = error;
-//     }
-    
-// }
+        turret.setPower(power);
+        lastError = error;
+    }
+}

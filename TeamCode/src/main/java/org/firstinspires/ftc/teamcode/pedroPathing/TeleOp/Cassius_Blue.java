@@ -8,6 +8,8 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import com.bylazar.telemetry.PanelsTelemetry;
+import com.bylazar.telemetry.TelemetryManager;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
@@ -85,8 +87,8 @@ public class Cassius_Blue extends LinearOpMode {
     double targetHeight = 29.5; // AprilTag center height in inches
       
         // Turret safety limits (FOUND FROM TESTING!)
-        int turretMinLimit = -275; // Left limit
-        int turretMaxLimit = 630;  // Right limit
+        int turretMinLimit = 0; // Left limit
+        int turretMaxLimit = 850;  // Right limit
         boolean limitsEnabled = true; // Limits are now active
         
         // Mag sensor calibration position
@@ -95,7 +97,7 @@ public class Cassius_Blue extends LinearOpMode {
 
         // Turret PID values are now in TurretConfig.java for live tuning via Pedro Pathing Panels
         // kRot: IMU yaw-rate feedforward gain (power per °/s of chassis rotation)
-        double kRot = 0.00410;
+        double kRot = 0.00504;
         
         // Turret tracking state variables (matches PID tuner)
         double filteredTurretError = 0;
@@ -108,6 +110,13 @@ public class Cassius_Blue extends LinearOpMode {
         int LIMIT_SLOW_ZONE = 30;       // Ramp down near limits
         ElapsedTime turretTimer = new ElapsedTime();
         ElapsedTime targetLostTimer = new ElapsedTime();
+        ElapsedTime acquireTimer = new ElapsedTime(); // Tracks time since target first reacquired
+        boolean hadTargetLastFrame = false;            // Detect target-found transition
+        double ACQUIRE_SLOW_SEC = 0.12;                 // Seconds to run at reduced speed
+        double ACQUIRE_SPEED_LIMIT = 0.20;             // Max turret power during acquire window
+
+        // Panels telemetry
+        TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
 
 
 
@@ -372,8 +381,19 @@ public class Cassius_Blue extends LinearOpMode {
 
                 // Always apply yaw-rate feedforward (cancels chassis rotation even when centered)
                 turretPower += rotationFF;
-                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
 
+                // Acquisition slowdown: if we just found the target, limit speed briefly
+                boolean acquiring = (!hadTargetLastFrame);
+                if (acquiring) {
+                    acquireTimer.reset();
+                }
+                double currentSpeedLimit = MAX_TURRET_SPEED;
+                if (acquireTimer.seconds() < ACQUIRE_SLOW_SEC) {
+                    currentSpeedLimit = ACQUIRE_SPEED_LIMIT;
+                }
+                turretPower = Math.max(-currentSpeedLimit, Math.min(currentSpeedLimit, turretPower));
+
+                hadTargetLastFrame = true;
                 targetLostTimer.reset();
 
             } else if (autoTrackingEnabled && !hasBlueGoal()) {
@@ -382,6 +402,7 @@ public class Cassius_Blue extends LinearOpMode {
                 previousError = 0;
                 filteredDeriv = 0;
                 filterInited = false;
+                hadTargetLastFrame = false;
 
                 // Start with yaw-rate compensation
                 turretPower = rotationFF;
@@ -421,6 +442,7 @@ public class Cassius_Blue extends LinearOpMode {
                 filteredDeriv = 0;
                 filterInited = false;
                 filteredTurretError = 0;
+                hadTargetLastFrame = false;
             }
 
             // Safety limits with slow zone (ramps down near limits instead of hard stop)
@@ -495,8 +517,17 @@ public class Cassius_Blue extends LinearOpMode {
                 telemetry.addData("Targets", 0);
             }
             
+            // Push key data to Panels
+            telemetryM.debug("Blue Goal: " + (hasBlueGoal() ? "YES" : "NO"));
+            telemetryM.debug("Turret Pos: " + turret.getCurrentPosition() + " | Pwr: " + String.format("%.2f", turretPower));
+            telemetryM.debug("Filtered Err: " + String.format("%.2f°", filteredTurretError) + " | Yaw: " + String.format("%.1f°/s", yawRate));
+            telemetryM.debug("PID: P=" + String.format("%.4f", KP_TURRET) + " I=" + String.format("%.4f", KI_TURRET) + " D=" + String.format("%.4f", KD_TURRET) + " R=" + String.format("%.4f", kRot));
+            telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
+            telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
+            telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
+            telemetryM.update(telemetry);
+            
             displayTelemetry(this); // Shows Limelight FPS and additional info
-            telemetry.update();
  
         }
 

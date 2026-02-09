@@ -10,6 +10,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import com.bylazar.telemetry.PanelsTelemetry;
+import com.bylazar.telemetry.TelemetryManager;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
@@ -42,8 +44,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 public class Turret_PID_Tuner extends LinearOpMode {
 
     // --- Turret physical limits ---
-    private static final int TURRET_MIN_LIMIT = -45;
-    private static final int TURRET_MAX_LIMIT = 860;
+    private static final int TURRET_MIN_LIMIT = 0;
+    private static final int TURRET_MAX_LIMIT = 850;
     private static final int LIMIT_SLOW_ZONE  = 30;
 
     // --- Camera constants ---
@@ -61,22 +63,22 @@ public class Turret_PID_Tuner extends LinearOpMode {
     private static final double DEADBAND_DEG    = 0.15;   // tighter deadband for precision
     private static final double MAX_TURRET_SPEED = 0.85;  // allow faster slewing
     private static final double MIN_TURRET_POWER = 0.04;  // overcome static friction at small errors
-    private static final double SCAN_POWER      = 0.045;  // slow enough for Limelight to catch targets
+    private static final double SCAN_POWER      = 0.08;   // scan speed when target lost
     private static final double SCAN_RAMP_SEC   = 0.6;    // seconds to ramp up to full scan speed
     private static final double FILTER_ALPHA    = 0.55;   // less lag (was 0.88) — faster reaction
     private static final double D_FILTER_ALPHA  = 0.5;    // less lag on derivative too
 
     // ========== PID + feedforward state ==========
-    private double kP   = 0.01630;
-    private double kI   = 0.00090;
-    private double kD   = 0.00210;
-    private double kRot = 0.00410;  // IMU yaw-rate feedforward gain (power per °/s)
+    private double kP   = 0.01200;
+    private double kI   = 0.00100;
+    private double kD   = 0.00800;
+    private double kRot = 0.00504;  // IMU yaw-rate feedforward gain (power per °/s)
 
     // Best found so far
-    private double bestKP   = 0.01630;
-    private double bestKI   = 0.00090;
-    private double bestKD   = 0.00210;
-    private double bestKRot = 0.00410;
+    private double bestKP   = 0.01200;
+    private double bestKI   = 0.00100;
+    private double bestKD   = 0.00800;
+    private double bestKRot = 0.00504;
     private double bestError = Double.MAX_VALUE;
 
     // IMU
@@ -138,6 +140,9 @@ public class Turret_PID_Tuner extends LinearOpMode {
         // Filtered error for smooth tracking
         double filteredError = 0.0;
         ElapsedTime targetLostTimer = new ElapsedTime();
+
+        // Panels telemetry
+        TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
 
         while (!isStarted() && !isStopRequested()) {
             int pos = turret.getCurrentPosition();
@@ -227,34 +232,26 @@ public class Turret_PID_Tuner extends LinearOpMode {
                     filteredError = FILTER_ALPHA * tx + (1.0 - FILTER_ALPHA) * filteredError;
                 }
 
-                if (Math.abs(filteredError) > DEADBAND_DEG) {
-                    // PID calculation
-                    double error = filteredError;
-                    integral += error * dt;
-                    // Anti-windup: clamp integral
-                    double maxIntegral = MAX_TURRET_SPEED / (kI == 0 ? 1.0 : Math.max(Math.abs(kI), 0.0001));
-                    integral = Math.max(-maxIntegral, Math.min(maxIntegral, integral));
+                // Always compute PID — no deadband freeze, smooth continuous tracking
+                double error = filteredError;
+                integral += error * dt;
+                // Anti-windup: clamp integral
+                double maxIntegral = MAX_TURRET_SPEED / (kI == 0 ? 1.0 : Math.max(Math.abs(kI), 0.0001));
+                integral = Math.max(-maxIntegral, Math.min(maxIntegral, integral));
 
-                    // Filtered derivative: low-pass to reject Limelight measurement noise
-                    double rawDeriv = (error - previousError) / dt;
-                    filteredDeriv = D_FILTER_ALPHA * rawDeriv + (1.0 - D_FILTER_ALPHA) * filteredDeriv;
-                    previousError = error;
+                // Filtered derivative: low-pass to reject Limelight measurement noise
+                double rawDeriv = (error - previousError) / dt;
+                filteredDeriv = D_FILTER_ALPHA * rawDeriv + (1.0 - D_FILTER_ALPHA) * filteredDeriv;
+                previousError = error;
 
-                    turretPower = (kP * error) + (kI * integral) + (kD * filteredDeriv);
+                turretPower = (kP * error) + (kI * integral) + (kD * filteredDeriv);
 
-                    // Static friction compensation: ensure minimum power to actually move
-                    if (Math.abs(turretPower) > 0.001 && Math.abs(turretPower) < MIN_TURRET_POWER) {
-                        turretPower = Math.signum(turretPower) * MIN_TURRET_POWER;
-                    }
-                } else {
-                    turretPower = 0.0;
-                    // Quickly decay integral when on target (prevent stale bias)
-                    integral *= 0.8;
-                    previousError = filteredError;
+                // Static friction compensation: ensure minimum power to actually move
+                if (Math.abs(turretPower) > 0.001 && Math.abs(turretPower) < MIN_TURRET_POWER) {
+                    turretPower = Math.signum(turretPower) * MIN_TURRET_POWER;
                 }
 
                 // IMU yaw-rate feedforward — always apply full strength
-                // (the whole point is to cancel chassis rotation even when centered)
                 turretPower += rotationFF;
                 turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
 
@@ -268,46 +265,26 @@ public class Turret_PID_Tuner extends LinearOpMode {
                     windowTrackFrames++;
                 }
             } else {
-                // No target — use odometry to aim turret at predicted goal angle
-                integral = 0.0;
-                previousError = 0.0;
-                filteredDeriv = 0.0;
-                filterInited = false;
-
-                // Start with yaw-rate compensation
-                turretPower = rotationFF;
-
+                // No target — keep PID state alive for smooth re-acquisition
+                // Only decay integral slowly, DON'T reset derivative or filter
                 double timeLost = targetLostTimer.seconds();
-                if (timeLost > 0.15) {
-                    // Odometry-guided aim: calculate field-relative angle to goal
-                    Pose pose = follower.getPose();
-                    double dx = BLUE_GOAL_X - pose.getX();
-                    double dy = BLUE_GOAL_Y - pose.getY();
-                    double fieldAngleRad = Math.atan2(dy, dx);
+                integral *= 0.95;  // gentle decay instead of hard reset
 
-                    // Robot-relative angle (subtract robot heading)
-                    double robotRelRad = fieldAngleRad - pose.getHeading();
-                    robotRelRad = Math.atan2(Math.sin(robotRelRad), Math.cos(robotRelRad));
-                    double robotRelDeg = Math.toDegrees(robotRelRad);
-
-                    // Convert to target turret encoder ticks
-                    double targetTicks = TURRET_FORWARD_TICKS + (robotRelDeg * TICKS_PER_TURRET_DEG);
-                    targetTicks = Math.max(TURRET_MIN_LIMIT, Math.min(TURRET_MAX_LIMIT, targetTicks));
-
-                    double tickError = targetTicks - turretPosition;
-
-                    if (Math.abs(tickError) > 3) {
-                        // Proportional slew toward predicted position
-                        turretPower = Math.signum(tickError) * Math.min(ODO_AIM_POWER,
-                                Math.abs(tickError) * 0.005);
-                        turretPower += rotationFF;
-                    }
-
-                    turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-                } else {
-                    // Brief grace period — just hold with yaw compensation
-                    turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
+                // After 0.5s with no target, start winding down
+                if (timeLost > 0.5) {
+                    integral *= 0.8;
+                    filteredDeriv *= 0.8;
                 }
+                // After 2s, fully reset (target is truly gone)
+                if (timeLost > 2.0) {
+                    integral = 0.0;
+                    previousError = 0.0;
+                    filteredDeriv = 0.0;
+                    filterInited = false;
+                }
+
+                turretPower = rotationFF;
+                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
             }
 
             // Count total frames for tracking ratio
@@ -383,7 +360,14 @@ public class Turret_PID_Tuner extends LinearOpMode {
             telemetry.addData("Window RMS", windowSampleCount > 0
                     ? String.format("%.3f°", Math.sqrt(windowErrorSqSum / windowSampleCount)) : "--");
             telemetry.addData("", "gamepad1.back = FREEZE best values");
-            telemetry.update();
+
+            // Push to Panels
+            telemetryM.debug(tuningFrozen ? "=== FROZEN ===" : "Tuning: " + tuningParam + " (iter " + twiddleIterations + ")");
+            telemetryM.debug("kP=" + String.format("%.5f", kP) + " kI=" + String.format("%.5f", kI) + " kD=" + String.format("%.5f", kD) + " kR=" + String.format("%.5f", kRot));
+            telemetryM.debug("Best err: " + String.format("%.3f°", bestError) + " | P=" + String.format("%.5f", bestKP) + " I=" + String.format("%.5f", bestKI) + " D=" + String.format("%.5f", bestKD) + " R=" + String.format("%.5f", bestKRot));
+            telemetryM.debug("Target: " + (hasTarget ? "BLUE" : "ODO") + " | Err: " + String.format("%.2f°", filteredError) + " | Pwr: " + String.format("%.3f", turretPower));
+            telemetryM.debug("Yaw: " + String.format("%.1f°/s", yawRate) + " | Pos: " + turretPosition + " | Track: " + String.format("%.0f%%", trackRatio * 100));
+            telemetryM.update(telemetry);
         }
     }
 

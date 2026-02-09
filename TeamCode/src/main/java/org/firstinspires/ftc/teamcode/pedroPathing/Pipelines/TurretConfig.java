@@ -12,10 +12,10 @@ import com.bylazar.configurables.annotations.Configurable;
 @Configurable
 public class TurretConfig {
     // ===== PID GAINS =====
-    // Tuned via Turret PID Tuner (best err: 0.138°, 133 iterations)
-    public static double KP_TURRET = 0.01630;     // Proportional gain
-    public static double KI_TURRET = 0.00090;     // Integral gain
-    public static double KD_TURRET = 0.00210;     // Derivative gain
+    // Tuned via Turret PID Tuner (best err: 0.026°, 115 iterations)
+    public static double KP_TURRET = 0.02070;     // Proportional gain
+    public static double KI_TURRET = 0.00400;     // Integral gain
+    public static double KD_TURRET = 0.00310;     // Derivative gain
     
     // ===== CONTROL LIMITS =====
     public static double TURRET_DEADBAND = 0.25;    // Degrees - How close is "good enough"

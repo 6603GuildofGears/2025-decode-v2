@@ -27,28 +27,33 @@ public class SpindexerController {
     private static final double[] POSITIONS = {P1, P2, P3};
 
     // ========== Timing constants ==========
-    private static final double SETTLE_SEC    = 0.35;  // wait after servo move before reading sensor
+    private static final double SETTLE_SEC    = 0.35;  // wait after servo arrives before reading sensor
     private static final double CONFIRM_SEC   = 0.1;   // ball must be seen continuously this long
     private static final double HOLD_SEC      = 0.1;   // pause after ball confirmed before rotating
 
     private static final double SPINUP_SEC    = 1.5;   // flywheel spin-up time
-    private static final double FLICK_SEC     = 0.35;  // flicker hold time
-    private static final double ADVANCE_SEC   = 0.5;   // wait for spindexer to move between shots
+    private static final double FLICK_SEC     = 0.5;   // flicker hold time (was 0.35)
+    private static final double POST_FLICK_SEC = 0.3;  // pause after flicker retracts before advancing
+
+    // ========== Slow servo movement ==========
+    private static final double SERVO_STEP    = 0.008; // position increment per loop (~1s per slot at 50Hz)
+    private double servoPos  = P1;   // current commanded position
+    private double servoTarget = P1; // where we're heading
 
     // ========== Slot tracking ==========
     private String[] slotColor = {"NONE", "NONE", "NONE"};
     private int currentSlot = 0;  // 0=P1, 1=P2, 2=P3
 
     // ========== Intake ==========
-    //  IDLE → SETTLING → SENSING → DETECTED → SETTLING → SENSING → ...
-    private enum IState { IDLE, SETTLING, SENSING, DETECTED }
+    //  IDLE → SETTLING → SENSING → DETECTED → MOVING → SETTLING → SENSING → ...
+    private enum IState { IDLE, SETTLING, SENSING, DETECTED, MOVING }
     private IState iState = IState.IDLE;
     private ElapsedTime iTimer = new ElapsedTime();  // shared timer for settle/confirm/hold
     private boolean ballSeen = false;
 
     // ========== Shoot ==========
-    //  IDLE → SPINUP → FIRE → ADVANCE → FIRE → ADVANCE → FIRE → DONE → IDLE
-    private enum SState { IDLE, SPINUP, FIRE, ADVANCE, DONE }
+    //  IDLE → SPINUP → FIRE → RETRACTING → ADVANCING → FIRE → ... → DONE → IDLE
+    private enum SState { IDLE, SPINUP, FIRE, RETRACTING, ADVANCING, DONE }
     private SState sState = SState.IDLE;
     private ElapsedTime sTimer = new ElapsedTime();
     private int shootSlot = 0;  // which slot we're firing (0, 1, 2)
@@ -135,19 +140,26 @@ public class SpindexerController {
                 return true;  // intake motor on
 
             case DETECTED:
-                // Ball confirmed — wait HOLD_SEC then rotate to next slot
+                // Ball confirmed — wait HOLD_SEC then start moving to next slot
                 if (iTimer.seconds() >= HOLD_SEC) {
                     if (currentSlot < 2) {
-                        // Advance to next slot
+                        // Start slow move to next slot
                         currentSlot++;
-                        spindexer.setPosition(POSITIONS[currentSlot]);
-                        iState = IState.SETTLING;
-                        iTimer.reset();
+                        servoTarget = POSITIONS[currentSlot];
+                        iState = IState.MOVING;
                     } else {
                         // Already at P3 (last slot) — stay here, keep intake running
-                        // Go back to sensing in case the ball gets swapped
                         iState = IState.SENSING;
                     }
+                }
+                return true;  // intake motor on
+
+            case MOVING:
+                // Slowly step servo toward target position
+                if (stepServo()) {
+                    // Arrived — now settle before reading sensor
+                    iState = IState.SETTLING;
+                    iTimer.reset();
                 }
                 return true;  // intake motor on
         }
@@ -183,6 +195,8 @@ public class SpindexerController {
                     // Start sequence: go to P1, spin up flywheel
                     shootSlot = 0;
                     currentSlot = 0;
+                    servoTarget = POSITIONS[0];
+                    servoPos = POSITIONS[0];
                     spindexer.setPosition(POSITIONS[0]);
                     flywheel.setVelocity(rpmToTPS(shootRpm));
                     sTimer.reset();
@@ -214,18 +228,26 @@ public class SpindexerController {
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {
-                        // Advance to next slot
-                        currentSlot = shootSlot;
-                        spindexer.setPosition(POSITIONS[shootSlot]);
+                        // Pause before advancing
                         sTimer.reset();
-                        sState = SState.ADVANCE;
+                        sState = SState.RETRACTING;
                     }
                 }
                 break;
 
-            case ADVANCE:
-                // Wait for spindexer to arrive, then fire
-                if (sTimer.seconds() >= ADVANCE_SEC) {
+            case RETRACTING:
+                // Brief pause after flicker retracts before moving spindexer
+                if (sTimer.seconds() >= POST_FLICK_SEC) {
+                    currentSlot = shootSlot;
+                    servoTarget = POSITIONS[shootSlot];
+                    sState = SState.ADVANCING;
+                }
+                break;
+
+            case ADVANCING:
+                // Slowly step spindexer to next slot, then fire
+                if (stepServo()) {
+                    // Arrived — small settle then fire
                     flicker1.setPosition(flickShoot1);
                     flicker2.setPosition(flickShoot2);
                     sTimer.reset();
@@ -234,9 +256,11 @@ public class SpindexerController {
                 break;
 
             case DONE:
-                if (sTimer.seconds() >= 0.2) {
+                if (sTimer.seconds() >= 0.3) {
                     // Reset to P1 so next intake starts fresh
                     currentSlot = 0;
+                    servoPos = POSITIONS[0];
+                    servoTarget = POSITIONS[0];
                     spindexer.setPosition(POSITIONS[0]);
                     sState = SState.IDLE;
                 }
@@ -252,10 +276,30 @@ public class SpindexerController {
         return rpm * 28.0 / 60.0;  // GoBilda 28 ticks/rev
     }
 
+    /**
+     * Move servoPos one step toward servoTarget.
+     * @return true when arrived (within half a step of target)
+     */
+    private boolean stepServo() {
+        double diff = servoTarget - servoPos;
+        if (Math.abs(diff) <= SERVO_STEP * 0.5) {
+            // Close enough — snap to target
+            servoPos = servoTarget;
+            spindexer.setPosition(servoPos);
+            return true;
+        }
+        // Step toward target
+        servoPos += Math.signum(diff) * SERVO_STEP;
+        spindexer.setPosition(servoPos);
+        return false;
+    }
+
     /** Move spindexer to a specific slot (for init / manual use) */
     public void goToSlot(int slot) {
         if (slot >= 0 && slot <= 2) {
             currentSlot = slot;
+            servoPos = POSITIONS[slot];
+            servoTarget = POSITIONS[slot];
             spindexer.setPosition(POSITIONS[slot]);
         }
     }

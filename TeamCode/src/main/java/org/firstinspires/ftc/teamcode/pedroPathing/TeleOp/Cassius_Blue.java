@@ -97,7 +97,7 @@ public class Cassius_Blue extends LinearOpMode {
 
         // Turret PID values are now in TurretConfig.java for live tuning via Pedro Pathing Panels
         // kRot: IMU yaw-rate feedforward gain (power per °/s of chassis rotation)
-        double kRot = 0.00504;
+        double kRot = 0.00378;
         
         // Turret tracking state variables (matches PID tuner)
         double filteredTurretError = 0;
@@ -121,6 +121,7 @@ public class Cassius_Blue extends LinearOpMode {
 
 
         waitForStart();
+        spindexer.setPosition(SpindexerController.P1); // start at P1 once
         while (opModeIsActive()) {
                // Update odometry pose every loop (even when Limelight is tracking)
                follower.update();

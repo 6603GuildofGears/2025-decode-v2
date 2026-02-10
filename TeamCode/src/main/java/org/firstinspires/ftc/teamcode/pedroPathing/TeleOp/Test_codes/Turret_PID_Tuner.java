@@ -67,16 +67,16 @@ public class Turret_PID_Tuner extends LinearOpMode {
     private static final double D_FILTER_ALPHA  = 0.5;    // less lag on derivative too
 
     // ========== PID + feedforward state ==========
-    private double kP   = 0.01630;
-    private double kI   = 0.00090;
+    private double kP   = 0.01969;
+    private double kI   = 0.00083;
     private double kD   = 0.00210;
-    private double kRot = 0.00410;  // IMU yaw-rate feedforward gain (power per °/s)
+    private double kRot = 0.00378;  // IMU yaw-rate feedforward gain (power per °/s)
 
     // Best found so far
-    private double bestKP   = 0.01630;
-    private double bestKI   = 0.00090;
+    private double bestKP   = 0.01969;
+    private double bestKI   = 0.00083;
     private double bestKD   = 0.00210;
-    private double bestKRot = 0.00410;
+    private double bestKRot = 0.00378;
     private double bestError = Double.MAX_VALUE;
 
     // IMU

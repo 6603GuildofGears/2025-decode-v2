@@ -65,16 +65,27 @@ public class Sensor {
     }
 
     /**
-     * Check if a ball is present — true if hue falls in green or purple range.
+     * Check if a ball is present — requires sufficient brightness (alpha)
+     * AND hue in green/purple range or dominant channel.
+     * The alpha check prevents false positives on empty slots.
      */
     public static boolean isBallPresent() {
         NormalizedRGBA c = ballSensor.getNormalizedColors();
+        // Must have enough brightness — empty air / plastic reads very low
+        float brightness = Math.max(c.red, Math.max(c.green, c.blue));
+        if (brightness < 0.15f) return false;
+
         float hue = rgbToHue(c.red, c.green, c.blue);
-        return (hue >= 160 && hue < 310);
+        // Green: ~140-195, Purple: ~195-330
+        if (hue >= 140 && hue < 330) return true;
+        // Fallback: green-dominant or blue-dominant channel check
+        if (c.green > c.red * 1.2f && c.green > c.blue * 1.2f && c.green > 0.05f) return true;
+        if (c.blue > c.red * 1.2f && c.blue > c.green * 1.2f && c.blue > 0.05f) return true;
+        return false;
     }
 
     /**
-     * Detect the ball color using HSV hue only.
+     * Detect the ball color using HSV hue + channel dominance fallback.
      * Green balls ~170°, Purple balls ~220°, split at 195°.
      * @return "GREEN", "PURPLE", or "NONE"
      */
@@ -82,10 +93,12 @@ public class Sensor {
         NormalizedRGBA c = ballSensor.getNormalizedColors();
         float hue = rgbToHue(c.red, c.green, c.blue);
 
-        // Green: hue 160-195 (~170)
-        // Purple: hue 195-310 (~220)
-        if (hue >= 160 && hue < 195) return "GREEN";
-        if (hue >= 195 && hue < 310) return "PURPLE";
+        // Green: hue 140-195 or green-dominant
+        if (hue >= 140 && hue < 195) return "GREEN";
+        if (c.green > c.red * 1.2f && c.green > c.blue * 1.2f && c.green > 0.05f) return "GREEN";
+        // Purple: hue 195-330 or blue-dominant
+        if (hue >= 195 && hue < 330) return "PURPLE";
+        if (c.blue > c.red * 1.2f && c.blue > c.green * 1.2f && c.blue > 0.05f) return "PURPLE";
 
         return "NONE";
     }

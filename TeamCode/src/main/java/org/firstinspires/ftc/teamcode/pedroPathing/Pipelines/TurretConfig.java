@@ -39,4 +39,24 @@ public class TurretConfig {
     // Odometry aim speed (how fast turret slews to predicted angle)
     public static double ODO_AIM_POWER = 0.25;     // Max power when seeking via odometry prediction
     public static double ODO_AIM_TOLERANCE = 15.0;  // Degrees — switch to Limelight PID within this window
+
+    // ===== TurretTest subsystem tuning =====
+    // PID gains (read every loop by TurretTest)
+    public static double TT_KP = 0.020;
+    public static double TT_KI = 0.001;
+    public static double TT_KD = 0.002;
+
+    // Control limits
+    public static double TT_DEADBAND     = 0.5;    // degrees — below this = on-target
+    public static double TT_MAX_POWER    = 0.45;   // max motor output (0–1)
+    public static double TT_MAX_INTEGRAL = 50.0;   // anti-windup cap (deg·sec)
+    public static double TT_K_STATIC     = 0.04;   // static-friction kick
+
+    // Lock
+    public static double TT_LOCK_THRESH  = 2.0;    // degrees — |tx| below this captures lock
+
+    // Mechanical soft-limits (robot-relative degrees, 0° = forward)
+    public static double TT_LIMIT_MIN    = -65.0;  // min angle (~8° past magnet)
+    public static double TT_LIMIT_MAX    = 264.2;  // max angle
+    public static double TT_SLOW_ZONE    = 15.0;   // ramp-down zone near limits
 }

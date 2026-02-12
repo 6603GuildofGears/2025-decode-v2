@@ -11,11 +11,6 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 
-import com.pedropathing.follower.Follower;
-import com.pedropathing.geometry.Pose;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
-
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
@@ -39,11 +34,6 @@ public class Cassius_Blue extends LinearOpMode {
         initLimelight(this);
         initSensors(this);
 
-        // Odometry — Pinpoint localizer for turret field-relative aiming
-        Follower follower = Constants.createFollower(hardwareMap);
-        // Set start pose (adjust to your actual start position on the field)
-        follower.setStartingPose(new Pose(72, 72, 0)); // center, facing +X
-        
         // Reset turret encoder to 0 at current position (should be centered manually before init)
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -63,10 +53,6 @@ public class Cassius_Blue extends LinearOpMode {
 
         double gear = 1.25; // speed modifier for drive train
         
-        // Turret tracking toggle
-        boolean autoTrackingEnabled = true; // Default to auto
-        boolean y2Pressed = false; // Debounce for Y button
-
         // Spindexer controller — handles intake detection, slot tracking, and shooting
         SpindexerController sdx = new SpindexerController();
         sdx.setFlickerPositions(0.1, 0.0875, 0.5, 0.5);
@@ -91,8 +77,7 @@ public class Cassius_Blue extends LinearOpMode {
         int turretMaxLimit = 850;  // Right limit
         boolean limitsEnabled = true; // Limits are now active
         
-        // Mag sensor calibration position
-        int magSensorPosition = -149; // Turret position when mag sensor triggers (-145 to -153 range)
+        // Mag sensor = turret home (position 0). Turret starts here at init.
         boolean lastMagState = false; // Track mag sensor state changes
 
         // Turret PID values are now in TurretConfig.java for live tuning via Pedro Pathing Panels
@@ -109,7 +94,6 @@ public class Cassius_Blue extends LinearOpMode {
         double MIN_TURRET_POWER = 0.04; // Static friction compensation
         int LIMIT_SLOW_ZONE = 30;       // Ramp down near limits
         ElapsedTime turretTimer = new ElapsedTime();
-        ElapsedTime targetLostTimer = new ElapsedTime();
         ElapsedTime acquireTimer = new ElapsedTime(); // Tracks time since target first reacquired
         boolean hadTargetLastFrame = false;            // Detect target-found transition
         double ACQUIRE_SLOW_SEC = 0.12;                 // Seconds to run at reduced speed
@@ -123,9 +107,6 @@ public class Cassius_Blue extends LinearOpMode {
         waitForStart();
         spindexer.setPosition(SpindexerController.P1); // start at P1 once
         while (opModeIsActive()) {
-               // Update odometry pose every loop (even when Limelight is tracking)
-               follower.update();
-
                boolean LStickIn2 = gamepad2.left_stick_button;
                 boolean RStickIn2 = gamepad2.right_stick_button;
                 boolean LBumper1 = gamepad1.left_bumper;
@@ -235,10 +216,10 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("spindexer pos", spindexer.getPosition());
             if(dpadRight2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.005);;
+                spindexer.setPosition(CPoS + 0.01);;
             } else if (dpadLeft2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.005);;
+                spindexer.setPosition(CPoS - 0.01);;
             }
 
 
@@ -293,45 +274,23 @@ public class Cassius_Blue extends LinearOpMode {
             //   RBumper2 = shoot, LBumper2 = kill switch
             sdx.updateShoot(RBumper2, LBumper2, flywheel); 
 
-            // Toggle turret auto-tracking with Y button (gamepad2)
-            if (y2 && !y2Pressed) {
-                autoTrackingEnabled = !autoTrackingEnabled;
-                // Reset tracking state when toggling
-                integratedError = 0;
-                previousError = 0;
-                filteredDeriv = 0;
-                filteredTurretError = 0;
-                filterInited = false;
-                turretTimer.reset();
-                y2Pressed = true;
-            } else if (!y2) {
-                y2Pressed = false;
-            }
-
-          
-
-            // Mag sensor calibration - Reset turret encoder if sensor triggered
+            // Mag sensor calibration — mag sensor = position 0 (home)
             boolean currentMagState = isMagPressed();
             if (currentMagState && !lastMagState) {
-                // Mag sensor just triggered - check if turret position needs correction
-                int currentPos = turret.getCurrentPosition();
-                int positionError = Math.abs(currentPos - magSensorPosition);
-                
-                if (positionError > 5) {
-                    // Position is off by more than 5 ticks - recalibrate
-                    turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                    turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    // Manually set the position by moving to the calibration point
-                    int offsetNeeded = magSensorPosition;
-                    // Note: Since we just reset to 0, we need to track this offset
-                    telemetry.addData("TURRET CALIBRATED", "Reset to %d", magSensorPosition);
-                }
+                // Mag sensor triggered — reset encoder to 0 (correct any drift)
+                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                telemetry.addData("TURRET CALIBRATED", "Reset to 0");
             }
             lastMagState = currentMagState;
             
             // Turret control — PID + IMU yaw-rate feedforward (from PID tuner)
             int turretPosition = turret.getCurrentPosition();
             double turretPower = 0;
+
+            // Cache Limelight data ONCE per loop (prevents race conditions)
+            boolean blueGoalVisible = hasBlueGoal();
+            double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
             // IMU yaw-rate feedforward: counter-rotate turret to cancel chassis spin
             double yawRate = imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate;
@@ -341,8 +300,8 @@ public class Cassius_Blue extends LinearOpMode {
             turretTimer.reset();
             if (dt > 0.5) dt = 0.02; // guard against first-frame spike
 
-            if (autoTrackingEnabled && hasBlueGoal()) {
-                double tx = getBlueGoalX();
+            if (blueGoalVisible) {
+                double tx = blueGoalTx;
 
                 // Low-pass filter — initialize on first reading to avoid lag
                 if (!filterInited) {
@@ -395,55 +354,17 @@ public class Cassius_Blue extends LinearOpMode {
                 turretPower = Math.max(-currentSpeedLimit, Math.min(currentSpeedLimit, turretPower));
 
                 hadTargetLastFrame = true;
-                targetLostTimer.reset();
 
-            } else if (autoTrackingEnabled && !hasBlueGoal()) {
-                // Reset PID state
-                integratedError = 0;
-                previousError = 0;
-                filteredDeriv = 0;
-                filterInited = false;
-                hadTargetLastFrame = false;
-
-                // Start with yaw-rate compensation
-                turretPower = rotationFF;
-
-                double timeLost = targetLostTimer.seconds();
-                if (timeLost > 0.15) {
-                    // Odometry-guided aim after brief grace period
-                    Pose pose = follower.getPose();
-                    double dx = BLUE_GOAL_X - pose.getX();
-                    double dy = BLUE_GOAL_Y - pose.getY();
-                    double fieldAngleRad = Math.atan2(dy, dx);
-
-                    double robotRelativeRad = fieldAngleRad - pose.getHeading();
-                    robotRelativeRad = Math.atan2(Math.sin(robotRelativeRad), Math.cos(robotRelativeRad));
-                    double robotRelativeDeg = Math.toDegrees(robotRelativeRad);
-
-                    double targetTicks = TURRET_FORWARD_TICKS + (robotRelativeDeg * TICKS_PER_TURRET_DEG);
-                    targetTicks = Math.max(turretMinLimit, Math.min(turretMaxLimit, targetTicks));
-
-                    double tickError = targetTicks - turretPosition;
-
-                    if (Math.abs(tickError) > 3) {
-                        turretPower = Math.signum(tickError) * Math.min(ODO_AIM_POWER,
-                                Math.abs(tickError) * 0.005);
-                        turretPower += rotationFF;
-                    }
-
-                    turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-
-                    telemetry.addData("Odo Aim", String.format("%.1f° → tick %.0f (err %.0f)",
-                            robotRelativeDeg, targetTicks, tickError));
-                }
             } else {
-                // Tracking disabled
+                // No target — hold position, just apply yaw-rate compensation
                 integratedError = 0;
                 previousError = 0;
                 filteredDeriv = 0;
                 filterInited = false;
-                filteredTurretError = 0;
                 hadTargetLastFrame = false;
+
+                turretPower = rotationFF;
+                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
             }
 
             // Safety limits with slow zone (ramps down near limits instead of hard stop)
@@ -464,18 +385,18 @@ public class Cassius_Blue extends LinearOpMode {
 
             turret.setPower(turretPower);
 
-            // Display telemetry
+            // Display telemetry (use cached values — same data the PID used)
             telemetry.addData("=== LIMELIGHT STATUS ===", "");
             telemetry.addData("LL Connected", hasTarget() ? "YES" : "CHECKING...");
-            telemetry.addData("Blue Goal Visible", hasBlueGoal() ? "YES" : "NO");
-            if (hasBlueGoal()) {
-                telemetry.addData("Target X Error", String.format("%.2f°", getBlueGoalX()));
+            telemetry.addData("Blue Goal Visible", blueGoalVisible ? "YES" : "NO");
+            if (blueGoalVisible) {
+                telemetry.addData("Target X Error", String.format("%.2f°", blueGoalTx));
             }
             
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Turret Position", turret.getCurrentPosition());
             telemetry.addData("Turret Power", String.format("%.2f", turretPower));
-            telemetry.addData("Auto Tracking", autoTrackingEnabled ? "ON" : "OFF");
+            telemetry.addData("Auto Tracking", "ON");
             telemetry.addData("Filtered Error", String.format("%.2f°", filteredTurretError));
             telemetry.addData("Integrated Error", String.format("%.3f", integratedError));
             telemetry.addData("Yaw Rate", String.format("%.1f °/s", yawRate));

@@ -15,7 +15,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
  *   - Order: P1 → P2 → P3. After P3 filled, stays there.
  *
  * SHOOT (one press):
- *   - Fires all 3 slots: P1 → P2 → P3.
+ *   - Fires all 3 slots: P3 → P2 → P1 (reverse of intake order).
  *   - Spins up flywheel → flick → advance → flick → advance → flick → done.
  */
 public class SpindexerController {
@@ -74,6 +74,12 @@ public class SpindexerController {
 
     // Flywheel
     private double shootRpm = 3000;
+
+    // ========== RPM drop detection ==========
+    private static final double RPM_DROP_THRESHOLD = 150;  // RPM drop that indicates a ball was fired
+    private double preFlickTPS = 0;   // flywheel velocity captured right before flick
+    private boolean shotDetected = false;  // true if RPM drop seen during this flick
+    private boolean[] slotEmpty = {true, true, true};  // tracks which slots are actually empty
 
     // ========== Constructor ==========
     public SpindexerController() {}
@@ -167,6 +173,7 @@ public class SpindexerController {
                     } else if (iTimer.seconds() >= CONFIRM_SEC) {
                         // Confirmed! Record color, move to DETECTED state
                         slotColor[currentSlot] = detectBallColor();
+                        slotEmpty[currentSlot] = false;
                         iState = IState.DETECTED;
                         iTimer.reset();
                         ballSeen = false;
@@ -233,8 +240,8 @@ public class SpindexerController {
 
             case IDLE:
                 if (shootPressed) {
-                    // Start sequence: go to start slot, spin up flywheel
-                    shootSlot = startSlot();
+                    // Start sequence: go to P3 first (reverse of intake), spin up flywheel
+                    shootSlot = 2;  // P3
                     currentSlot = shootSlot;
                     servoTarget = POSITIONS[shootSlot];
                     servoPos = POSITIONS[shootSlot];
@@ -248,6 +255,8 @@ public class SpindexerController {
             case SPINUP:
                 // Wait for flywheel to reach speed
                 if (sTimer.seconds() >= SPINUP_SEC) {
+                    preFlickTPS = flywheel.getVelocity();  // capture baseline RPM
+                    shotDetected = false;
                     flicker1.setPosition(flickShoot1);
                     // flicker2 fires after FLICK2_DELAY in FIRE state
                     sTimer.reset();
@@ -260,14 +269,25 @@ public class SpindexerController {
                 if (sTimer.seconds() >= FLICK2_DELAY) {
                     flicker2.setPosition(flickShoot2);
                 }
+                // Check for RPM drop — indicates ball was actually shot
+                if (!shotDetected) {
+                    double currentTPS = flywheel.getVelocity();
+                    if (preFlickTPS - currentTPS > rpmToTPS(RPM_DROP_THRESHOLD)) {
+                        shotDetected = true;
+                    }
+                }
                 // Wait for flick to complete
                 if (sTimer.seconds() >= FLICK_SEC) {
                     flicker1.setPosition(flickRest1);
                     flicker2.setPosition(flickRest2);
-                    slotColor[shootSlot] = "NONE";
+                    // Only mark slot empty if RPM drop detected (ball was actually fired)
+                    if (shotDetected) {
+                        slotColor[shootSlot] = "NONE";
+                        slotEmpty[shootSlot] = true;
+                    }
 
-                    int nextShoot = shootSlot + direction;
-                    if (nextShoot < 0 || nextShoot > 2) {
+                    int nextShoot = shootSlot - 1;  // P3→P2→P1
+                    if (nextShoot < 0) {
                         // All 3 fired — done
                         flywheel.setVelocity(0);
                         sTimer.reset();
@@ -293,7 +313,9 @@ public class SpindexerController {
             case ADVANCING:
                 // Slowly step spindexer to next slot, then fire
                 if (stepServo(SHOOT_SERVO_STEP)) {
-                    // Arrived — small settle then fire
+                    // Arrived — capture baseline RPM, then fire
+                    preFlickTPS = flywheel.getVelocity();
+                    shotDetected = false;
                     flicker1.setPosition(flickShoot1);
                     flicker2.setPosition(flickShoot2);
                     sTimer.reset();
@@ -355,7 +377,9 @@ public class SpindexerController {
     // ========== Getters ==========
     public int     getCurrentSlot()   { return currentSlot; }
     public String  getSlotColor(int i){ return (i >= 0 && i < 3) ? slotColor[i] : "NONE"; }
+    public boolean isSlotEmpty(int i) { return (i >= 0 && i < 3) && slotEmpty[i]; }
     public boolean isShooting()       { return sState != SState.IDLE && sState != SState.DONE; }
+    public int     getBallCount()     { int c = 0; for (boolean e : slotEmpty) if (!e) c++; return c; }
 
     /** Add telemetry */
     public void addTelemetry(org.firstinspires.ftc.robotcore.external.Telemetry telemetry) {
@@ -363,8 +387,17 @@ public class SpindexerController {
         telemetry.addData("Slot", "P" + (currentSlot + 1));
         telemetry.addData("Direction", startFromP3 ? "P3→P1" : "P1→P3");
         telemetry.addData("Colors", slotColor[0] + " | " + slotColor[1] + " | " + slotColor[2]);
+        telemetry.addData("Slots",
+                (slotEmpty[0] ? "EMPTY" : "BALL") + " | " +
+                (slotEmpty[1] ? "EMPTY" : "BALL") + " | " +
+                (slotEmpty[2] ? "EMPTY" : "BALL"));
+        telemetry.addData("Balls Loaded", getBallCount());
         telemetry.addData("Intake State", iState.toString());
         telemetry.addData("Shoot State", sState.toString());
+        if (sState == SState.FIRE) {
+            telemetry.addData("Shot Detected", shotDetected ? "YES (RPM drop)" : "waiting...");
+            telemetry.addData("Pre-Flick RPM", String.format("%.0f", preFlickTPS * 60.0 / 28.0));
+        }
         telemetry.addData("Servo Pos/Target", String.format("%.3f / %.3f", servoPos, servoTarget));
         telemetry.addData("Spindexer Pos", String.format("%.3f", spindexer.getPosition()));
         telemetry.addData("Ball Present?", isBallPresent() ? "YES" : "NO");

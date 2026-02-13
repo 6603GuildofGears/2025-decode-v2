@@ -13,11 +13,23 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.HoodTestConfig.*;
 
-@Disabled
 @TeleOp(name="Flywheel & Hood Tuner", group="Testing")
 public class Flywheel_Hood_Tuner extends LinearOpMode {
 
     // All values controlled ONLY by HoodTestConfig via Pedro Pathing Panels
+    private double flickRest1  = 0.1;
+    private double flickRest2  = 0.1;
+    private double flickShoot1 = 0.55;
+    private double flickShoot2 = 0.5;
+
+    // Flicker state machine
+    private ElapsedTime flickTimer = new ElapsedTime();
+    private ElapsedTime loopTimer = new ElapsedTime();
+    private enum FlickState { REST, SWEEPING_TO_SHOOT, HOLDING, SWEEPING_TO_REST }
+    private FlickState flickState = FlickState.REST;
+    private boolean lastA = false;
+    private double flickPos1, flickPos2; // current interpolated positions
+
     
     @Override
     public void runOpMode() throws InterruptedException {
@@ -41,6 +53,9 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
         
         waitForStart();
         
+        flickPos1 = flickRest1;
+        flickPos2 = flickRest2;
+        loopTimer.reset();
         while (opModeIsActive()) {
             
             // All values read directly from HoodTestConfig (updated live via Panels)
@@ -84,6 +99,46 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                     distance = heightDifference / Math.tan(Math.toRadians(totalAngle));
                 }
             }
+
+            // Flicker state machine with variable speed
+            double dt = loopTimer.seconds();
+            loopTimer.reset();
+            double step = FLICK_SPEED * dt; // position change this loop
+
+            boolean currentA = gamepad1.a;
+            if (currentA && !lastA && flickState == FlickState.REST) {
+                flickState = FlickState.SWEEPING_TO_SHOOT;
+            }
+            lastA = currentA;
+
+            switch (flickState) {
+                case REST:
+                    flickPos1 = flickRest1;
+                    flickPos2 = flickRest2;
+                    break;
+                case SWEEPING_TO_SHOOT:
+                    flickPos1 = moveToward(flickPos1, flickShoot1, step);
+                    flickPos2 = moveToward(flickPos2, flickShoot2, step);
+                    if (flickPos1 == flickShoot1 && flickPos2 == flickShoot2) {
+                        flickState = FlickState.HOLDING;
+                        flickTimer.reset();
+                    }
+                    break;
+                case HOLDING:
+                    if (flickTimer.seconds() >= FLICK_HOLD_TIME) {
+                        flickState = FlickState.SWEEPING_TO_REST;
+                    }
+                    break;
+                case SWEEPING_TO_REST:
+                    flickPos1 = moveToward(flickPos1, flickRest1, step);
+                    flickPos2 = moveToward(flickPos2, flickRest2, step);
+                    if (flickPos1 == flickRest1 && flickPos2 == flickRest2) {
+                        flickState = FlickState.REST;
+                    }
+                    break;
+            }
+            flicker1.setPosition(flickPos1);
+            flicker2.setPosition(flickPos2);
             
             // Display telemetry
             telemetry.addData("=== LIMELIGHT ===", "");
@@ -111,7 +166,18 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             telemetry.addData("Control Method", "Pedro Pathing Panels ONLY");
             telemetry.addData("Hood Increment", "±%.3f", HOOD_INCREMENT);
             telemetry.addData("RPM Increment", "±%.0f", RPM_INCREMENT);
+            telemetry.addData("", "");
+            telemetry.addData("=== FLICKER ===", "");
+            telemetry.addData("Flick Speed", "%.1f pos/sec", FLICK_SPEED);
+            telemetry.addData("Hold Time", "%.2f sec", FLICK_HOLD_TIME);
+            telemetry.addData("Flick State", flickState.toString());
             telemetry.update();
         }
+    }
+
+    /** Move current toward target by at most step, clamped to target */
+    private double moveToward(double current, double target, double step) {
+        if (Math.abs(target - current) <= step) return target;
+        return current + Math.signum(target - current) * step;
     }
 }

@@ -19,6 +19,13 @@ public class HoodTestConfig {
     // Target RPM for flywheel motor testing
     public static double TARGET_RPM = 3000.0;     // Starting RPM - adjust via Panels
     
+    // ===== FLICKER =====
+    // Speed of flicker servo sweep (position units per second)
+    // Higher = faster flick. 1.0 means full sweep in 1 second, 5.0 = full sweep in 0.2s
+    public static double FLICK_SPEED = 3.0;
+    // How long the flicker holds at the shoot position (seconds) before returning
+    public static double FLICK_HOLD_TIME = 0.15;
+
     // ===== TESTING INCREMENTS =====
     // Fine-tune adjustment steps
     public static double HOOD_INCREMENT = 0.01;   // How much hood moves per button press

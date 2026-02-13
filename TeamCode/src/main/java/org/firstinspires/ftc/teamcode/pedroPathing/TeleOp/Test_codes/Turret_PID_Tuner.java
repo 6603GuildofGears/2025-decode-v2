@@ -19,7 +19,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
-import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.pedroPathing.other.Constants;
 
 /**
  * Turret PID Auto-Tuner (Blue Alliance)

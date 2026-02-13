@@ -10,8 +10,10 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.pedroPathing.other.Constants;
+
 @Autonomous(name = "PEDRO - Red Back Auto", group = "Red")
-public class Red_BackAuto extends OpMode {
+public class Red_Back extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
 
@@ -24,7 +26,8 @@ public class Red_BackAuto extends OpMode {
             DRIVE_INTAKE1_TO_SHOOTPOSE,
             SHOOT_INTAKE1,
             DRIVE_SHOOTPOSE_TO_INTAKEPOSE2,
-            DRIVE_INTAKEPOSE2_TO_SHOOTPOSE,
+            DRIVE_INTAKEPOSE2_TO_INTAKE2,
+            DRIVE_INTAKE2_TO_SHOOTPOSE,
             SHOOT_INTAKE2,
             DRIVE_SHOOTPOSE_TO_ENDPOSE,
 
@@ -43,6 +46,8 @@ public class Red_BackAuto extends OpMode {
     private final Pose intake1 = new Pose(106, 36, Math.toRadians(0));
 
     private final Pose intakePose2 = new Pose(135,  9.5, Math.toRadians(0));
+
+    private final Pose intake2 = new Pose(135, 9.5, Math.toRadians(0));
 
     private final Pose endPose = new Pose(120, 36, Math.toRadians(0));  // End position
    // Shooter hardware
@@ -105,7 +110,7 @@ public class Red_BackAuto extends OpMode {
                     follower.followPath(driveStartPoseShootPose, true);
                     pathStarted = true;
                 }
-                if (follower.isFollowingPath()) {
+                if (follower.isBusy()) {
                     follower.update();
                 } else {
                     pathState = PathState.SHOOT_PRELOAD;
@@ -143,7 +148,7 @@ public class Red_BackAuto extends OpMode {
                 }
                 
                 if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.DRIVE_INTAKEPOSE_TO_SAMPLE1;
+                    pathState = PathState.DRIVE_INTAKEPOSE_TO_INTAKE1;
                     pathStarted = false;
                 }
                 break;
@@ -166,7 +171,6 @@ public class Red_BackAuto extends OpMode {
                 case DRIVE_INTAKE1_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake1ToShootPose, true);
-                    intake.setPower(0);  // Stop intake while driving to shoot
                     pathStarted = true;
                 }
                 
@@ -211,14 +215,26 @@ public class Red_BackAuto extends OpMode {
                 }
                 
                 if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.DRIVE_INTAKEPOSE2_TO_SAMPLE2;
+                    pathState = PathState.DRIVE_INTAKEPOSE2_TO_INTAKE2;
                     pathStarted = false;
                 }
                 break;  
 
-                 case DRIVE_INTAKEPOSE2_TO_SHOOTPOSE:
+                case DRIVE_INTAKEPOSE2_TO_INTAKE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntakePose2ToShootPose, true);
+                    follower.followPath(driveIntakePose2ToIntake2, true);
+                    pathStarted = true;
+                }
+                
+                if (pathStarted && !follower.isBusy()) {
+                    pathState = PathState.DRIVE_INTAKE2_TO_SHOOTPOSE;
+                    pathStarted = false;
+                }
+                break;
+
+                 case DRIVE_INTAKE2_TO_SHOOTPOSE:
+                if (!pathStarted) {
+                    follower.followPath(driveIntake2ToShootPose, true);
                     pathStarted = true;
                 }
                 
@@ -229,7 +245,7 @@ public class Red_BackAuto extends OpMode {
                 }
                 
                 if (!follower.isBusy()) {
-                    pathState = PathState.SHOOT_SAMPLE2;
+                    pathState = PathState.SHOOT_INTAKE2;
                     pathStarted = false;
                 }
                 break;
@@ -320,10 +336,6 @@ public class Red_BackAuto extends OpMode {
         telemetry.addData("Path time (s): ", pathTimer.getElapsedTimeSeconds());
         telemetry.update();
     
-    }
-    
-    public double getTickSpeed(double speed) {
-        return speed * TICKS_PER_REV / 60;
     }
 
 

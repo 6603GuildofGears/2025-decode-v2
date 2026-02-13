@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.Autos.other;
+package org.firstinspires.ftc.teamcode.pedroPathing.other;
 
 import com.pedropathing.control.FilteredPIDFCoefficients;
 import com.pedropathing.control.PIDFCoefficients;

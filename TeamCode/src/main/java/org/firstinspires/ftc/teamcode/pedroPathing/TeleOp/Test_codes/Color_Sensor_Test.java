@@ -4,13 +4,11 @@ import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
-import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.rgbToHue;
 
 /**
  * Simple test for color sensor + spindexer + intake.
@@ -110,13 +108,11 @@ public class Color_Sensor_Test extends LinearOpMode {
                              || (Math.abs(spindexer.getPosition() - p3) < 0.005);
             String detectedColor = "---";
             boolean ballPresent = false;
-            float hue = 0;
 
             if (atSlotPos) {
+                updateSensors();
                 detectedColor = detectBallColor();
                 ballPresent = isBallPresent();
-                NormalizedRGBA raw = getBallColor();
-                hue = rgbToHue(raw.red, raw.green, raw.blue);
 
                 // Update slot with what sensor sees
                 if (ballPresent) {
@@ -141,7 +137,7 @@ public class Color_Sensor_Test extends LinearOpMode {
             if (atSlotPos) {
                 telemetry.addData("Ball Present", ballPresent ? "YES" : "no");
                 telemetry.addData("Detected Color", detectedColor);
-                telemetry.addData("Hue", String.format("%.1f° (GREEN<195 | PURPLE>195)", hue));
+                telemetry.addData("ColorSensor", getColorSensorDebug());
             } else {
                 telemetry.addData("Status", "MOVING...");
             }
@@ -164,7 +160,7 @@ public class Color_Sensor_Test extends LinearOpMode {
             // === Panels telemetry ===
             if (atSlotPos) {
                 telemetryM.debug("Ball Present: " + (ballPresent ? "YES" : "no"));
-                telemetryM.debug("Color: " + detectedColor + " | Hue: " + String.format("%.1f°", hue));
+                telemetryM.debug("Color: " + detectedColor + " | " + getColorSensorDebug());
             } else {
                 telemetryM.debug("MOVING...");
             }

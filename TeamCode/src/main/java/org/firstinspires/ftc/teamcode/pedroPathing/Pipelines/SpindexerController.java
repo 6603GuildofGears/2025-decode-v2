@@ -29,17 +29,18 @@ public class SpindexerController {
 
     // ========== Timing constants ==========
     private static final double SETTLE_SEC    = 0.35;  // wait after servo arrives before reading sensor
-    private static final double CONFIRM_SEC   = 0.1;   // ball must be seen continuously this long
-    private static final double HOLD_SEC      = 0.1;   // pause after ball confirmed before rotating
+    private static final double CONFIRM_SEC   = 0.03;  // ball must be seen continuously this long
+    private static final double HOLD_SEC      = 0.05;  // pause after ball confirmed before rotating
 
     private static final double SPINUP_SEC    = 1.5;   // flywheel spin-up time
     private static final double FLICK_SEC     = 0.3;   // flicker hold time (fast snap)
     private static final double FLICK2_DELAY  = 0.02;   // right flicker fires 100ms after left
     private static final double POST_FLICK_SEC = 0.35;  // pause after flicker retracts before advancing
+    private static final double SHOOT_SETTLE_SEC = 0.4; // settle time before firing each shot
 
-    // ========== Slow servo movement ==========
-    private static final double INTAKE_SERVO_STEP = 0.025; // intake speed (~1s per slot at 50Hz)
-    private static final double SHOOT_SERVO_STEP  = 0.0125; // shoot speed (~1s per slot at 50Hz)
+    // ========== Servo movement speed ==========
+    private static final double INTAKE_SERVO_STEP = 0.055;  // intake rotation speed
+    private static final double SHOOT_SERVO_STEP  = 0.028;  // shoot rotation speed
     private double servoPos  = P1;   // current commanded position
     private double servoTarget = P1; // where we're heading
 
@@ -60,8 +61,8 @@ public class SpindexerController {
     private boolean ballSeen = false;
 
     // ========== Shoot ==========
-    //  IDLE → SPINUP → FIRE → RETRACTING → ADVANCING → FIRE → ... → DONE → IDLE
-    private enum SState { IDLE, SPINUP, FIRE, RETRACTING, ADVANCING, DONE }
+    //  IDLE → SPINUP → SHOOT_SETTLE → FIRE → RETRACTING → ADVANCING → SHOOT_SETTLE → FIRE → ... → DONE → IDLE
+    private enum SState { IDLE, SPINUP, SHOOT_SETTLE, FIRE, RETRACTING, ADVANCING, DONE }
     private SState sState = SState.IDLE;
     private ElapsedTime sTimer = new ElapsedTime();
     private int shootSlot = 0;  // which slot we're firing (0, 1, 2)
@@ -126,63 +127,71 @@ public class SpindexerController {
      */
     public boolean updateIntake(boolean held) {
 
-        // --- Don't process intake while shooting ---
+        // Refresh color sensor data each loop
+        updateSensors();
+
+        // --- Don't process spindexer rotation while shooting ---
         if (isShooting()) {
             iState = IState.IDLE;
             ballSeen = false;
             return false;
         }
 
-        // --- Trigger released: stop everything, go idle ---
-        if (!held) {
-            iState = IState.IDLE;
-            ballSeen = false;
-            return false;
-        }
-
-        // --- Trigger held: run the state machine ---
+        // --- Auto-spin state machine runs ALWAYS (trigger only controls motor) ---
         switch (iState) {
 
             case IDLE:
-                // Just started holding trigger.
-                // If servo was interrupted mid-move, finish the move first
+                // Start sensing: finish any pending move, or settle at current slot
                 if (Math.abs(servoPos - servoTarget) > 0.01) {
                     iState = IState.MOVING;
                 } else {
-                    // Already at a slot — settle before reading sensor
                     iState = IState.SETTLING;
                     iTimer.reset();
                 }
-                return true;  // intake motor on
+                break;
 
             case SETTLING:
+                // If this slot already has a ball saved, skip to next slot
+                if (!slotEmpty[currentSlot]) {
+                    int next = nextSlot();
+                    if (next >= 0) {
+                        currentSlot = next;
+                        servoTarget = POSITIONS[currentSlot];
+                        iState = IState.MOVING;
+                    } else {
+                        // All slots full — stay idle, nothing to do
+                    }
+                    break;
+                }
                 // Wait for servo to physically stop before trusting sensor
                 if (iTimer.seconds() >= SETTLE_SEC) {
                     iState = IState.SENSING;
                     ballSeen = false;
                 }
-                return true;  // intake motor on
+                break;
 
             case SENSING:
                 // Read sensor — look for a ball
                 if (isBallPresent()) {
+                    // Save color IMMEDIATELY on first detection so it persists
+                    slotColor[currentSlot] = detectBallColor();
+                    slotEmpty[currentSlot] = false;
+
                     if (!ballSeen) {
-                        // First frame we see it — start confirmation timer
+                        // First frame — start confirmation timer for advancing
                         ballSeen = true;
                         iTimer.reset();
                     } else if (iTimer.seconds() >= CONFIRM_SEC) {
-                        // Confirmed! Record color, move to DETECTED state
-                        slotColor[currentSlot] = detectBallColor();
-                        slotEmpty[currentSlot] = false;
+                        // Confirmed long enough — advance to next slot
                         iState = IState.DETECTED;
                         iTimer.reset();
                         ballSeen = false;
                     }
                 } else {
-                    // Lost it — restart confirmation
+                    // Lost it — restart confirmation (saved color stays)
                     ballSeen = false;
                 }
-                return true;  // intake motor on
+                break;
 
             case DETECTED:
                 // Ball confirmed — wait HOLD_SEC then start moving to next slot
@@ -194,11 +203,11 @@ public class SpindexerController {
                         servoTarget = POSITIONS[currentSlot];
                         iState = IState.MOVING;
                     } else {
-                        // Already at last slot — stay here, keep intake running
+                        // Already at last slot — stay here
                         iState = IState.SENSING;
                     }
                 }
-                return true;  // intake motor on
+                break;
 
             case MOVING:
                 // Slowly step servo toward target position
@@ -207,10 +216,11 @@ public class SpindexerController {
                     iState = IState.SETTLING;
                     iTimer.reset();
                 }
-                return true;  // intake motor on
+                break;
         }
 
-        return true;
+        // Trigger only controls whether intake motor runs
+        return held;
     }
 
     // ======================================================================
@@ -255,6 +265,14 @@ public class SpindexerController {
             case SPINUP:
                 // Wait for flywheel to reach speed
                 if (sTimer.seconds() >= SPINUP_SEC) {
+                    sTimer.reset();
+                    sState = SState.SHOOT_SETTLE;
+                }
+                break;
+
+            case SHOOT_SETTLE:
+                // Wait for spindexer to settle before firing
+                if (sTimer.seconds() >= SHOOT_SETTLE_SEC) {
                     preFlickTPS = flywheel.getVelocity();  // capture baseline RPM
                     shotDetected = false;
                     flicker1.setPosition(flickShoot1);
@@ -311,26 +329,17 @@ public class SpindexerController {
                 break;
 
             case ADVANCING:
-                // Slowly step spindexer to next slot, then fire
+                // Slowly step spindexer to next slot, then settle before firing
                 if (stepServo(SHOOT_SERVO_STEP)) {
-                    // Arrived — capture baseline RPM, then fire
-                    preFlickTPS = flywheel.getVelocity();
-                    shotDetected = false;
-                    flicker1.setPosition(flickShoot1);
-                    flicker2.setPosition(flickShoot2);
+                    // Arrived — settle before firing
                     sTimer.reset();
-                    sState = SState.FIRE;
+                    sState = SState.SHOOT_SETTLE;
                 }
                 break;
 
             case DONE:
                 if (sTimer.seconds() >= 0.3) {
-                    // Reset to start slot so next intake starts fresh
-                    int s = startSlot();
-                    currentSlot = s;
-                    servoPos = POSITIONS[s];
-                    servoTarget = POSITIONS[s];
-                    spindexer.setPosition(POSITIONS[s]);
+                    // Stay at current position — don't reset servo back to P1
                     sState = SState.IDLE;
                 }
                 break;
@@ -384,14 +393,23 @@ public class SpindexerController {
     /** Add telemetry */
     public void addTelemetry(org.firstinspires.ftc.robotcore.external.Telemetry telemetry) {
         telemetry.addData("--- Spindexer ---", "");
-        telemetry.addData("Slot", "P" + (currentSlot + 1));
-        telemetry.addData("Direction", startFromP3 ? "P3→P1" : "P1→P3");
-        telemetry.addData("Colors", slotColor[0] + " | " + slotColor[1] + " | " + slotColor[2]);
-        telemetry.addData("Slots",
-                (slotEmpty[0] ? "EMPTY" : "BALL") + " | " +
-                (slotEmpty[1] ? "EMPTY" : "BALL") + " | " +
-                (slotEmpty[2] ? "EMPTY" : "BALL"));
-        telemetry.addData("Balls Loaded", getBallCount());
+        telemetry.addData("Current Slot", "P" + (currentSlot + 1));
+        // Show slot colors — show LIVE reading when sensor sees a ball at current slot
+        int liveBallCount = 0;
+        for (int i = 0; i < 3; i++) {
+            String label = "P" + (i + 1);
+            boolean liveAtSlot = (i == currentSlot) && isBallPresent();
+            if (liveAtSlot) {
+                telemetry.addData(label, detectBallColor() + " (LIVE)");
+                liveBallCount++;
+            } else if (!slotEmpty[i]) {
+                telemetry.addData(label, slotColor[i]);
+                liveBallCount++;
+            } else {
+                telemetry.addData(label, "EMPTY");
+            }
+        }
+        telemetry.addData("Balls Loaded", liveBallCount + "/3");
         telemetry.addData("Intake State", iState.toString());
         telemetry.addData("Shoot State", sState.toString());
         if (sState == SState.FIRE) {
@@ -401,10 +419,9 @@ public class SpindexerController {
         telemetry.addData("Servo Pos/Target", String.format("%.3f / %.3f", servoPos, servoTarget));
         telemetry.addData("Spindexer Pos", String.format("%.3f", spindexer.getPosition()));
         telemetry.addData("Ball Present?", isBallPresent() ? "YES" : "NO");
-        // Raw sensor data for debugging
-        com.qualcomm.robotcore.hardware.NormalizedRGBA c = ballSensor.getNormalizedColors();
-        float brightness = Math.max(c.red, Math.max(c.green, c.blue));
-        float hue = rgbToHue(c.red, c.green, c.blue);
-        telemetry.addData("Sensor", String.format("H:%.0f B:%.2f  R:%.2f G:%.2f B:%.2f", hue, brightness, c.red, c.green, c.blue));
+        telemetry.addData("Verified Color", detectBallColor());
+        telemetry.addData("Sensor Compliance?", sensorsAgree() ? "YES" : "NO");
+        telemetry.addData("Sensor1", getColorSensorDebug());
+        telemetry.addData("Sensor2", getColorSensor2Debug());
     }
 }

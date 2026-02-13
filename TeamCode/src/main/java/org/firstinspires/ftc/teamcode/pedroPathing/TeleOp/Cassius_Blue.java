@@ -447,9 +447,9 @@ public class Cassius_Blue extends LinearOpMode {
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
-            telemetryM.update(telemetry);
-            
             displayTelemetry(this); // Shows Limelight FPS and additional info
+            telemetry.update(); // Push telemetry to Driver Station
+            telemetryM.update(); // Push Panels data separately
  
         }
 

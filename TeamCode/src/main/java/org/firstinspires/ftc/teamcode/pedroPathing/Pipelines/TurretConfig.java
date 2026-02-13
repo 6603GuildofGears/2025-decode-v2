@@ -57,6 +57,6 @@ public class TurretConfig {
 
     // Mechanical soft-limits (robot-relative degrees, 0° = forward)
     public static double TT_LIMIT_MIN    = -65.0;  // min angle (~8° past magnet)
-    public static double TT_LIMIT_MAX    = 264.2;  // max angle
+    public static double TT_LIMIT_MAX    = 254.0;  // max angle
     public static double TT_SLOW_ZONE    = 15.0;   // ramp-down zone near limits
 }

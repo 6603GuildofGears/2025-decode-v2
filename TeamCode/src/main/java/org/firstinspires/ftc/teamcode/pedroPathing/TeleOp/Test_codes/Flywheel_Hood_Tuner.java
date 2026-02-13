@@ -13,6 +13,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.HoodTestConfig.*;
 
+@Disabled
 @TeleOp(name="Flywheel & Hood Tuner", group="Testing")
 public class Flywheel_Hood_Tuner extends LinearOpMode {
 

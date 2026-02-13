@@ -94,10 +94,7 @@ public class Cassius_Blue extends LinearOpMode {
         double MIN_TURRET_POWER = 0.04; // Static friction compensation
         int LIMIT_SLOW_ZONE = 30;       // Ramp down near limits
         ElapsedTime turretTimer = new ElapsedTime();
-        ElapsedTime acquireTimer = new ElapsedTime(); // Tracks time since target first reacquired
         boolean hadTargetLastFrame = false;            // Detect target-found transition
-        double ACQUIRE_SLOW_SEC = 0.12;                 // Seconds to run at reduced speed
-        double ACQUIRE_SPEED_LIMIT = 0.20;             // Max turret power during acquire window
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -107,6 +104,8 @@ public class Cassius_Blue extends LinearOpMode {
         waitForStart();
         spindexer.setPosition(SpindexerController.P1); // start at P1 once
         while (opModeIsActive()) {
+               // Poll Limelight ONCE per loop — all getters below see the SAME frame
+               pollOnce();
                boolean LStickIn2 = gamepad2.left_stick_button;
                 boolean RStickIn2 = gamepad2.right_stick_button;
                 boolean LBumper1 = gamepad1.left_bumper;
@@ -274,14 +273,14 @@ public class Cassius_Blue extends LinearOpMode {
             //   RBumper2 = shoot, LBumper2 = kill switch
             sdx.updateShoot(RBumper2, LBumper2, flywheel); 
 
-            // Mag sensor calibration — mag sensor = position 0 (home)
+            // Mag sensor calibration — DISABLED at runtime to prevent position jumps
+            // (encoder resets cause brief power loss and tracking hiccups)
+            // Calibration happens at init via STOP_AND_RESET_ENCODER above.
             boolean currentMagState = isMagPressed();
-            if (currentMagState && !lastMagState) {
-                // Mag sensor triggered — reset encoder to 0 (correct any drift)
-                turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                telemetry.addData("TURRET CALIBRATED", "Reset to 0");
-            }
+            // if (currentMagState && !lastMagState) {
+            //     turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            //     turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            // }
             lastMagState = currentMagState;
             
             // Turret control — PID + IMU yaw-rate feedforward (from PID tuner)
@@ -293,8 +292,9 @@ public class Cassius_Blue extends LinearOpMode {
             double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
             // IMU yaw-rate feedforward: counter-rotate turret to cancel chassis spin
+            // Sign is NEGATED — positive yawRate (CCW spin) needs negative turret correction
             double yawRate = imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate;
-            double rotationFF = yawRate * kRot;
+            double rotationFF = -yawRate * kRot;
 
             double dt = turretTimer.seconds();
             turretTimer.reset();
@@ -342,25 +342,18 @@ public class Cassius_Blue extends LinearOpMode {
                 // Always apply yaw-rate feedforward (cancels chassis rotation even when centered)
                 turretPower += rotationFF;
 
-                // Acquisition slowdown: if we just found the target, limit speed briefly
-                boolean acquiring = (!hadTargetLastFrame);
-                if (acquiring) {
-                    acquireTimer.reset();
-                }
-                double currentSpeedLimit = MAX_TURRET_SPEED;
-                if (acquireTimer.seconds() < ACQUIRE_SLOW_SEC) {
-                    currentSpeedLimit = ACQUIRE_SPEED_LIMIT;
-                }
-                turretPower = Math.max(-currentSpeedLimit, Math.min(currentSpeedLimit, turretPower));
+                // Clamp to max turret speed (acquisition slowdown removed — it was
+                // causing the turret to stay sluggish when the target blinked in/out)
+                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
 
                 hadTargetLastFrame = true;
 
             } else {
-                // No target — hold position, just apply yaw-rate compensation
-                integratedError = 0;
-                previousError = 0;
-                filteredDeriv = 0;
-                filterInited = false;
+                // No target — preserve PID state briefly so reacquisition is smooth.
+                // Only decay integral; keep filter & derivative state so the turret
+                // doesn't jolt when the tag reappears next frame.
+                integratedError *= 0.9;  // gentle decay instead of hard reset
+                // Keep filterInited, previousError, filteredDeriv intact
                 hadTargetLastFrame = false;
 
                 turretPower = rotationFF;

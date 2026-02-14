@@ -81,29 +81,16 @@ public class Cassius_Blue extends LinearOpMode {
         // Mag sensor = turret home (position 0). Turret starts here at init.
         boolean lastMagState = false; // Track mag sensor state changes
 
-        // Turret PID values are now in TurretConfig.java for live tuning via Pedro Pathing Panels
-        // K_HEADING_LOCK, SEARCH_SPEED also in TurretConfig
+        // Turret values in TurretConfig.java (KP_TURRET, K_HEADING_LOCK, etc.)
         
-        // Turret tracking state variables (matches PID tuner)
-        double filteredTurretError = 0;
-        double integratedError = 0;
-        double previousError = 0;
-        double filteredDeriv = 0;       // Low-pass filtered derivative
-        boolean filterInited = false;   // First-reading flag
-        double D_FILTER_ALPHA = 0.5;    // Derivative filter (less lag)
-        double MIN_TURRET_POWER = 0.04; // Static friction compensation
-        ElapsedTime turretTimer = new ElapsedTime();
-        boolean hadTargetLastFrame = false;            // Detect target-found transition
-        double lastExitDirection = 0;                  // Direction target was MOVING when lost (tx derivative)
-        int lastKnownTurretPos = 0;                    // Encoder position when we last had good tracking
-        ElapsedTime targetLostTimer = new ElapsedTime(); // How long since target was last seen
-        double HOLD_TIME = 0.2;                        // Seconds to hold position after losing target
-        double SEARCH_TIMEOUT = 1.5;                   // Seconds before reversing search direction
-        boolean searchReversed = false;                // True if we already reversed search direction
+        // Heading lock state
+        double lockedHeading = 0;
+        boolean headingLocked = false;
 
-        // Heading lock state — uses IMU heading (reliable) instead of getRobotAngularVelocity (broken)
-        double lockedHeading = 0;       // IMU heading when turret was last centered on target
-        boolean headingLockActive = false;
+        // Position hold state — locks turret in place when idle
+        int holdPosition = 0;
+        boolean positionHeld = false;
+        double K_HOLD = 0.005; // P gain for position hold (ticks)
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -300,152 +287,104 @@ public class Cassius_Blue extends LinearOpMode {
             // }
             lastMagState = currentMagState;
             
-            // Turret control — PID + heading lock (from PID tuner)
+            // Turret control — simple P-control + heading lock + manual override
             int turretPosition = turret.getCurrentPosition();
             double turretPower = 0;
 
-            // Cache Limelight data ONCE per loop (prevents race conditions)
+            // Cache Limelight data ONCE per loop
             boolean blueGoalVisible = hasBlueGoal();
             double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
-            // Read IMU heading for heading lock (reliable — unlike getRobotAngularVelocity)
+            // Read IMU heading for heading lock
             double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+            double headingError = 0;
 
-            double dt = turretTimer.seconds();
-            turretTimer.reset();
-            if (dt > 0.5) dt = 0.02; // guard against first-frame spike
+            // Manual turret control — gamepad2 left stick X
+            boolean manualTurret = Math.abs(LStickX2) > 0.1;
 
-            if (blueGoalVisible) {
+            if (manualTurret) {
+                // Manual override — direct stick control
+                turretPower = LStickX2 * MAX_TURRET_SPEED;
+                headingLocked = false;
+                positionHeld = false;
+
+            } else if (blueGoalVisible) {
                 double tx = blueGoalTx;
+                positionHeld = false;
 
-                // Low-pass filter — initialize on first reading to avoid lag
-                if (!filterInited) {
-                    filteredTurretError = tx;
-                    previousError = tx;
-                    filteredDeriv = 0;
-                    filterInited = true;
-                } else {
-                    filteredTurretError = FILTER_ALPHA * tx + (1.0 - FILTER_ALPHA) * filteredTurretError;
-                }
+                if (Math.abs(tx) > TURRET_DEADBAND) {
+                    // P-control: power proportional to error
+                    turretPower = KP_TURRET * tx;
 
-                if (Math.abs(filteredTurretError) > TURRET_DEADBAND) {
-                    double error = filteredTurretError;
-
-                    // Integral with anti-windup
-                    integratedError += error * dt;
-                    double maxIntegral = MAX_TURRET_SPEED / Math.max(Math.abs(KI_TURRET), 0.0001);
-                    integratedError = Math.max(-maxIntegral, Math.min(maxIntegral, integratedError));
-
-                    // Filtered derivative — low-pass to reject Limelight noise
-                    double rawDeriv = (error - previousError) / dt;
-                    filteredDeriv = D_FILTER_ALPHA * rawDeriv + (1.0 - D_FILTER_ALPHA) * filteredDeriv;
-                    previousError = error;
-
-                    turretPower = (KP_TURRET * error) + (KI_TURRET * integratedError) + (KD_TURRET * filteredDeriv);
-
-                    // Static friction compensation: ensure minimum power to actually move
-                    if (Math.abs(turretPower) > 0.001 && Math.abs(turretPower) < MIN_TURRET_POWER) {
-                        turretPower = Math.signum(turretPower) * MIN_TURRET_POWER;
+                    // Min power to overcome static friction
+                    if (Math.abs(turretPower) < 0.02) {
+                        turretPower = Math.signum(turretPower) * 0.02;
                     }
                 } else {
-                    // Within deadband — centered, decay integral to prevent stale bias
+                    // On target — lock heading
+                    lockedHeading = currentHeading;
+                    headingLocked = true;
                     turretPower = 0;
-                    integratedError *= 0.8;
-                    previousError = filteredTurretError;
                 }
 
-                // HEADING LOCK: counter-rotate turret when chassis spins
-                // Update locked heading when turret is settled on target
-                if (Math.abs(filteredTurretError) <= TURRET_DEADBAND * 1.5) {
-                    lockedHeading = currentHeading;
-                    headingLockActive = true;
-                }
-                // Apply correction: each degree of chassis rotation → proportional counter-power
-                if (headingLockActive) {
-                    double headingError = currentHeading - lockedHeading;
-                    // Normalize to [-180, 180]
+                // Heading lock: counter-rotate when chassis spins
+                if (headingLocked) {
+                    headingError = currentHeading - lockedHeading;
                     while (headingError > 180) headingError -= 360;
                     while (headingError < -180) headingError += 360;
                     turretPower += headingError * K_HEADING_LOCK;
                 }
 
-                // Clamp to max turret speed
                 turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
 
-                // Track exit direction: use the derivative (which way tx is MOVING)
-                // If tx is increasing (target drifting right), search right when lost
-                // Only update when tx is meaningful (not noise near center)
-                if (Math.abs(filteredDeriv) > 0.5) {
-                    lastExitDirection = Math.signum(filteredDeriv);
-                } else if (Math.abs(blueGoalTx) > 2.0) {
-                    // Fallback: if target is far from center, it's heading that way
-                    lastExitDirection = Math.signum(blueGoalTx);
-                }
-                lastKnownTurretPos = turretPosition;
-                targetLostTimer.reset();
-                searchReversed = false;
-                hadTargetLastFrame = true;
+            } else if (headingLocked) {
+                // No target — heading lock holds aim
+                headingError = currentHeading - lockedHeading;
+                while (headingError > 180) headingError -= 360;
+                while (headingError < -180) headingError += 360;
+                turretPower = headingError * K_HEADING_LOCK;
+                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
+                positionHeld = false;
 
             } else {
-                // No target — smart search based on how long it's been lost
-                integratedError *= 0.9;
-
-                double timeLost = targetLostTimer.seconds();
-
-                if (hadTargetLastFrame) {
-                    // JUST lost it this frame — keep filter state for smooth resume
-                    hadTargetLastFrame = false;
+                // No target, no heading lock, no manual — HOLD POSITION
+                if (!positionHeld) {
+                    holdPosition = turretPosition;
+                    positionHeld = true;
                 }
-
-                if (timeLost < HOLD_TIME) {
-                    // Phase 1: HOLD — heading lock maintains aim while target blinks
-                    if (headingLockActive) {
-                        double headingError = currentHeading - lockedHeading;
-                        while (headingError > 180) headingError -= 360;
-                        while (headingError < -180) headingError += 360;
-                        turretPower = headingError * K_HEADING_LOCK;
-                    } else {
-                        turretPower = 0;
-                    }
-                } else if (timeLost < HOLD_TIME + SEARCH_TIMEOUT) {
-                    // Phase 2: SEARCH — move in the direction the target was heading
-                    double dir = searchReversed ? -lastExitDirection : lastExitDirection;
-                    if (dir == 0) dir = 1; // default to positive if we have no info
-                    turretPower = dir * SEARCH_SPEED;
-                } else if (!searchReversed) {
-                    // Phase 3: REVERSE — didn't find it, try the other direction
-                    searchReversed = true;
-                    // Return to where we last saw it, then search the other way
-                    double tickError = lastKnownTurretPos - turretPosition;
-                    if (Math.abs(tickError) > 5) {
-                        turretPower = Math.signum(tickError) * SEARCH_SPEED;
-                    } else {
-                        turretPower = -lastExitDirection * SEARCH_SPEED;
-                    }
-                } else {
-                    // Phase 4: Still searching reversed direction
-                    double dir = -lastExitDirection;
-                    if (dir == 0) dir = -1;
-                    turretPower = dir * SEARCH_SPEED;
-                }
-
-                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
+                int posError = turretPosition - holdPosition;
+                turretPower = -posError * K_HOLD;
+                turretPower = Math.max(-0.15, Math.min(0.15, turretPower));
             }
 
-            // Safety limits with slow zone (degrees — ramps down near limits instead of hard stop)
+            // HARD limit enforcement — turret CANNOT move past limits under any circumstance
             if (limitsEnabled) {
                 double turretDeg = turretPosition / TICKS_PER_DEG;
+
+                // ---- HARD STOPS: kill all positive/negative power at or past limits ----
                 if (turretDeg >= turretMaxDeg && turretPower > 0) {
                     turretPower = 0;
-                } else if (turretPower > 0 && turretDeg > turretMaxDeg - LIMIT_SLOW_ZONE_DEG) {
-                    double s = (turretMaxDeg - turretDeg) / LIMIT_SLOW_ZONE_DEG;
-                    turretPower *= Math.max(0.0, Math.min(1.0, s));
                 }
                 if (turretDeg <= turretMinDeg && turretPower < 0) {
                     turretPower = 0;
-                } else if (turretPower < 0 && turretDeg < turretMinDeg + LIMIT_SLOW_ZONE_DEG) {
+                }
+
+                // ---- SLOW ZONES: ramp down power approaching limits ----
+                if (turretPower > 0 && turretDeg > turretMaxDeg - LIMIT_SLOW_ZONE_DEG) {
+                    double s = (turretMaxDeg - turretDeg) / LIMIT_SLOW_ZONE_DEG;
+                    turretPower *= Math.max(0.0, Math.min(1.0, s));
+                }
+                if (turretPower < 0 && turretDeg < turretMinDeg + LIMIT_SLOW_ZONE_DEG) {
                     double s = (turretDeg - turretMinDeg) / LIMIT_SLOW_ZONE_DEG;
                     turretPower *= Math.max(0.0, Math.min(1.0, s));
+                }
+
+                // ---- OVERSHOOT RECOVERY: if past limit, actively push back ----
+                if (turretDeg > turretMaxDeg) {
+                    turretPower = -0.15;  // push back toward safe zone
+                }
+                if (turretDeg < turretMinDeg) {
+                    turretPower = 0.15;   // push back toward safe zone
                 }
             }
 
@@ -462,19 +401,13 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Turret Angle", String.format("%.1f°", turretPosition / TICKS_PER_DEG));
             telemetry.addData("Turret Power", String.format("%.2f", turretPower));
-            telemetry.addData("Auto Tracking", blueGoalVisible ? "LOCKED" :
-                    (targetLostTimer.seconds() < HOLD_TIME ? "HOLD" :
-                    (searchReversed ? "SEARCH (reversed)" : "SEARCH")));
-            telemetry.addData("Filtered Error", String.format("%.2f°", filteredTurretError));
-            telemetry.addData("Integrated Error", String.format("%.3f", integratedError));
-            telemetry.addData("Heading", String.format("%.1f°", currentHeading));
-            telemetry.addData("Heading Lock", headingLockActive ?
-                    String.format("ACTIVE (locked=%.1f°, err=%.1f°)", lockedHeading,
-                            currentHeading - lockedHeading) : "OFF");
+            telemetry.addData("Mode", manualTurret ? "MANUAL" :
+                    (blueGoalVisible ? "TRACKING" :
+                    (headingLocked ? "HEADING LOCK" : "IDLE")));
+            telemetry.addData("Heading Lock", headingLocked ?
+                    String.format("%.1f° (err=%.1f°)", lockedHeading, headingError) : "OFF");
             telemetry.addData("--- PID TUNING (Panels) ---", "");
-            telemetry.addData("KP", String.format("%.3f", KP_TURRET));
-            telemetry.addData("KI", String.format("%.3f", KI_TURRET));
-            telemetry.addData("KD", String.format("%.3f", KD_TURRET));
+            telemetry.addData("KP", String.format("%.4f", KP_TURRET));
             telemetry.addData("K_HL", String.format("%.4f", K_HEADING_LOCK));
             
             telemetry.addData("=== SHOOTER ===", "");
@@ -513,8 +446,8 @@ public class Cassius_Blue extends LinearOpMode {
             // Push key data to Panels
             telemetryM.debug("Blue Goal: " + (hasBlueGoal() ? "YES" : "NO"));
             telemetryM.debug("Turret Pos: " + turret.getCurrentPosition() + " | Pwr: " + String.format("%.2f", turretPower));
-            telemetryM.debug("Filtered Err: " + String.format("%.2f°", filteredTurretError) + " | Hdg: " + String.format("%.1f°", currentHeading));
-            telemetryM.debug("PID: P=" + String.format("%.4f", KP_TURRET) + " I=" + String.format("%.4f", KI_TURRET) + " D=" + String.format("%.4f", KD_TURRET) + " HL=" + String.format("%.4f", K_HEADING_LOCK));
+            telemetryM.debug("Turret: " + String.format("%.1f°", turretPosition / TICKS_PER_DEG) + " | Pwr: " + String.format("%.2f", turretPower) + " | " + (manualTurret ? "MANUAL" : (blueGoalVisible ? "TRACK" : (headingLocked ? "HL" : "IDLE"))));
+            telemetryM.debug("KP=" + String.format("%.4f", KP_TURRET) + " K_HL=" + String.format("%.4f", K_HEADING_LOCK));
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));

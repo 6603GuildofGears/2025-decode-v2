@@ -8,21 +8,18 @@ import com.bylazar.configurables.annotations.Configurable;
  */
 @Configurable
 public class TurretConfig {
-    // ===== PID GAINS =====
-    public static double KP_TURRET = 0.01969;     // Proportional gain
-    public static double KI_TURRET = 0.00083;     // Integral gain
-    public static double KD_TURRET = 0.00210;     // Derivative gain
+    // ===== GAINS =====
+    public static double KP_TURRET = 0.008;        // Proportional gain (tuned on robot)
+    public static double KI_TURRET = 0.00083;      // Integral gain (used by Cassius_Red, TurretPipeline)
+    public static double KD_TURRET = 0.00210;      // Derivative gain (used by Cassius_Red, TurretPipeline)
 
     // ===== CONTROL =====
-    public static double TURRET_DEADBAND = 0.25;   // Degrees — error below this = on-target
+    public static double TURRET_DEADBAND = 1.0;    // Degrees — error below this = on-target
     public static double MAX_TURRET_SPEED = 0.35;  // Maximum motor power (0-1)
-    public static double SEARCH_SPEED = 0.12;      // Turret power when searching for lost target
+    public static double SEARCH_SPEED = 0.12;      // Turret power when searching (Cassius_Red)
 
     // ===== HEADING LOCK =====
-    // Counter-rotates turret when chassis spins. Uses IMU heading (reliable).
-    // Units: motor power per degree of heading error.
-    // Higher = snappier lock but may oscillate. Lower = smoother but may lag.
-    public static double K_HEADING_LOCK = 0.04;
+    public static double K_HEADING_LOCK = 0.008;   // Power per degree of chassis rotation
 
     // ===== FILTERING =====
     public static double FILTER_ALPHA = 0.8;       // Low-pass filter (0=smooth, 1=responsive)

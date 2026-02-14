@@ -208,6 +208,32 @@ public class Limelight_Pipeline {
         return 0.0;
     }
 
+    // ========== Obelisk / Motif Tag Detection (IDs 21, 22, 23) ==========
+
+    /**
+     * Check if any obelisk motif tag (IDs 21-23) is detected.
+     */
+    public static boolean hasObeliskTag() {
+        return getObeliskTagId() != -1;
+    }
+
+    /**
+     * Get the detected obelisk tag ID (21, 22, or 23).
+     * Returns -1 if no obelisk tag is visible.
+     */
+    public static int getObeliskTagId() {
+        LLResult r = getResult();
+        if (r != null && r.isValid() && r.getFiducialResults() != null) {
+            for (int i = 0; i < r.getFiducialResults().size(); i++) {
+                int id = (int) r.getFiducialResults().get(i).getFiducialId();
+                if (id >= 21 && id <= 23) {
+                    return id;
+                }
+            }
+        }
+        return -1;
+    }
+
     /**
      * Display telemetry for detected AprilTags.
      * If using pollOnce(), call it before this.
@@ -227,6 +253,7 @@ public class Limelight_Pipeline {
                 String goalName = "";
                 if (tagId == 20) goalName = " (BLUE GOAL)";
                 else if (tagId == 24) goalName = " (RED GOAL)";
+                else if (tagId >= 21 && tagId <= 23) goalName = " (OBELISK MOTIF)";
 
                 opMode.telemetry.addData("Tag " + tagId + goalName, String.format("X: %.2f°", tx));
             }

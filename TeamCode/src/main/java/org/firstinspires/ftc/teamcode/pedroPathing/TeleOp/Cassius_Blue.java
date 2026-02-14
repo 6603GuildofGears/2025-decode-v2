@@ -81,11 +81,7 @@ public class Cassius_Blue extends LinearOpMode {
         // Mag sensor = turret home (position 0). Turret starts here at init.
         boolean lastMagState = false; // Track mag sensor state changes
 
-        // Turret values in TurretConfig.java (KP_TURRET, K_HEADING_LOCK, etc.)
-        
-        // Heading lock state
-        double lockedHeading = 0;
-        boolean headingLocked = false;
+        // Turret values in TurretConfig.java (KP_TURRET, etc.)
 
         // Position hold state — locks turret in place when idle
         int holdPosition = 0;
@@ -229,7 +225,7 @@ public class Cassius_Blue extends LinearOpMode {
             boolean runIntakeMotor = sdx.updateIntake(intakeRequested);
 
             if (runIntakeMotor) {
-                intake.setPower(0.75); // intake in (spindexer auto-rotates on ball detect)
+                intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
             } else if (sdx.isShooting()) {
                 intake.setPower(0.25); // slow feed during shoot sequence
             } else if (RBumper1) {
@@ -287,7 +283,7 @@ public class Cassius_Blue extends LinearOpMode {
             // }
             lastMagState = currentMagState;
             
-            // Turret control — simple P-control + heading lock + manual override
+            // Turret control — simple P-control + position hold + manual override
             int turretPosition = turret.getCurrentPosition();
             double turretPower = 0;
 
@@ -295,17 +291,14 @@ public class Cassius_Blue extends LinearOpMode {
             boolean blueGoalVisible = hasBlueGoal();
             double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
-            // Read IMU heading for heading lock
-            double currentHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-            double headingError = 0;
-
-            // Manual turret control — gamepad2 left stick X
-            boolean manualTurret = Math.abs(LStickX2) > 0.1;
+            // Manual turret control — gamepad2 triggers (proportional, divided by 3)
+            // LT2 = rotate left, RT2 = rotate right
+            double manualInput = (RTrigger2 - LTrigger2) / 1.5;
+            boolean manualTurret = Math.abs(manualInput) > 0.03;
 
             if (manualTurret) {
-                // Manual override — direct stick control
-                turretPower = LStickX2 * MAX_TURRET_SPEED;
-                headingLocked = false;
+                // Manual override — trigger depth controls speed
+                turretPower = manualInput * MAX_TURRET_SPEED;
                 positionHeld = false;
 
             } else if (blueGoalVisible) {
@@ -321,33 +314,20 @@ public class Cassius_Blue extends LinearOpMode {
                         turretPower = Math.signum(turretPower) * 0.02;
                     }
                 } else {
-                    // On target — lock heading
-                    lockedHeading = currentHeading;
-                    headingLocked = true;
-                    turretPower = 0;
-                }
-
-                // Heading lock: counter-rotate when chassis spins
-                if (headingLocked) {
-                    headingError = currentHeading - lockedHeading;
-                    while (headingError > 180) headingError -= 360;
-                    while (headingError < -180) headingError += 360;
-                    turretPower += headingError * K_HEADING_LOCK;
+                    // On target — hold this position
+                    if (!positionHeld) {
+                        holdPosition = turretPosition;
+                        positionHeld = true;
+                    }
+                    int posError = turretPosition - holdPosition;
+                    turretPower = -posError * K_HOLD;
+                    turretPower = Math.max(-0.15, Math.min(0.15, turretPower));
                 }
 
                 turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-
-            } else if (headingLocked) {
-                // No target — heading lock holds aim
-                headingError = currentHeading - lockedHeading;
-                while (headingError > 180) headingError -= 360;
-                while (headingError < -180) headingError += 360;
-                turretPower = headingError * K_HEADING_LOCK;
-                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-                positionHeld = false;
 
             } else {
-                // No target, no heading lock, no manual — HOLD POSITION
+                // No target, no manual — HOLD POSITION
                 if (!positionHeld) {
                     holdPosition = turretPosition;
                     positionHeld = true;
@@ -403,12 +383,9 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("Turret Power", String.format("%.2f", turretPower));
             telemetry.addData("Mode", manualTurret ? "MANUAL" :
                     (blueGoalVisible ? "TRACKING" :
-                    (headingLocked ? "HEADING LOCK" : "IDLE")));
-            telemetry.addData("Heading Lock", headingLocked ?
-                    String.format("%.1f° (err=%.1f°)", lockedHeading, headingError) : "OFF");
+                    (positionHeld ? "HOLD" : "IDLE")));
             telemetry.addData("--- PID TUNING (Panels) ---", "");
             telemetry.addData("KP", String.format("%.4f", KP_TURRET));
-            telemetry.addData("K_HL", String.format("%.4f", K_HEADING_LOCK));
             
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
@@ -446,8 +423,8 @@ public class Cassius_Blue extends LinearOpMode {
             // Push key data to Panels
             telemetryM.debug("Blue Goal: " + (hasBlueGoal() ? "YES" : "NO"));
             telemetryM.debug("Turret Pos: " + turret.getCurrentPosition() + " | Pwr: " + String.format("%.2f", turretPower));
-            telemetryM.debug("Turret: " + String.format("%.1f°", turretPosition / TICKS_PER_DEG) + " | Pwr: " + String.format("%.2f", turretPower) + " | " + (manualTurret ? "MANUAL" : (blueGoalVisible ? "TRACK" : (headingLocked ? "HL" : "IDLE"))));
-            telemetryM.debug("KP=" + String.format("%.4f", KP_TURRET) + " K_HL=" + String.format("%.4f", K_HEADING_LOCK));
+            telemetryM.debug("Turret: " + String.format("%.1f°", turretPosition / TICKS_PER_DEG) + " | Pwr: " + String.format("%.2f", turretPower) + " | " + (manualTurret ? "MANUAL" : (blueGoalVisible ? "TRACK" : (positionHeld ? "HOLD" : "IDLE"))));
+            telemetryM.debug("KP=" + String.format("%.4f", KP_TURRET));
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));

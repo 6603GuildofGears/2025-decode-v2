@@ -34,14 +34,14 @@ public class SpindexerController {
     private static final double CONFIRM_SEC   = 0.03;  // ball must be seen continuously this long
     private static final double HOLD_SEC      = 0.05;  // pause after ball confirmed before rotating
 
-    private static final double SPINUP_SEC    = 1.5;   // flywheel spin-up time
+    private static final double SPINUP_SEC    = 1;   // flywheel spin-up time
     public static double FLICK_SEC     = 0.45;   // flicker hold time — how long flicker stays extended
     public static double FLICK2_DELAY  = 0.02;   // right flicker fires after left
     public static double POST_FLICK_SEC = 0.5;   // pause after flicker retracts before advancing
     public static double SHOOT_SETTLE_SEC = 0.5; // settle time before firing each shot
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.0375;  // intake rotation speed
+    private static final double INTAKE_SERVO_STEP = 0.0325;  // intake rotation speed
     private static final double SHOOT_SERVO_STEP  = 0.01875;  // shoot rotation speed
     public static double FLICKER_STEP = 0.04;   // flicker speed per loop (smaller = slower flick)
     private double servoPos  = P1;   // current commanded position
@@ -91,6 +91,10 @@ public class SpindexerController {
     private boolean shotDetected = false;  // true if RPM drop seen during this flick
     private boolean[] slotEmpty = {true, true, true};  // tracks which slots are actually empty
 
+    // ========== Motif ordering ==========
+    private String[] motifOrder = null;   // null = default P3→P2→P1, else color sequence
+    private int motifIndex = 0;           // which motif position we're shooting next (0, 1, 2)
+
     // ========== Constructor ==========
     public SpindexerController() {}
 
@@ -102,6 +106,22 @@ public class SpindexerController {
     }
 
     public void setShootRpm(double rpm) { this.shootRpm = rpm; }
+
+    /**
+     * Set motif color order for shooting.
+     * Pass null to revert to default P3→P2→P1 order.
+     * @param order  String[3] e.g. {"GREEN","PURPLE","PURPLE"} — first-to-fire first
+     */
+    public void setMotifOrder(String[] order) {
+        this.motifOrder = order;
+        this.motifIndex = 0;
+    }
+
+    /** Clear motif ordering — revert to default shoot order */
+    public void clearMotifOrder() {
+        this.motifOrder = null;
+        this.motifIndex = 0;
+    }
 
     /**
      * Set whether intake starts from P3 (reverse order).
@@ -268,14 +288,8 @@ public class SpindexerController {
 
             case IDLE:
                 if (shootPressed) {
-                    // Find first filled slot from P3 going down — skip empties
-                    shootSlot = -1;
-                    for (int i = 2; i >= 0; i--) {
-                        if (!slotEmpty[i]) {
-                            shootSlot = i;
-                            break;
-                        }
-                    }
+                    // Find first slot to shoot
+                    shootSlot = findFirstShootSlot();
                     if (shootSlot < 0) break;  // nothing loaded — don't shoot
 
                     currentSlot = shootSlot;
@@ -339,14 +353,8 @@ public class SpindexerController {
                     }
                     // shotDetected is also used for telemetry: true = fired, false = misfire
 
-                    // Find next filled slot going down — skip empties
-                    int nextShoot = -1;
-                    for (int i = shootSlot - 1; i >= 0; i--) {
-                        if (!slotEmpty[i]) {
-                            nextShoot = i;
-                            break;
-                        }
-                    }
+                    // Find next slot to shoot
+                    int nextShoot = findNextShootSlot();
                     if (nextShoot < 0) {
                         // No more balls — done
                         flywheel.setVelocity(0);
@@ -386,6 +394,67 @@ public class SpindexerController {
                 }
                 break;
         }
+    }
+
+    // ======================================================================
+    //  SHOOT SLOT SELECTION (motif-aware)
+    // ======================================================================
+
+    /**
+     * Find the first slot to shoot.
+     * If motif is set, finds the slot matching motifOrder[0].
+     * Otherwise, picks highest non-empty slot (P3→P2→P1).
+     */
+    private int findFirstShootSlot() {
+        if (motifOrder != null) {
+            motifIndex = 0;
+            return findSlotForMotifIndex(motifIndex);
+        }
+        // Default: highest non-empty slot
+        for (int i = 2; i >= 0; i--) {
+            if (!slotEmpty[i]) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Find the next slot to shoot after the current one was fired.
+     * If motif is set, advances motifIndex and finds matching slot.
+     * Otherwise, scans downward from shootSlot.
+     */
+    private int findNextShootSlot() {
+        if (motifOrder != null) {
+            motifIndex++;
+            if (motifIndex >= motifOrder.length) return -1;
+            return findSlotForMotifIndex(motifIndex);
+        }
+        // Default: next non-empty slot going down
+        for (int i = shootSlot - 1; i >= 0; i--) {
+            if (!slotEmpty[i]) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Find a non-empty slot whose color matches motifOrder[idx].
+     * Skips already-empty slots. Returns -1 if no match found.
+     */
+    private int findSlotForMotifIndex(int idx) {
+        if (motifOrder == null || idx >= motifOrder.length) return -1;
+        String needed = motifOrder[idx];
+        // "ANY" matches any non-empty slot
+        for (int i = 0; i < 3; i++) {
+            if (!slotEmpty[i]) {
+                if ("ANY".equals(needed) || needed.equals(slotColor[i])) {
+                    return i;
+                }
+            }
+        }
+        // No color match — fall back to any non-empty slot (better than not shooting)
+        for (int i = 0; i < 3; i++) {
+            if (!slotEmpty[i]) return i;
+        }
+        return -1;
     }
 
     // ======================================================================
@@ -478,6 +547,10 @@ public class SpindexerController {
         telemetry.addData("Balls Loaded", liveBallCount + "/3");
         telemetry.addData("Intake State", iState.toString());
         telemetry.addData("Shoot State", sState.toString());
+        if (motifOrder != null) {
+            telemetry.addData("Motif Order", motifOrder[0] + " → " + motifOrder[1] + " → " + motifOrder[2]);
+            telemetry.addData("Motif Index", motifIndex);
+        }
         if (sState == SState.FIRE) {
             telemetry.addData("Shot Detected", shotDetected ? "YES (RPM drop)" : "waiting...");
             telemetry.addData("Pre-Flick RPM", String.format("%.0f", preFlickTPS * 60.0 / 28.0));

@@ -1,8 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 
-import com.bylazar.configurables.annotations.Configurable;
-
-@Configurable
+// @Configurable  — hidden from Panels (not actively used)
 public class TurretTunerConfig {
     public static boolean AUTO_TUNE_ENABLED = false;
     public static double RESPONSE_TIME_SECONDS = 1.0; // target response time

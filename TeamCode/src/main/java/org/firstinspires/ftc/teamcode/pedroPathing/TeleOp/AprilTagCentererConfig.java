@@ -1,8 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 
-import com.bylazar.configurables.annotations.Configurable;
-
-@Configurable
+// @Configurable  — hidden from Panels (not actively used)
 public class AprilTagCentererConfig {
     public static double KP = 0.013;
     public static double FILTER_ALPHA = 0.88;

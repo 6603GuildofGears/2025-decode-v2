@@ -453,7 +453,7 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                         dTerm = errorChange * KD_TURRET;
                     }
                     integratedError += filteredTurretError * dt;
-                    integratedError = Math.max(-MAX_INTEGRAL, Math.min(MAX_INTEGRAL, integratedError));
+                    integratedError = Math.max(-0.2, Math.min(0.2, integratedError));
                     double iTerm = integratedError * KI_TURRET;
                     turretPower = pTerm + iTerm + dTerm;
                     turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));

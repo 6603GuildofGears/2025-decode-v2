@@ -468,7 +468,7 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                     
                     // Integral term with anti-windup
                     integratedError += filteredTurretError * dt;
-                    integratedError = Math.max(-MAX_INTEGRAL, Math.min(MAX_INTEGRAL, integratedError));
+                    integratedError = Math.max(-0.2, Math.min(0.2, integratedError));
                     double iTerm = integratedError * KI_TURRET;
                     
                     // Combined PID control

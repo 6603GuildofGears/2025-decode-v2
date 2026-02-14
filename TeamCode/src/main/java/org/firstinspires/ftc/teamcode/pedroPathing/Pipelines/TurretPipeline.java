@@ -128,7 +128,7 @@ public class TurretPipeline {
 
         // --- I term with anti-windup clamp ---
         integral += error * dt;
-        integral  = Range.clip(integral, -MAX_INTEGRAL, MAX_INTEGRAL);
+        integral  = Range.clip(integral, -0.2, 0.2);
         double iTerm = KI_TURRET * integral;
 
         // --- D term ---

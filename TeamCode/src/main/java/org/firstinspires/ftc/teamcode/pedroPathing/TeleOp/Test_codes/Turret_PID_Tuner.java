@@ -51,6 +51,13 @@ public class Turret_PID_Tuner extends LinearOpMode {
     private static final double CAMERA_MOUNT_ANGLE = 22.85; // calibrated
     private static final double TARGET_HEIGHT      = 29.5;
 
+    // --- Odometry constants (local — removed from TurretConfig) ---
+    private static final double BLUE_GOAL_X = 9.01;
+    private static final double BLUE_GOAL_Y = 28.69;
+    private static final double TICKS_PER_TURRET_DEG = 2.64;
+    private static final double TURRET_FORWARD_TICKS = 130.5;
+    private static final double ODO_AIM_POWER = 0.25;
+
     // --- Twiddle tuning settings ---
     private static final double EVAL_WINDOW_SEC = 2.5;   // seconds per evaluation window
     private static final double MIN_TRACK_RATIO = 0.60;  // must see target 60% of window to count

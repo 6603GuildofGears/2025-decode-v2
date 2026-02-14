@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.hardware.Servo;
 
 /**
  * Bare-minimum turret encoder test.
@@ -20,13 +21,14 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
  * Controls: gamepad2 left stick X = spin turret at 30% power
  */
 
-@Disabled
 
 
 @TeleOp(name = "!! Encoder Diag", group = "Testing")
 public class EncoderDiag extends OpMode {
 
     private DcMotorEx turretMotor;
+    private Servo flicker1;
+    private Servo flicker2;
 
     @Override
     public void init() {
@@ -35,6 +37,12 @@ public class EncoderDiag extends OpMode {
         turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        // Get flicker servos — match direction from Servo_Pipeline
+        flicker1 = hardwareMap.get(Servo.class, "flicker1");
+        flicker1.setDirection(Servo.Direction.FORWARD);
+        flicker2 = hardwareMap.get(Servo.class, "flicker2");
+        flicker2.setDirection(Servo.Direction.REVERSE);
 
         telemetry.addData("Status", "Ready — use GP2 left stick X to spin");
         telemetry.update();
@@ -61,6 +69,16 @@ public class EncoderDiag extends OpMode {
         telemetry.addData("Check", "1. Encoder cable plugged into SAME port as motor");
         telemetry.addData("Check", "2. Cable not damaged / loose");
         telemetry.addData("Check", "3. Try swapping to a different hub port");
+
+        // Command flicker servos to rest positions (matches SpindexerController defaults)
+        flicker1.setPosition(0.06875);
+        flicker2.setPosition(0.05);
+
+        telemetry.addData("", "");
+        telemetry.addData("=== FLICKER ===", "");
+        telemetry.addData("Flicker1 pos", String.format("%.4f", flicker1.getPosition()));
+        telemetry.addData("Flicker2 pos", String.format("%.4f", flicker2.getPosition()));
+
         telemetry.update();
     }
 }

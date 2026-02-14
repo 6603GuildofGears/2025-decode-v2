@@ -5,8 +5,6 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
-import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig;
-
 /**
  * Turret subsystem — built from first principles.
  *
@@ -43,8 +41,26 @@ public class TurretTest {
     // Verify on your robot and adjust if needed.
     private static final int FORWARD_OFFSET_TICKS = 150;
 
-    // All PID gains, limits, and soft-limit values are read LIVE from
-    // TurretConfig each loop so they can be tuned via Panels.
+    // All PID gains, limits, and soft-limit values are local constants.
+
+    // PID gains
+    private static final double TT_KP = 0.020;
+    private static final double TT_KI = 0.001;
+    private static final double TT_KD = 0.002;
+
+    // Control limits
+    private static final double TT_DEADBAND     = 0.5;    // degrees — below this = on-target
+    private static final double TT_MAX_POWER    = 0.45;   // max motor output (0–1)
+    private static final double TT_MAX_INTEGRAL = 50.0;   // anti-windup cap (deg·sec)
+    private static final double TT_K_STATIC     = 0.04;   // static-friction kick
+
+    // Lock
+    private static final double TT_LOCK_THRESH  = 2.0;    // degrees — |tx| below this captures lock
+
+    // Mechanical soft-limits (robot-relative degrees, 0° = forward)
+    private static final double TT_LIMIT_MIN    = -65.0;
+    private static final double TT_LIMIT_MAX    = 254.0;
+    private static final double TT_SLOW_ZONE    = 15.0;
 
     // ===== Inputs (set each loop by caller) =====
     private boolean targetValid    = false;
@@ -133,7 +149,7 @@ public class TurretTest {
                 errorDeg = tx;
 
                 // While centred, capture the field-space lock angle
-                if (Math.abs(tx) < TurretConfig.TT_LOCK_THRESH) {
+                if (Math.abs(tx) < TT_LOCK_THRESH) {
                     lockedFieldAngle = normalize(robotHeadingDeg + turretAngleDeg);
                     hasLock = true;
                 }
@@ -159,7 +175,7 @@ public class TurretTest {
         }
 
         // --- Deadband ---
-        if (Math.abs(errorDeg) < TurretConfig.TT_DEADBAND) {
+        if (Math.abs(errorDeg) < TT_DEADBAND) {
             power    = 0;
             onTarget = true;
             integral *= 0.90;   // bleed integral to prevent drift
@@ -171,23 +187,23 @@ public class TurretTest {
         onTarget = false;
 
         // --- PID ---
-        pTerm = TurretConfig.TT_KP * errorDeg;
+        pTerm = TT_KP * errorDeg;
 
         integral += errorDeg * dt;
-        integral  = Range.clip(integral, -TurretConfig.TT_MAX_INTEGRAL, TurretConfig.TT_MAX_INTEGRAL);
-        iTerm = TurretConfig.TT_KI * integral;
+        integral  = Range.clip(integral, -TT_MAX_INTEGRAL, TT_MAX_INTEGRAL);
+        iTerm = TT_KI * integral;
 
-        dTerm = (dt > 0) ? TurretConfig.TT_KD * ((errorDeg - lastError) / dt) : 0;
+        dTerm = (dt > 0) ? TT_KD * ((errorDeg - lastError) / dt) : 0;
 
         double output = pTerm + iTerm + dTerm;
 
         // --- Static friction compensation ---
         if (output != 0) {
-            output += Math.signum(output) * TurretConfig.TT_K_STATIC;
+            output += Math.signum(output) * TT_K_STATIC;
         }
 
         // --- Clamp ---
-        output = Range.clip(output, -TurretConfig.TT_MAX_POWER, TurretConfig.TT_MAX_POWER);
+        output = Range.clip(output, -TT_MAX_POWER, TT_MAX_POWER);
 
         // --- Soft-limits (in degrees, robot-relative) ---
         output = applySoftLimits(output, turretAngleDeg);
@@ -204,9 +220,9 @@ public class TurretTest {
 
     private double applySoftLimits(double pwr, double angleDeg) {
 
-        double minDeg = TurretConfig.TT_LIMIT_MIN;
-        double maxDeg = TurretConfig.TT_LIMIT_MAX;
-        double slow   = TurretConfig.TT_SLOW_ZONE;
+        double minDeg = TT_LIMIT_MIN;
+        double maxDeg = TT_LIMIT_MAX;
+        double slow   = TT_SLOW_ZONE;
 
         // Hard kill past limits
         if (angleDeg <= minDeg && pwr < 0) return 0;
@@ -311,7 +327,7 @@ public class TurretTest {
     public double  getITerm()      { return iTerm; }
     public double  getDTerm()      { return dTerm; }
     public double  getIntegral()   { return integral; }
-    public double  getKP()         { return TurretConfig.TT_KP; }
-    public double  getKI()         { return TurretConfig.TT_KI; }
-    public double  getKD()         { return TurretConfig.TT_KD; }
+    public double  getKP()         { return TT_KP; }
+    public double  getKI()         { return TT_KI; }
+    public double  getKD()         { return TT_KD; }
 }

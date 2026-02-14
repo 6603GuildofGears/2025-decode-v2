@@ -39,8 +39,8 @@ public class SpindexerController {
     private static final double SHOOT_SETTLE_SEC = 0.4; // settle time before firing each shot
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.055;  // intake rotation speed
-    private static final double SHOOT_SERVO_STEP  = 0.028;  // shoot rotation speed
+    private static final double INTAKE_SERVO_STEP = 0.0375;  // intake rotation speed
+    private static final double SHOOT_SERVO_STEP  = 0.01875;  // shoot rotation speed
     private double servoPos  = P1;   // current commanded position
     private double servoTarget = P1; // where we're heading
 
@@ -68,9 +68,9 @@ public class SpindexerController {
     private int shootSlot = 0;  // which slot we're firing (0, 1, 2)
 
     // Flicker positions
-    private double flickRest1  = 0.1;
-    private double flickRest2  = 0.1;
-    private double flickShoot1 = 0.55;
+    private double flickRest1  = 0.06875;
+    private double flickRest2  = 0.05;
+    private double flickShoot1 = 0.53;
     private double flickShoot2 = 0.5;
 
     // Flywheel
@@ -250,12 +250,19 @@ public class SpindexerController {
 
             case IDLE:
                 if (shootPressed) {
-                    // Start sequence: go to P3 first (reverse of intake), spin up flywheel
-                    shootSlot = 2;  // P3
+                    // Find first filled slot from P3 going down — skip empties
+                    shootSlot = -1;
+                    for (int i = 2; i >= 0; i--) {
+                        if (!slotEmpty[i]) {
+                            shootSlot = i;
+                            break;
+                        }
+                    }
+                    if (shootSlot < 0) break;  // nothing loaded — don't shoot
+
                     currentSlot = shootSlot;
                     servoTarget = POSITIONS[shootSlot];
-                    servoPos = POSITIONS[shootSlot];
-                    spindexer.setPosition(POSITIONS[shootSlot]);
+                    // Don't snap servo — step smoothly during SPINUP
                     flywheel.setVelocity(rpmToTPS(shootRpm));
                     sTimer.reset();
                     sState = SState.SPINUP;
@@ -263,8 +270,10 @@ public class SpindexerController {
                 break;
 
             case SPINUP:
-                // Wait for flywheel to reach speed
-                if (sTimer.seconds() >= SPINUP_SEC) {
+                // Move servo toward target during spinup (hides travel behind spin-up time)
+                boolean servoReady = stepServo(SHOOT_SERVO_STEP);
+                // Wait for BOTH flywheel speed AND servo arrival
+                if (sTimer.seconds() >= SPINUP_SEC && servoReady) {
                     sTimer.reset();
                     sState = SState.SHOOT_SETTLE;
                 }
@@ -298,20 +307,30 @@ public class SpindexerController {
                 if (sTimer.seconds() >= FLICK_SEC) {
                     flicker1.setPosition(flickRest1);
                     flicker2.setPosition(flickRest2);
-                    // Only mark slot empty if RPM drop detected (ball was actually fired)
+
+                    // Only mark slot empty if RPM drop confirmed the ball actually left.
+                    // If no drop detected, the ball is likely still in the slot (misfire/jam).
                     if (shotDetected) {
                         slotColor[shootSlot] = "NONE";
                         slotEmpty[shootSlot] = true;
                     }
+                    // shotDetected is also used for telemetry: true = fired, false = misfire
 
-                    int nextShoot = shootSlot - 1;  // P3→P2→P1
+                    // Find next filled slot going down — skip empties
+                    int nextShoot = -1;
+                    for (int i = shootSlot - 1; i >= 0; i--) {
+                        if (!slotEmpty[i]) {
+                            nextShoot = i;
+                            break;
+                        }
+                    }
                     if (nextShoot < 0) {
-                        // All 3 fired — done
+                        // No more balls — done
                         flywheel.setVelocity(0);
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {
-                        // Pause before advancing
+                        // Pause before advancing to next filled slot
                         shootSlot = nextShoot;
                         sTimer.reset();
                         sState = SState.RETRACTING;
@@ -415,6 +434,8 @@ public class SpindexerController {
         if (sState == SState.FIRE) {
             telemetry.addData("Shot Detected", shotDetected ? "YES (RPM drop)" : "waiting...");
             telemetry.addData("Pre-Flick RPM", String.format("%.0f", preFlickTPS * 60.0 / 28.0));
+        } else if (sState == SState.RETRACTING || sState == SState.ADVANCING) {
+            telemetry.addData("Last Shot", shotDetected ? "FIRED" : "MISFIRE (ball kept)");
         }
         telemetry.addData("Servo Pos/Target", String.format("%.3f / %.3f", servoPos, servoTarget));
         telemetry.addData("Spindexer Pos", String.format("%.3f", spindexer.getPosition()));

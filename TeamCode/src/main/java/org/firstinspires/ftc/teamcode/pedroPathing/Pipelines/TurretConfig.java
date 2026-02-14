@@ -3,60 +3,31 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 import com.bylazar.configurables.annotations.Configurable;
 
 /**
- * Configuration class for Turret PID Control
- * Adjust these values live via Pedro Pathing Panels
- * 
- * BASELINE VALUES (Always active, even without Panels):
- * These are your tested starting values that will be used by default
+ * Turret PID Configuration — live-tunable via Pedro Pathing Panels.
+ * Only the essentials: PID gains, deadband, speed, and filter.
  */
 @Configurable
 public class TurretConfig {
     // ===== PID GAINS =====
-    // Tuned via Turret PID Tuner (best err: 0.036°, 135 iterations)
     public static double KP_TURRET = 0.01969;     // Proportional gain
     public static double KI_TURRET = 0.00083;     // Integral gain
     public static double KD_TURRET = 0.00210;     // Derivative gain
-    
-    // ===== CONTROL LIMITS =====
-    public static double TURRET_DEADBAND = 0.25;    // Degrees - How close is "good enough"
+
+    // ===== CONTROL =====
+    public static double TURRET_DEADBAND = 0.25;   // Degrees — error below this = on-target
     public static double MAX_TURRET_SPEED = 0.35;  // Maximum motor power (0-1)
-    public static double MAX_INTEGRAL = 0.2;       // Anti-windup limit for integral
-    
+    public static double SEARCH_SPEED = 0.12;      // Turret power when searching for lost target
+
+    // ===== HEADING LOCK =====
+    // Counter-rotates turret when chassis spins. Uses IMU heading (reliable).
+    // Units: motor power per degree of heading error.
+    // Higher = snappier lock but may oscillate. Lower = smoother but may lag.
+    public static double K_HEADING_LOCK = 0.04;
+
     // ===== FILTERING =====
     public static double FILTER_ALPHA = 0.8;       // Low-pass filter (0=smooth, 1=responsive)
 
-    // ===== ODOMETRY-GUIDED TURRET =====
-    // Blue goal position in Pedro Pathing coordinates (inches, origin at field corner)
-    // From user measurement: (-1.6m, -1.1m) from field center → (9.01", 28.69") in Pedro coords
-    public static double BLUE_GOAL_X = 9.01;       // inches (Pedro coords)
-    public static double BLUE_GOAL_Y = 28.69;      // inches (Pedro coords)
-
-    // Turret encoder calibration
+    // ===== ENCODER CONVERSION =====
     // GoBilda 1150 RPM: 145.1 ticks/rev × 6.55 external ratio = 950.4 ticks/turret-rev
-    public static double TICKS_PER_TURRET_DEG = 2.64;  // 950.4 / 360
-    public static double TURRET_FORWARD_TICKS = 130.5;  // Encoder ticks when turret faces robot-forward
-
-    // Odometry aim speed (how fast turret slews to predicted angle)
-    public static double ODO_AIM_POWER = 0.25;     // Max power when seeking via odometry prediction
-    public static double ODO_AIM_TOLERANCE = 15.0;  // Degrees — switch to Limelight PID within this window
-
-    // ===== TurretTest subsystem tuning =====
-    // PID gains (read every loop by TurretTest)
-    public static double TT_KP = 0.020;
-    public static double TT_KI = 0.001;
-    public static double TT_KD = 0.002;
-
-    // Control limits
-    public static double TT_DEADBAND     = 0.5;    // degrees — below this = on-target
-    public static double TT_MAX_POWER    = 0.45;   // max motor output (0–1)
-    public static double TT_MAX_INTEGRAL = 50.0;   // anti-windup cap (deg·sec)
-    public static double TT_K_STATIC     = 0.04;   // static-friction kick
-
-    // Lock
-    public static double TT_LOCK_THRESH  = 2.0;    // degrees — |tx| below this captures lock
-
-    // Mechanical soft-limits (robot-relative degrees, 0° = forward)
-    public static double TT_LIMIT_MIN    = -65.0;  // min angle (~8° past magnet)
-    public static double TT_LIMIT_MAX    = 254.0;  // max angle
-    public static double TT_SLOW_ZONE    = 15.0;   // ramp-down zone near limits
+    public static double TICKS_PER_DEG = 2.64;     // 950.4 / 360
 }

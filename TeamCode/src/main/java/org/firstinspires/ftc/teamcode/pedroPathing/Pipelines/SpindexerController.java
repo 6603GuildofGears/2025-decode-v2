@@ -41,8 +41,8 @@ public class SpindexerController {
     public static double SHOOT_SETTLE_SEC = 0.5; // settle time before firing each shot
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.0325;  // intake rotation speed
-    private static final double SHOOT_SERVO_STEP  = 0.01875;  // shoot rotation speed
+    private static final double INTAKE_SERVO_STEP = 0.03;  // intake rotation speed
+    private static final double SHOOT_SERVO_STEP  = 0.0175;  // shoot rotation speed
     public static double FLICKER_STEP = 0.04;   // flicker speed per loop (smaller = slower flick)
     private double servoPos  = P1;   // current commanded position
     private double servoTarget = P1; // where we're heading
@@ -87,9 +87,12 @@ public class SpindexerController {
 
     // ========== RPM drop detection ==========
     private static final double RPM_DROP_THRESHOLD = 150;  // RPM drop that indicates a ball was fired
+    private static final double FIRST_SHOT_REDUCE = 200;   // lower 1st shot RPM by this much
+    private static final double RPM_BOOST_2ND_3RD = 150;   // extra RPM for 2nd and 3rd shots
     private double preFlickTPS = 0;   // flywheel velocity captured right before flick
     private boolean shotDetected = false;  // true if RPM drop seen during this flick
     private boolean[] slotEmpty = {true, true, true};  // tracks which slots are actually empty
+    private int shotNumber = 0;  // 0 = first shot, 1 = second, 2 = third
 
     // ========== Motif ordering ==========
     private String[] motifOrder = null;   // null = default P3→P2→P1, else color sequence
@@ -271,7 +274,7 @@ public class SpindexerController {
     
         // Kill switch
         if (killSwitch && sState != SState.IDLE) {
-            flywheel.setVelocity(0);
+            flywheel.setPower(0);
             flick1Target = flickRest1;
             flick2Target = flickRest2;
             flick1Pos = flickRest1; flick2Pos = flickRest2;
@@ -288,16 +291,16 @@ public class SpindexerController {
 
             case IDLE:
                 if (shootPressed) {
-                    // Find first slot to shoot
+                    // Find first slot to shoot (always P3)
                     shootSlot = findFirstShootSlot();
-                    if (shootSlot < 0) break;  // nothing loaded — don't shoot
 
                     currentSlot = shootSlot;
                     servoTarget = POSITIONS[shootSlot];
                     // Ensure flickers at rest
                     flick1Target = flickRest1;
                     flick2Target = flickRest2;
-                    flywheel.setVelocity(rpmToTPS(shootRpm));
+                    shotNumber = 0;  // first shot
+                    flywheel.setVelocity(rpmToTPS(shootRpm - FIRST_SHOT_REDUCE));
                     sTimer.reset();
                     sState = SState.SPINUP;
                 }
@@ -357,12 +360,16 @@ public class SpindexerController {
                     int nextShoot = findNextShootSlot();
                     if (nextShoot < 0) {
                         // No more balls — done
-                        flywheel.setVelocity(0);
+                        flywheel.setPower(0);
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {
                         // Pause before advancing to next filled slot
                         shootSlot = nextShoot;
+                        shotNumber++;  // increment shot counter
+                        // Boost RPM for 2nd and 3rd shots
+                        double boostedRpm = shootRpm + (shotNumber >= 1 ? RPM_BOOST_2ND_3RD : 0);
+                        flywheel.setVelocity(rpmToTPS(boostedRpm));
                         sTimer.reset();
                         sState = SState.RETRACTING;
                     }
@@ -402,37 +409,19 @@ public class SpindexerController {
 
     /**
      * Find the first slot to shoot.
-     * If motif is set, finds the slot matching motifOrder[0].
-     * Otherwise, picks highest non-empty slot (P3→P2→P1).
+     * Hard-coded: always starts at P3 (slot 2) regardless of slot status.
      */
     private int findFirstShootSlot() {
-        if (motifOrder != null) {
-            motifIndex = 0;
-            return findSlotForMotifIndex(motifIndex);
-        }
-        // Default: highest non-empty slot
-        for (int i = 2; i >= 0; i--) {
-            if (!slotEmpty[i]) return i;
-        }
-        return -1;
+        return 2;  // always start at P3
     }
 
     /**
      * Find the next slot to shoot after the current one was fired.
-     * If motif is set, advances motifIndex and finds matching slot.
-     * Otherwise, scans downward from shootSlot.
+     * Hard-coded: always goes P3→P2→P1 regardless of slot status.
      */
     private int findNextShootSlot() {
-        if (motifOrder != null) {
-            motifIndex++;
-            if (motifIndex >= motifOrder.length) return -1;
-            return findSlotForMotifIndex(motifIndex);
-        }
-        // Default: next non-empty slot going down
-        for (int i = shootSlot - 1; i >= 0; i--) {
-            if (!slotEmpty[i]) return i;
-        }
-        return -1;
+        int next = shootSlot - 1;
+        return (next >= 0) ? next : -1;  // P2 then P1, then done
     }
 
     /**
@@ -516,6 +505,31 @@ public class SpindexerController {
             servoTarget = POSITIONS[slot];
             spindexer.setPosition(POSITIONS[slot]);
         }
+    }
+
+    /**
+     * Mark all 3 slots as loaded (for auto — robot starts pre-filled).
+     * Color is set to "ANY" since auto doesn't care about color.
+     */
+    public void prefillAllSlots() {
+        for (int i = 0; i < 3; i++) {
+            slotEmpty[i] = false;
+            slotColor[i] = "ANY";
+        }
+    }
+
+    /** Mark all 3 slots as empty. */
+    public void clearAllSlots() {
+        for (int i = 0; i < 3; i++) {
+            slotEmpty[i] = true;
+            slotColor[i] = "NONE";
+        }
+    }
+
+    /** Reset shoot state machine to IDLE so a new shoot sequence can start cleanly. */
+    public void resetShootState() {
+        sState = SState.IDLE;
+        shotNumber = 0;
     }
 
     // ========== Getters ==========

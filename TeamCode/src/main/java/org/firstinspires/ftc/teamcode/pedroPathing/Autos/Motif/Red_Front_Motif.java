@@ -1,6 +1,7 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Blue;
+package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Motif;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.pedropathing.util.Timer;
 import com.pedropathing.follower.Follower;
@@ -13,20 +14,18 @@ import org.firstinspires.ftc.teamcode.pedroPathing.other.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motif;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 
 /**
- * Blue Front Auto with Motif detection.
+ * Red Front Auto with Motif detection.
  * Scans for obelisk tag (21/22/23) during init_loop,
  * then shoots balls in the motif-required color order.
  */
-@Autonomous(name = "Blue Front MOTIF", group = "Blue")
-public class Blue_Front_Motif extends OpMode {
+@Disabled
+@Autonomous(name = "Red Front MOTIF", group = "Red")
+public class Red_Front_Motif extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     private SpindexerController spindexer;
-    private DcMotorEx flywheel;
 
     // Motif detection
     private int detectedTagId = -1;
@@ -48,13 +47,13 @@ public class Blue_Front_Motif extends OpMode {
 
     PathState pathState;
 
-    // Poses (same as Blue_Front)
-    private final Pose startPose = new Pose(21, 123, Math.toRadians(142));
-    private final Pose shootPose = new Pose(49, 84, Math.toRadians(180));
-    private final Pose intake1 = new Pose(24, 84, Math.toRadians(180));
-    private final Pose intakePose2 = new Pose(42, 60, Math.toRadians(180));
-    private final Pose intake2 = new Pose(24, 60, Math.toRadians(180));
-    private final Pose endPose = new Pose(24, 72, Math.toRadians(180));
+    // Poses (same as Red_Front)
+    private final Pose startPose = new Pose(123, 123, Math.toRadians(37));
+    private final Pose shootPose = new Pose(85, 85, Math.toRadians(0));
+    private final Pose intake1 = new Pose(121, 84, Math.toRadians(0));
+    private final Pose intakePose2 = new Pose(102, 60, Math.toRadians(0));
+    private final Pose intake2 = new Pose(121, 60, Math.toRadians(0));
+    private final Pose endPose = new Pose(125, 70, Math.toRadians(0));
 
     private ElapsedTime shooterTimer = new ElapsedTime();
     private boolean shooterStarted = false;
@@ -124,14 +123,12 @@ public class Blue_Front_Motif extends OpMode {
             case SHOOT_PRELOAD:
                 if (!follower.isBusy()) {
                     if (shooterTimer.seconds() >= 2.0) {
-                        // Shoot preloaded balls in motif order
+                        // Shoot in motif order
                     }
-
                     if (shooterTimer.seconds() >= 7) {
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
                         shooterStarted = false;
                     }
-
                     telemetry.addLine("Preload Shot — Motif: " + Motif.getMotifName(detectedTagId));
                 }
                 break;
@@ -165,7 +162,7 @@ public class Blue_Front_Motif extends OpMode {
             case SHOOT_INTAKE1:
                 if (!follower.isBusy()) {
                     if (shooterTimer.seconds() >= 2.0) {
-                        // Shoot with motif order
+                        // Shoot in motif order
                     }
                     if (shooterTimer.seconds() >= 8) {
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKEPOSE2;
@@ -215,7 +212,7 @@ public class Blue_Front_Motif extends OpMode {
             case SHOOT_INTAKE2:
                 if (!follower.isBusy()) {
                     if (shooterTimer.seconds() >= 2.0) {
-                        // Shoot with motif order
+                        // Shoot in motif order
                     }
                     telemetry.addLine("Sample 2 Shot — Motif: " + Motif.getMotifName(detectedTagId));
                     if (shooterTimer.seconds() >= 6) {
@@ -251,10 +248,7 @@ public class Blue_Front_Motif extends OpMode {
         opmodeTimer.resetTimer();
         follower = Constants.createFollower(hardwareMap);
 
-        // Initialize Limelight for obelisk scanning
         Limelight_Pipeline.initLimelight(this);
-
-        // Initialize spindexer
         spindexer = new SpindexerController();
 
         buildPaths();
@@ -264,10 +258,6 @@ public class Blue_Front_Motif extends OpMode {
         telemetry.update();
     }
 
-    /**
-     * Runs repeatedly after init() until play is pressed.
-     * Scans for the obelisk tag and locks the motif.
-     */
     @Override
     public void init_loop() {
         Limelight_Pipeline.pollOnce();
@@ -279,7 +269,6 @@ public class Blue_Front_Motif extends OpMode {
             motifLocked = true;
         }
 
-        // Show detection status
         if (motifLocked) {
             telemetry.addData("MOTIF LOCKED", Motif.getMotifName(detectedTagId));
             telemetry.addData("Shoot Order",
@@ -296,7 +285,6 @@ public class Blue_Front_Motif extends OpMode {
         opmodeTimer.resetTimer();
         pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
 
-        // Apply motif to spindexer (or use default order if not detected)
         if (motifLocked && motifOrder != null) {
             spindexer.setMotifOrder(motifOrder);
         }

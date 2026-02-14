@@ -1,6 +1,7 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Blue;
+package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Motif;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.pedropathing.util.Timer;
 import com.pedropathing.follower.Follower;
@@ -19,6 +20,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController
  * Scans for obelisk tag (21/22/23) during init_loop,
  * then shoots balls in the motif-required color order.
  */
+@Disabled
 @Autonomous(name = "Blue Back MOTIF", group = "Blue")
 public class Blue_Back_Motif extends OpMode {
     private Follower follower;

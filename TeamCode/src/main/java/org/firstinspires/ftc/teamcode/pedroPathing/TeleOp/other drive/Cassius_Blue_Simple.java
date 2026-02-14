@@ -188,10 +188,10 @@ public class Cassius_Blue_Simple extends LinearOpMode {
             telemetry.addData("spindexer pos", spindexer.getPosition());
             if(dpadRight2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.005);;
+                spindexer.setPosition(CPoS + 0.03);;
             } else if (dpadLeft2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.005);;
+                spindexer.setPosition(CPoS - 0.03);;
             }
 
             // intake with spindexer slow rotation

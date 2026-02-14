@@ -1,6 +1,7 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Red;
+package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Motif;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.pedropathing.util.Timer;
 import com.pedropathing.follower.Follower;
@@ -15,12 +16,13 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motif;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
 /**
- * Red Front Auto with Motif detection.
+ * Red Back Auto with Motif detection.
  * Scans for obelisk tag (21/22/23) during init_loop,
  * then shoots balls in the motif-required color order.
  */
-@Autonomous(name = "Red Front MOTIF", group = "Red")
-public class Red_Front_Motif extends OpMode {
+@Disabled
+@Autonomous(name = "Red Back MOTIF", group = "Red")
+public class Red_Back_Motif extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     private SpindexerController spindexer;
@@ -33,7 +35,8 @@ public class Red_Front_Motif extends OpMode {
     public enum PathState {
         DRIVE_STARTPOSE_TO_SHOOTPOSE,
         SHOOT_PRELOAD,
-        DRIVE_SHOOTPOSE_TO_INTAKE1,
+        DRIVE_SHOOT_PRELOAD_TO_INTAKEPOSE,
+        DRIVE_INTAKEPOSE_TO_INTAKE1,
         DRIVE_INTAKE1_TO_SHOOTPOSE,
         SHOOT_INTAKE1,
         DRIVE_SHOOTPOSE_TO_INTAKEPOSE2,
@@ -45,20 +48,22 @@ public class Red_Front_Motif extends OpMode {
 
     PathState pathState;
 
-    // Poses (same as Red_Front)
-    private final Pose startPose = new Pose(123, 123, Math.toRadians(37));
-    private final Pose shootPose = new Pose(85, 85, Math.toRadians(0));
-    private final Pose intake1 = new Pose(121, 84, Math.toRadians(0));
-    private final Pose intakePose2 = new Pose(102, 60, Math.toRadians(0));
-    private final Pose intake2 = new Pose(121, 60, Math.toRadians(0));
-    private final Pose endPose = new Pose(125, 70, Math.toRadians(0));
+    // Poses (same as Red_Back)
+    private final Pose startPose = new Pose(84, 9, Math.toRadians(0));
+    private final Pose shootPose = new Pose(84, 20, Math.toRadians(0));
+    private final Pose intakePose = new Pose(103, 36, Math.toRadians(0));
+    private final Pose intake1 = new Pose(106, 36, Math.toRadians(0));
+    private final Pose intakePose2 = new Pose(135, 9.5, Math.toRadians(0));
+    private final Pose intake2 = new Pose(135, 9.5, Math.toRadians(0));
+    private final Pose endPose = new Pose(120, 36, Math.toRadians(0));
 
     private ElapsedTime shooterTimer = new ElapsedTime();
     private boolean shooterStarted = false;
     private boolean pathStarted = false;
 
-    private PathChain driveStartPoseToShootPose;
-    private PathChain driveShootPoseToIntake1;
+    private PathChain driveStartPoseShootPose;
+    private PathChain driveShootPreloadToIntakePose;
+    private PathChain driveIntakePoseToIntake1;
     private PathChain driveIntake1ToShootPose;
     private PathChain driveShootPoseToIntakePose2;
     private PathChain driveIntakePose2ToIntake2;
@@ -66,13 +71,18 @@ public class Red_Front_Motif extends OpMode {
     private PathChain driveShootPoseToEndPose;
 
     public void buildPaths() {
-        driveStartPoseToShootPose = follower.pathBuilder()
+        driveStartPoseShootPose = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, shootPose))
-                .setLinearHeadingInterpolation(startPose.getHeading(), shootPose.getHeading())
+                .setConstantHeadingInterpolation(shootPose.getHeading())
                 .build();
 
-        driveShootPoseToIntake1 = follower.pathBuilder()
-                .addPath(new BezierLine(shootPose, intake1))
+        driveShootPreloadToIntakePose = follower.pathBuilder()
+                .addPath(new BezierLine(shootPose, intakePose))
+                .setConstantHeadingInterpolation(intakePose.getHeading())
+                .build();
+
+        driveIntakePoseToIntake1 = follower.pathBuilder()
+                .addPath(new BezierLine(intakePose, intake1))
                 .setConstantHeadingInterpolation(intake1.getHeading())
                 .build();
 
@@ -106,7 +116,7 @@ public class Red_Front_Motif extends OpMode {
         switch (pathState) {
             case DRIVE_STARTPOSE_TO_SHOOTPOSE:
                 if (!pathStarted) {
-                    follower.followPath(driveStartPoseToShootPose, true);
+                    follower.followPath(driveStartPoseShootPose, true);
                     pathStarted = true;
                 }
                 if (follower.isBusy()) {
@@ -124,16 +134,27 @@ public class Red_Front_Motif extends OpMode {
                         // Shoot in motif order
                     }
                     if (shooterTimer.seconds() >= 7) {
-                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
+                        pathState = PathState.DRIVE_SHOOT_PRELOAD_TO_INTAKEPOSE;
                         shooterStarted = false;
                     }
                     telemetry.addLine("Preload Shot — Motif: " + Motif.getMotifName(detectedTagId));
                 }
                 break;
 
-            case DRIVE_SHOOTPOSE_TO_INTAKE1:
+            case DRIVE_SHOOT_PRELOAD_TO_INTAKEPOSE:
                 if (!pathStarted) {
-                    follower.followPath(driveShootPoseToIntake1, true);
+                    follower.followPath(driveShootPreloadToIntakePose, true);
+                    pathStarted = true;
+                }
+                if (pathStarted && !follower.isBusy()) {
+                    pathState = PathState.DRIVE_INTAKEPOSE_TO_INTAKE1;
+                    pathStarted = false;
+                }
+                break;
+
+            case DRIVE_INTAKEPOSE_TO_INTAKE1:
+                if (!pathStarted) {
+                    follower.followPath(driveIntakePoseToIntake1, true);
                     pathStarted = true;
                 }
                 if (pathStarted && !follower.isBusy()) {

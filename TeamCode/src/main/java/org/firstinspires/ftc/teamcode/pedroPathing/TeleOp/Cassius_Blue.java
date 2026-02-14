@@ -213,10 +213,10 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("spindexer pos", spindexer.getPosition());
             if(dpadRight2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.01);;
+                spindexer.setPosition(CPoS + 0.03);;
             } else if (dpadLeft2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.01);;
+                spindexer.setPosition(CPoS - 0.03);;
             }
 
 
@@ -291,9 +291,8 @@ public class Cassius_Blue extends LinearOpMode {
             boolean blueGoalVisible = hasBlueGoal();
             double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
-            // Manual turret control — gamepad2 triggers (proportional, divided by 3)
-            // LT2 = rotate left, RT2 = rotate right
-            double manualInput = (RTrigger2 - LTrigger2) / 1.5;
+            // Manual turret control — gamepad2 left stick X
+            double manualInput = LStickX2/1.75;
             boolean manualTurret = Math.abs(manualInput) > 0.03;
 
             if (manualTurret) {

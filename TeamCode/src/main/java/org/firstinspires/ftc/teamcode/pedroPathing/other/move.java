@@ -22,11 +22,11 @@ public class move extends LinearOpMode {
         if (opModeIsActive()) {
             // Move forward at half speed
             frontLeft.setPower(-0.25);
-            frontRight.setPower(0.25);
+            frontRight.setPower(-0.25);
             backLeft.setPower(-0.25);
-            backRight.setPower(0.25);
+            backRight.setPower(-0.25);
             
-            sleep(500); // Move for 2 seconds
+            sleep(1250); // Move for 2 seconds
             
             // Stop all motors
             frontLeft.setPower(0);  

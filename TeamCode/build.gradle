@@ -22,8 +22,13 @@ android {
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
+
+    aaptOptions {
+        noCompress "tflite"
+    }
 }
 
 dependencies {
     implementation project(':FtcRobotController')
+    implementation 'org.tensorflow:tensorflow-lite:2.4.0'
 }

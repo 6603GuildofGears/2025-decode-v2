@@ -44,15 +44,20 @@ fi
 echo "[usb-deploy] Using ADB: $ADB"
 echo ""
 
-# ── Restart ADB server to pick up USB devices ──
-echo "[usb-deploy] Restarting ADB server..."
-"$ADB" kill-server > /dev/null 2>&1 || true
-"$ADB" start-server > /dev/null 2>&1
-
-# ── Wait for a USB device ──
-echo "[usb-deploy] Waiting for USB device..."
+# ── Look for a USB device (restart ADB only if needed) ──
+echo "[usb-deploy] Checking for USB device..."
 WAIT_COUNT=0
 DEVICE_SERIAL=""
+
+# First, try without restarting ADB
+DEVICE_SERIAL=$("$ADB" devices | grep -v '^\s*$' | grep -v '^List' | grep -v ':' | awk '{print $1}' | head -n 1)
+
+if [ -z "$DEVICE_SERIAL" ]; then
+    echo "[usb-deploy] No device found, restarting ADB server..."
+    "$ADB" kill-server > /dev/null 2>&1 || true
+    "$ADB" start-server > /dev/null 2>&1
+    sleep 2
+fi
 
 while [ $WAIT_COUNT -lt 10 ]; do
     # List only USB-connected devices (ignore network ones with ":" in serial)

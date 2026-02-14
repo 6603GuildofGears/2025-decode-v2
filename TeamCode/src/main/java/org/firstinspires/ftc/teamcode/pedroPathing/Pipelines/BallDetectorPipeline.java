@@ -67,6 +67,9 @@ public class BallDetectorPipeline implements VisionProcessor {
     // Latest results (written on camera thread, read on OpMode thread)
     private volatile List<BallDetection> latestDetections = new ArrayList<>();
 
+    // Compute-time tracking (ms per processFrame call)
+    private volatile double lastComputeMs = 0.0;
+
     // ── Singleton + VisionPortal ──
     private static BallDetectorPipeline instance;
     private static VisionPortal visionPortal;
@@ -195,6 +198,11 @@ public class BallDetectorPipeline implements VisionProcessor {
         instance = null;
     }
 
+    /** Returns the time in ms that the last processFrame() call took. */
+    public static double getComputeMs() {
+        return instance != null ? instance.lastComputeMs : 0.0;
+    }
+
     public static boolean isReady() {
         return visionPortal != null &&
                visionPortal.getCameraState() == VisionPortal.CameraState.STREAMING;
@@ -222,11 +230,15 @@ public class BallDetectorPipeline implements VisionProcessor {
         textPaint.setAntiAlias(true);
     }
 
+    // Reusable byte array for bulk pixel read (allocated once)
+    private byte[] pixelBytes;
+
     @Override
     public Object processFrame(Mat frame, long captureTimeNanos) {
         if (interpreter == null) return null;
+        long t0 = System.nanoTime();
 
-        // ── 1. Pre-process: resize → RGB → normalise to [0,1] ──
+        // ── 1. Pre-process: resize → RGB → bulk read → normalise ──
         Mat rgb = new Mat();
         Imgproc.cvtColor(frame, rgb, Imgproc.COLOR_RGBA2RGB);
 
@@ -234,39 +246,44 @@ public class BallDetectorPipeline implements VisionProcessor {
         Imgproc.resize(rgb, resized, new org.opencv.core.Size(MODEL_INPUT, MODEL_INPUT));
         rgb.release();
 
-        inputBuffer.rewind();
-        for (int y = 0; y < MODEL_INPUT; y++) {
-            for (int x = 0; x < MODEL_INPUT; x++) {
-                double[] px = resized.get(y, x);
-                inputBuffer.putFloat((float) (px[0] / 255.0));
-                inputBuffer.putFloat((float) (px[1] / 255.0));
-                inputBuffer.putFloat((float) (px[2] / 255.0));
-            }
+        // Bulk read all pixels in one JNI call
+        int totalBytes = MODEL_INPUT * MODEL_INPUT * 3;
+        if (pixelBytes == null || pixelBytes.length != totalBytes) {
+            pixelBytes = new byte[totalBytes];
         }
+        resized.get(0, 0, pixelBytes);
         resized.release();
 
-        // ── 2. Run inference ──
-        float[][] raw = runModel();
-        // raw shape: [4+numClasses][numDetections]  (YOLOv8 transposed output)
+        // Fill input buffer from byte array (pure Java — fast)
+        inputBuffer.rewind();
+        for (int i = 0; i < totalBytes; i++) {
+            inputBuffer.putFloat((pixelBytes[i] & 0xFF) / 255.0f);
+        }
 
-        // ── 3. Post-process ──
+        // ── 2. Run inference ──
+        outputBuffer.rewind();
+        interpreter.run(inputBuffer, outputBuffer);
+        outputBuffer.rewind();
+
+        // ── 3. Post-process (read output buffer directly) ──
         int numClasses = LABELS.length;   // 2
         float scaleX = (float) frameWidth  / MODEL_INPUT;
         float scaleY = (float) frameHeight / MODEL_INPUT;
+        int stride = outCols;
 
         List<BallDetection> detections = new ArrayList<>();
 
         for (int d = 0; d < outCols; d++) {
-            float cx = raw[0][d];
-            float cy = raw[1][d];
-            float w  = raw[2][d];
-            float h  = raw[3][d];
+            float cx = outputBuffer.getFloat((0 * stride + d) * 4);
+            float cy = outputBuffer.getFloat((1 * stride + d) * 4);
+            float w  = outputBuffer.getFloat((2 * stride + d) * 4);
+            float h  = outputBuffer.getFloat((3 * stride + d) * 4);
 
             // Best class
             int   bestIdx  = 0;
             float bestConf = 0f;
             for (int c = 0; c < numClasses; c++) {
-                float conf = raw[4 + c][d];
+                float conf = outputBuffer.getFloat(((4 + c) * stride + d) * 4);
                 if (conf > bestConf) { bestConf = conf; bestIdx = c; }
             }
             if (bestConf < minConfidence) continue;
@@ -301,6 +318,7 @@ public class BallDetectorPipeline implements VisionProcessor {
         }
 
         latestDetections = positioned;
+        lastComputeMs = (System.nanoTime() - t0) / 1_000_000.0;
         return positioned;   // forwarded to onDrawFrame
     }
 
@@ -362,20 +380,6 @@ public class BallDetectorPipeline implements VisionProcessor {
         } catch (IOException e) {
             throw new RuntimeException("Failed to load TFLite model: " + e.getMessage(), e);
         }
-    }
-
-    private float[][] runModel() {
-        outputBuffer.rewind();
-        interpreter.run(inputBuffer, outputBuffer);
-        outputBuffer.rewind();
-
-        float[][] result = new float[outRows][outCols];
-        for (int r = 0; r < outRows; r++) {
-            for (int c = 0; c < outCols; c++) {
-                result[r][c] = outputBuffer.getFloat();
-            }
-        }
-        return result;
     }
 
     // ── Simple greedy NMS ──

@@ -15,6 +15,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
+import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
+
 @Autonomous(name = "PEDRO - Red Front Auto", group = "Red")
 public class Red_Front extends OpMode {
     private Follower follower;
@@ -22,10 +24,20 @@ public class Red_Front extends OpMode {
 
     private DcMotorEx flywheel;
     private DcMotorEx intake;
+    private DcMotorEx turret;
     private Motor_PipeLine motorPipeline;
     private Servo_Pipeline servoPipeline;
     private SpindexerController spindexerController;
     private boolean intakeRunning = false;
+    private boolean shootSequenceStarted = false;
+    private ElapsedTime ballWaitTimer = new ElapsedTime();
+    private boolean ballWaitStarted = false;
+
+    // Turret auto-aim
+    private static final double TURRET_TARGET_DEG = 85.0;
+    private static final double TURRET_P_GAIN = 0.006;
+    private static final double TURRET_MAX_POWER = 0.30;
+    private static final double TURRET_LIMIT_DEG = 5.0;
 
     public enum PathState {
         DRIVE_STARTPOSE_TO_SHOOTPOSE,
@@ -131,11 +143,30 @@ public class Red_Front extends OpMode {
                 .build();
     }
 
+    private void updateTurret() {
+        int pos = turret.getCurrentPosition();
+        double posDeg = pos / TICKS_PER_DEG;
+        double targetTicks = TURRET_TARGET_DEG * TICKS_PER_DEG;
+        double error = targetTicks - pos;
+        double power = error * TURRET_P_GAIN;
+        power = Math.max(-TURRET_MAX_POWER, Math.min(TURRET_MAX_POWER, power));
+        if (posDeg > TURRET_TARGET_DEG + TURRET_LIMIT_DEG && power > 0) {
+            power = 0;
+        } else if (posDeg < TURRET_TARGET_DEG - TURRET_LIMIT_DEG && power < 0) {
+            power = 0;
+        }
+        turret.setPower(power);
+    }
+
     public void statePathUpdate() {
+        updateTurret();
+
         switch (pathState) {
             case DRIVE_STARTPOSE_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveStartPoseToShootPose, true);
+                    Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
              
@@ -147,18 +178,27 @@ public class Red_Front extends OpMode {
                 break;
 
             case SHOOT_PRELOAD:
-                if (!follower.isBusy()) {
-                    if (shooterTimer.seconds() >= 2.0) {
-                        // Open blocker and run intake
-                    }
-
-                    if (shooterTimer.seconds() >= 7) {
-                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
-                        shooterStarted = false;
-                    }
-
-                    telemetry.addLine("Preload Shot");
+                if (!shootSequenceStarted) {
+                    spindexerController.prefillAllSlots();
+                    spindexerController.updateShoot(true, false, flywheel);
+                    intake.setPower(-0.5);
+                    shootSequenceStarted = true;
+                } else {
+                    spindexerController.updateShoot(false, false, flywheel);
                 }
+
+                if (!spindexerController.isShooting() && shootSequenceStarted) {
+                    intake.setPower(0);
+                    flywheel.setVelocity(0);
+                    shootSequenceStarted = false;
+                    spindexerController.resetShootState();
+                    spindexerController.clearAllSlots();
+                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker2.setPosition(0.0875);
+                    pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
+                }
+
+                telemetry.addLine("Preload Shot");
                 break;
 
             case DRIVE_SHOOTPOSE_TO_INTAKE1:
@@ -170,9 +210,16 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
@@ -185,9 +232,16 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
@@ -200,15 +254,23 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
             case DRIVE_INTAKE1POSE3_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake1Pose3ToShootPose, true);
+                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
 
@@ -225,18 +287,26 @@ public class Red_Front extends OpMode {
                 break;
 
             case SHOOT_INTAKE1:
-                if (!follower.isBusy()) {
-                    if (shooterTimer.seconds() >= 2.0) {
-                        // Open blocker and run intake
-                    }
-
-                    if (shooterTimer.seconds() >= 8) {
-                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
-                        shooterStarted = false;
-                    }
-
-                    telemetry.addLine("Sample 1 Shot");
+                if (!shootSequenceStarted) {
+                    spindexerController.updateShoot(true, false, flywheel);
+                    intake.setPower(-0.5);
+                    shootSequenceStarted = true;
+                } else {
+                    spindexerController.updateShoot(false, false, flywheel);
                 }
+
+                if (!spindexerController.isShooting() && shootSequenceStarted) {
+                    intake.setPower(0);
+                    flywheel.setVelocity(0);
+                    shootSequenceStarted = false;
+                    spindexerController.resetShootState();
+                    spindexerController.clearAllSlots();
+                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker2.setPosition(0.0875);
+                    pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
+                }
+
+                telemetry.addLine("Sample 1 Shot");
                 break;
 
             case DRIVE_SHOOTPOSE_TO_INTAKE2:
@@ -260,9 +330,16 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
@@ -275,9 +352,16 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
@@ -290,15 +374,23 @@ public class Red_Front extends OpMode {
                     intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
-                    pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
-                    pathStarted = false;
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
                 }
                 break;
 
             case DRIVE_INTAKE2POSE3_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake2Pose3ToShootPose, true);
+                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
                 
@@ -321,18 +413,26 @@ public class Red_Front extends OpMode {
                 break;
 
             case SHOOT_INTAKE2:
-                if (!follower.isBusy()) {
-                    if (shooterTimer.seconds() >= 2.0) {
-                        // Open blocker and run intake
-                    }
-
-                    telemetry.addLine("Sample 2 Shot");
-
-                    if (shooterTimer.seconds() >= 6) {
-                        pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
-                        shooterStarted = false;
-                    }
+                if (!shootSequenceStarted) {
+                    spindexerController.updateShoot(true, false, flywheel);
+                    intake.setPower(-0.5);
+                    shootSequenceStarted = true;
+                } else {
+                    spindexerController.updateShoot(false, false, flywheel);
                 }
+
+                if (!spindexerController.isShooting() && shootSequenceStarted) {
+                    intake.setPower(0);
+                    flywheel.setVelocity(0);
+                    shootSequenceStarted = false;
+                    spindexerController.resetShootState();
+                    spindexerController.clearAllSlots();
+                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker2.setPosition(0.0875);
+                    pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
+                }
+
+                telemetry.addLine("Sample 2 Shot");
                 break;
 
             case DRIVE_SHOOTPOSE_TO_ENDPOSE:
@@ -344,6 +444,7 @@ public class Red_Front extends OpMode {
                 if (pathStarted && !follower.isBusy()) {
                     telemetry.addLine("Auto Complete");
                     pathStarted = false;
+                    turret.setPower(0);
                     requestOpModeStop();
                 }
                 break;
@@ -371,10 +472,17 @@ public class Red_Front extends OpMode {
         Motor_PipeLine.resetMotors();
         flywheel = Motor_PipeLine.flywheel;
         intake = Motor_PipeLine.intake;
+        turret = Motor_PipeLine.turret;
 
         Sensor.initSensors(this);
         servoPipeline = new Servo_Pipeline(this);
         spindexerController = new SpindexerController();
+        spindexerController.setFlickerPositions(0.1, 0.0875, 0.5, 0.5);
+        spindexerController.setShootRpm(3000);
+        spindexerController.prefillAllSlots();
+        Servo_Pipeline.flicker1.setPosition(0.1);
+        Servo_Pipeline.flicker2.setPosition(0.0875);
+        Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
 
         buildPaths();
         follower.setPose(startPose);

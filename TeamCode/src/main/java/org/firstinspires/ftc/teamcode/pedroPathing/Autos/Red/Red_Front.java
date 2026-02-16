@@ -7,11 +7,13 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.*;
 import com.pedropathing.paths.*;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.other.Constants;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
 @Autonomous(name = "PEDRO - Red Front Auto", group = "Red")
 public class Red_Front extends OpMode {
@@ -20,8 +22,10 @@ public class Red_Front extends OpMode {
 
     private DcMotorEx flywheel;
     private DcMotorEx intake;
-    private Servo spindexer;
     private Motor_PipeLine motorPipeline;
+    private Servo_Pipeline servoPipeline;
+    private SpindexerController spindexerController;
+    private boolean intakeRunning = false;
 
     public enum PathState {
         DRIVE_STARTPOSE_TO_SHOOTPOSE,
@@ -159,13 +163,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_SHOOTPOSE_TO_INTAKE1:
                 if (!pathStarted) {
-                    follower.followPath(driveShootPoseToIntake1, 0.375, true);
+                    follower.followPath(driveShootPoseToIntake1, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Start intake while driving to first intake position
+                    intake.setPower(-0.275); // Start intake while driving to first intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
                     pathStarted = false;
                 }
@@ -173,13 +178,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_INTAKE1_TO_INTAKE1POSE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1ToIntake1Pose2, 0.375, true);
+                    follower.followPath(driveIntake1ToIntake1Pose2, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Keep intake running while driving to second intake position
+                    intake.setPower(-0.275); // Keep intake running while driving to second intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
                     pathStarted = false;
                 }
@@ -187,13 +193,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1Pose2ToIntake1Pose3, 0.375, true);
+                    follower.followPath(driveIntake1Pose2ToIntake1Pose3, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Keep intake running while driving to third intake position
+                    intake.setPower(-0.275); // Keep intake running while driving to third intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
                     pathStarted = false;
                 }
@@ -203,12 +210,11 @@ public class Red_Front extends OpMode {
                 if (!pathStarted) {
                     follower.followPath(driveIntake1Pose3ToShootPose, true);
                     pathStarted = true;
-
-                
                 }
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0); // Stop intake halfway through drive back to shoot position
+                    intakeRunning = false;
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -247,13 +253,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_INTAKE2_TO_INTAKE2POSE1:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2ToIntake2Pose1, 0.375, true);
+                    follower.followPath(driveIntake2ToIntake2Pose1, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Start intake while driving to first intake position
+                    intake.setPower(-0.275); // Start intake while driving to first intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2;
                     pathStarted = false;
                 }
@@ -261,13 +268,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2Pose1ToIntake2Pose2, 0.375, true);
+                    follower.followPath(driveIntake2Pose1ToIntake2Pose2, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Keep intake running while driving to second intake position
+                    intake.setPower(-0.275); // Keep intake running while driving to second intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3;
                     pathStarted = false;
                 }
@@ -275,13 +283,14 @@ public class Red_Front extends OpMode {
 
             case DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2Pose2ToIntake2Pose3, 0.375, true);
+                    follower.followPath(driveIntake2Pose2ToIntake2Pose3, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.4); // Keep intake running while driving to third intake position
+                    intake.setPower(-0.275); // Keep intake running while driving to third intake position
+                    intakeRunning = true;
                 }
 
-                if (pathStarted && !follower.isBusy()) {
+                if (pathStarted && !follower.isBusy() && Sensor.isBallPresent()) {
                     pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
                     pathStarted = false;
                 }
@@ -296,6 +305,7 @@ public class Red_Front extends OpMode {
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0); // Stop intake halfway through drive back to shoot position
+                    intakeRunning = false;
                 }   
 
 
@@ -362,6 +372,10 @@ public class Red_Front extends OpMode {
         flywheel = Motor_PipeLine.flywheel;
         intake = Motor_PipeLine.intake;
 
+        Sensor.initSensors(this);
+        servoPipeline = new Servo_Pipeline(this);
+        spindexerController = new SpindexerController();
+
         buildPaths();
         follower.setPose(startPose);
     }
@@ -369,6 +383,7 @@ public class Red_Front extends OpMode {
     public void start() {
         opmodeTimer.resetTimer();
         pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
+        spindexerController.goToSlot(0);
     }
 
     @Override
@@ -376,6 +391,7 @@ public class Red_Front extends OpMode {
         follower.update();
 
         statePathUpdate();
+        spindexerController.updateIntake(intakeRunning);
 
         telemetry.addData("Path state", pathState.toString());
         telemetry.addData("X", follower.getPose().getX());

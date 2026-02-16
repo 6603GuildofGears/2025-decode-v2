@@ -198,7 +198,7 @@ public class Red_Back extends OpMode {
                     shootAttempts++;
                     if (shootAttempts >= 3) {
                         // 3 failures — skip intake to avoid penalties
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                         pathStarted = false;
                         shooterStarted = false;
@@ -215,7 +215,7 @@ public class Red_Back extends OpMode {
             case DRIVE_SHOOT_PRELOAD_TO_INTAKEPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveShootPreloadToIntakePose, 1, true);
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     pathStarted = true;
                 }
                 wantIntakeMotor = true;
@@ -280,7 +280,7 @@ public class Red_Back extends OpMode {
                     shootAttempts++;
                     if (shootAttempts >= 3) {
                         // 3 failures — skip intake to avoid penalties
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                         pathStarted = false;
                         shooterStarted = false;
@@ -297,7 +297,7 @@ public class Red_Back extends OpMode {
             case DRIVE_SHOOTPOSE_TO_INTAKEPOSE2:
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToIntakePose2, 0.375, true);
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     pathStarted = true;
                 }
                 wantIntakeMotor = true;
@@ -377,7 +377,7 @@ public class Red_Back extends OpMode {
             case DRIVE_SHOOTPOSE_TO_ENDPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToEndPose, true);
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     pathStarted = true;
                 }
                 if (pathStarted && !follower.isBusy()) {

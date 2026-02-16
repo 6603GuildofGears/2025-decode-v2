@@ -205,7 +205,7 @@ public class Blue_Front extends OpMode {
                     shootAttempts++;
                     if (shootAttempts >= 3) {
                         // 3 failures — skip intake to avoid penalties
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         sdx.resetShootState();
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                         pathStarted = false;
@@ -226,7 +226,7 @@ public class Blue_Front extends OpMode {
             case DRIVE_SHOOTPOSE_TO_INTAKE1:
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToIntake1, 0.5, true);
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     pathStarted = true;
                 }
                 // Run intake motor + spindexer sensing while driving
@@ -284,7 +284,7 @@ public class Blue_Front extends OpMode {
                     shootAttempts++;
                     if (shootAttempts >= 3) {
                         // 3 failures — skip intake to avoid penalties
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         sdx.resetShootState();
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                         pathStarted = false;
@@ -305,7 +305,7 @@ public class Blue_Front extends OpMode {
             case DRIVE_SHOOTPOSE_TO_INTAKEPOSE2:
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToIntakePose2, true);
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     pathStarted = true;
                 }
                 wantIntakeMotor = true;
@@ -373,7 +373,7 @@ public class Blue_Front extends OpMode {
                 if (shooterTimer.seconds() >= 8) {
                     shootAttempts++;
                     if (shootAttempts >= 3) {
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         sdx.resetShootState();
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                         pathStarted = false;
@@ -394,7 +394,7 @@ public class Blue_Front extends OpMode {
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToEndPose, true);
                     // Stop everything
-                    flywheel.setPower(0);
+                    flywheel.setVelocity(0);
                     intakeMotor.setPower(0);
                     turret.setPower(0);
                     pathStarted = true;

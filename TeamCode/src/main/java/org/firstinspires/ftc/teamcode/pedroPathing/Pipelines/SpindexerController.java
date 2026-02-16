@@ -274,7 +274,7 @@ public class SpindexerController {
     
         // Kill switch
         if (killSwitch && sState != SState.IDLE) {
-            flywheel.setPower(0);
+            flywheel.setVelocity(0);
             flick1Target = flickRest1;
             flick2Target = flickRest2;
             flick1Pos = flickRest1; flick2Pos = flickRest2;
@@ -360,7 +360,7 @@ public class SpindexerController {
                     int nextShoot = findNextShootSlot();
                     if (nextShoot < 0) {
                         // No more balls — done
-                        flywheel.setPower(0);
+                        flywheel.setVelocity(0);
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {

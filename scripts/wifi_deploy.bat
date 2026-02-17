@@ -55,10 +55,27 @@ if "%ADB%"=="" (
 echo [deploy] Using ADB: %ADB%
 echo.
 
-REM Ensure device is connected and online
-echo [deploy] Establishing connection...
+REM Check if device is already connected
+"%ADB%" -s %TARGET% shell echo ok >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [deploy] Device already connected
+    goto device_ready
+)
 
-REM First, disconnect any stale connections
+REM Try quick reconnect first
+echo [deploy] Device not responding, attempting reconnect...
+"%ADB%" reconnect device >nul 2>&1
+timeout /t 3 /nobreak >nul
+"%ADB%" -s %TARGET% shell echo ok >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [deploy] Reconnected successfully
+    goto device_ready
+)
+
+REM Full connection sequence
+echo [deploy] Reconnect failed, establishing fresh connection...
+
+REM Disconnect any stale connections
 "%ADB%" disconnect %TARGET% >nul 2>&1
 
 REM Connect fresh

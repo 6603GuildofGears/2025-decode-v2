@@ -530,6 +530,11 @@ public class SpindexerController {
     public void resetShootState() {
         sState = SState.IDLE;
         shotNumber = 0;
+        // Sync flicker tracking to rest so stale positions don't cause an extra flick
+        flick1Pos = flickRest1;
+        flick2Pos = flickRest2;
+        flick1Target = flickRest1;
+        flick2Target = flickRest2;
     }
 
     // ========== Getters ==========

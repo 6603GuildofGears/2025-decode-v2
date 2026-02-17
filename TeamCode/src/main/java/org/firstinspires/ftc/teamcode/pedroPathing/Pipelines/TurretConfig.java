@@ -9,7 +9,7 @@ import com.bylazar.configurables.annotations.Configurable;
 @Configurable
 public class TurretConfig {
     // ===== GAINS =====
-    public static double KP_TURRET = 0.012;        // Proportional gain (increased for snappier strafe tracking)
+    public static double KP_TURRET = 0.010;        // Proportional gain (tuned for strafe tracking)
     public static double KI_TURRET = 0.00083;      // Integral gain
     public static double KD_TURRET = 0.00210;      // Derivative gain
 

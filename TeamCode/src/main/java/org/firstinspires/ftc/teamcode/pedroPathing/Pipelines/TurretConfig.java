@@ -9,9 +9,9 @@ import com.bylazar.configurables.annotations.Configurable;
 @Configurable
 public class TurretConfig {
     // ===== GAINS =====
-    public static double KP_TURRET = 0.010;        // Proportional gain (tuned for strafe tracking)
+    public static double KP_TURRET = 0.012;        // Proportional gain (back to snappy — filter handles smoothing)
     public static double KI_TURRET = 0.00083;      // Integral gain
-    public static double KD_TURRET = 0.00210;      // Derivative gain
+    public static double KD_TURRET = 0.00210;      // Derivative gain (reverted — 0.004 amplified noise)
 
     // ===== CONTROL =====
     public static double TURRET_DEADBAND = 1.0;    // Degrees — error below this = on-target
@@ -19,7 +19,7 @@ public class TurretConfig {
     public static double SEARCH_SPEED = 0.12;      // Turret power when searching
 
     // ===== FEEDFORWARD =====
-    public static double K_YAW_FF = 0.007;         // Layer 1: power per °/s of robot yaw rate
+    public static double K_YAW_FF = 0.009;         // Layer 1: power per °/s of robot yaw rate (increased for spin tracking)
 
     // ===== HEADING / FIELD LOCK =====
     public static double K_HEADING_LOCK = 0.008;   // Power per degree of chassis rotation
@@ -27,7 +27,7 @@ public class TurretConfig {
     public static double LOCK_MAX_POWER = 0.25;    // Layer 3: max turret power during field lock
 
     // ===== FILTERING =====
-    public static double FILTER_ALPHA = 0.8;       // Low-pass filter (0=smooth, 1=responsive)
+    public static double FILTER_ALPHA = 0.6;       // Low-pass filter (reduced to smooth oscillation)
 
     // ===== ENCODER CONVERSION =====
     // GoBilda 1150 RPM: 145.1 ticks/rev × 6.55 external ratio = 950.4 ticks/turret-rev

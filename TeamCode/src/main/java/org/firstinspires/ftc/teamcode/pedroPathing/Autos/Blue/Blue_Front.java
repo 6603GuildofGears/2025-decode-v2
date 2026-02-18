@@ -32,9 +32,10 @@ public class Blue_Front extends OpMode {
     private boolean shootSequenceStarted = false;
     private ElapsedTime ballWaitTimer = new ElapsedTime();
     private boolean ballWaitStarted = false;
+    private int ballsNeeded = 3;  // how many balls we need to intake (based on missed shots)
 
     // Turret auto-aim
-    private static final double TURRET_TARGET_DEG = 85.0;
+    private static final double TURRET_TARGET_DEG = 92.5;
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
     private static final double TURRET_LIMIT_DEG = 5.0;
@@ -61,13 +62,13 @@ public class Blue_Front extends OpMode {
     // Poses from the provided coordinates
     private final Pose startPose = new Pose(21, 123, Math.toRadians(142));
     private final Pose shootPose = new Pose(49, 82, Math.toRadians(180));
-    private final Pose intake1 = new Pose(32, 83, Math.toRadians(180));       // Intake 1 position
-    private final Pose intake1Pose2 = new Pose(28, 83, Math.toRadians(180));  // Intake 1 waypoint 2
-    private final Pose intake1Pose3 = new Pose(25, 83, Math.toRadians(180));  // Intake 1 waypoint 3
-    private final Pose intake2 = new Pose(40, 58, Math.toRadians(180));       // Intake 2 position
-    private final Pose intake2Pose1 = new Pose(30, 58, Math.toRadians(180));  // Intake 2 waypoint 1
-    private final Pose intake2Pose2 = new Pose(27, 58, Math.toRadians(180));  // Intake 2 waypoint 2
-    private final Pose intake2Pose3 = new Pose(25, 58, Math.toRadians(180));  // Intake 2 waypoint 3
+    private final Pose intake1 = new Pose(34, 80, Math.toRadians(180));       // Intake 1 position
+    private final Pose intake1Pose2 = new Pose(30, 80, Math.toRadians(180));  // Intake 1 waypoint 2
+    private final Pose intake1Pose3 = new Pose(25, 80, Math.toRadians(180));  // Intake 1 waypoint 3
+    private final Pose intake2 = new Pose(40, 56, Math.toRadians(180));       // Intake 2 position
+    private final Pose intake2Pose1 = new Pose(34, 56, Math.toRadians(180));  // Intake 2 waypoint 1
+    private final Pose intake2Pose2 = new Pose(30, 56, Math.toRadians(180));  // Intake 2 waypoint 2
+    private final Pose intake2Pose3 = new Pose(25, 56, Math.toRadians(180));  // Intake 2 waypoint 3
     private final Pose endPose = new Pose(24, 72, Math.toRadians(180));       // Park position
 
     private ElapsedTime shooterTimer = new ElapsedTime();
@@ -166,38 +167,43 @@ public class Blue_Front extends OpMode {
                 if (!pathStarted) {
                     follower.followPath(driveStartPoseToShootPose, true);
                     Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
-                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
+                    flywheel.setVelocity(3200.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
-                if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.SHOOT_PRELOAD;
-                    pathStarted = false;
-                    shooterTimer.reset();
-                }
-                break;
 
-            case SHOOT_PRELOAD:
-                if (!shootSequenceStarted) {
+                // At 70% through the drive, begin shooting while still moving
+                if (pathStarted && !shootSequenceStarted && follower.getCurrentTValue() >= 0.5) {
                     spindexerController.prefillAllSlots();
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
                     shootSequenceStarted = true;
-                } else {
+                } else if (shootSequenceStarted) {
                     spindexerController.updateShoot(false, false, flywheel);
                 }
 
-                if (!spindexerController.isShooting() && shootSequenceStarted) {
+                // Transition when shooting is complete (may finish after robot stops)
+                if (shootSequenceStarted && !spindexerController.isShooting()) {
                     intake.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
+                    // Confirmed = balls that left the chamber = balls we need to replace
+                    int confirmed = spindexerController.getConfirmedShots();
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
                     Servo_Pipeline.flicker1.setPosition(0.1);
                     Servo_Pipeline.flicker2.setPosition(0.0875);
-                    pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
+
+                    if (confirmed <= 0) {
+                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
+                    } else {
+                        ballsNeeded = 3;
+                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
+                    }
+                    pathStarted = false;
                 }
 
-                telemetry.addLine("Preload Shot");
+                telemetry.addLine("Drive + Preload Shot");
+                telemetry.addData("Confirmed Shots", spindexerController.getConfirmedShots());
                 break;
 
             case DRIVE_SHOOTPOSE_TO_INTAKE1:
@@ -205,7 +211,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveShootPoseToIntake1, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -215,7 +221,13 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
-                        pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
+                        ballsNeeded--;
+                        if (ballsNeeded <= 0) {
+                            // Got all we need — skip remaining intake waypoints
+                            pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                        } else {
+                            pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
+                        }
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
@@ -227,7 +239,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveIntake1ToIntake1Pose2, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -237,7 +249,12 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
-                        pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
+                        ballsNeeded--;
+                        if (ballsNeeded <= 0) {
+                            pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                        } else {
+                            pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
+                        }
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
@@ -249,7 +266,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveIntake1Pose2ToIntake1Pose3, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -259,6 +276,7 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        ballsNeeded--;
                         pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
                         pathStarted = false;
                         ballWaitStarted = false;
@@ -269,7 +287,7 @@ public class Blue_Front extends OpMode {
             case DRIVE_INTAKE1POSE3_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake1Pose3ToShootPose, true);
-                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
+                    flywheel.setVelocity(3200.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
 
@@ -298,14 +316,23 @@ public class Blue_Front extends OpMode {
                     intake.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
+                    // Confirmed = balls that left the chamber = balls we need to replace
+                    ballsNeeded = spindexerController.getConfirmedShots();
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
                     Servo_Pipeline.flicker1.setPosition(0.1);
                     Servo_Pipeline.flicker2.setPosition(0.0875);
-                    pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
+
+                    if (ballsNeeded <= 0) {
+                        // No balls left — skip intake 2
+                        pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
+                    } else {
+                        pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
+                    }
                 }
 
                 telemetry.addLine("Sample 1 Shot");
+                telemetry.addData("Confirmed Shots", spindexerController.getConfirmedShots());
                 break;
 
             case DRIVE_SHOOTPOSE_TO_INTAKE2:
@@ -325,7 +352,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveIntake2ToIntake2Pose1, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -335,7 +362,12 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
-                        pathState = PathState.DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2;
+                        ballsNeeded--;
+                        if (ballsNeeded <= 0) {
+                            pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
+                        } else {
+                            pathState = PathState.DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2;
+                        }
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
@@ -347,7 +379,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveIntake2Pose1ToIntake2Pose2, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -357,7 +389,12 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
-                        pathState = PathState.DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3;
+                        ballsNeeded--;
+                        if (ballsNeeded <= 0) {
+                            pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
+                        } else {
+                            pathState = PathState.DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3;
+                        }
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
@@ -369,7 +406,7 @@ public class Blue_Front extends OpMode {
                     follower.followPath(driveIntake2Pose2ToIntake2Pose3, 0.425, true);
                     pathStarted = true;
 
-                    intake.setPower(-0.275);
+                    intake.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -379,6 +416,7 @@ public class Blue_Front extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        ballsNeeded--;
                         pathState = PathState.DRIVE_INTAKE2POSE3_TO_SHOOTPOSE;
                         pathStarted = false;
                         ballWaitStarted = false;
@@ -430,6 +468,7 @@ public class Blue_Front extends OpMode {
                 }
 
                 telemetry.addLine("Sample 2 Shot");
+                telemetry.addData("Confirmed Shots", spindexerController.getConfirmedShots());
                 break;
 
             case DRIVE_SHOOTPOSE_TO_ENDPOSE:
@@ -499,6 +538,8 @@ public class Blue_Front extends OpMode {
         spindexerController.updateIntake(intakeRunning);
 
         telemetry.addData("Path state", pathState.toString());
+        telemetry.addData("Balls Needed", ballsNeeded);
+        telemetry.addData("Confirmed Shots", spindexerController.getConfirmedShots());
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));

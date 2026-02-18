@@ -516,15 +516,16 @@ public class Blue_Front extends OpMode {
         spindexerController.setFlickerPositions(0.1, 0.0875, 0.5, 0.5);
         spindexerController.setShootRpm(3000);
         spindexerController.prefillAllSlots();
-        Servo_Pipeline.flicker1.setPosition(0.1);
-        Servo_Pipeline.flicker2.setPosition(0.0875);
-        Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
 
         buildPaths();
         follower.setPose(startPose);
     }
 
     public void start() {
+        Servo_Pipeline.flicker1.setPosition(0.1);
+        Servo_Pipeline.flicker2.setPosition(0.0875);
+        Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+        Servo_Pipeline.hood.setPosition(0.5);
         opmodeTimer.resetTimer();
         pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
         spindexerController.goToSlot(0);

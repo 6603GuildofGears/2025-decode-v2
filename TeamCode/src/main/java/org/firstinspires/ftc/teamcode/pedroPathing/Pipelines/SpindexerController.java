@@ -47,8 +47,8 @@ public class SpindexerController {
     private int totalMisfires = 0;                        // lifetime misfire counter for telemetry
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.3;  // intake rotation speed (per second)
-    private static final double SHOOT_SERVO_STEP  = 0.3;   // shoot rotation speed (per second)
+    private static final double INTAKE_SERVO_STEP = 0.25;  // intake rotation speed (per second)
+    private static final double SHOOT_SERVO_STEP  = 0.25;   // shoot rotation speed (per second)
     public static double FLICKER_STEP = 0.875;   // flicker speed per SECOND (position units/sec)
     private double servoPos  = P1;   // current commanded position
     private double servoTarget = P1; // where we're heading

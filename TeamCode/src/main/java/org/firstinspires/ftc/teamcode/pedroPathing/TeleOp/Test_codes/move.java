@@ -1,11 +1,13 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.Autos.other;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;  
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 
 
+@Disabled
 @Autonomous(name="Move", group="Auto")
 public class move extends LinearOpMode {
 

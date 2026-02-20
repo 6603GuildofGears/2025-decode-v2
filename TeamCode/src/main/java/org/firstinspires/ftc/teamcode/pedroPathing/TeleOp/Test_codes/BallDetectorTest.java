@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -65,6 +66,7 @@ import java.util.List;
  *   Gamepad1 A  — Toggle live camera view on/off
  *   Gamepad1 B  — Cycle confidence threshold (50% → 70% → 90% → 50%)
  */
+@Disabled
 @TeleOp(name = "Ball Detector Test", group = "Test")
 public class BallDetectorTest extends LinearOpMode {
 

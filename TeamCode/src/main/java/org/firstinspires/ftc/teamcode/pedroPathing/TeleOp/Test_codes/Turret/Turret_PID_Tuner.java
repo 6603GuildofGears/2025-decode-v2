@@ -38,6 +38,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.other.Constants;
  *
  * Tuned parameters: kP, kI, kD, kRot (IMU yaw-rate feedforward)
  */
+@Disabled
 @TeleOp(name = "Turret PID Tuner", group = "Testing")
 public class Turret_PID_Tuner extends LinearOpMode {
 

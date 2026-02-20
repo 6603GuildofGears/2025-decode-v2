@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.test_codes;
 
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -18,14 +18,15 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLi
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
 
 
 @Disabled
-@TeleOp(name="Cassius Red BACKUP", group="TeleOp")
-public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
+@TeleOp(name="Cassius Blue BACKUP", group="TeleOp")
+public class Cassius_Blue_BACKUP_IMU_ONLY extends LinearOpMode {
 
 
 
@@ -69,7 +70,7 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
 
 
 
-    double baseRpm = 3000; // default RPM for shooter
+    double baseRpm = 3000; // default RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
     double targetRpm = baseRpm; // updated from Limelight lookup when available
     double targetHoodPos = hood.getPosition();
     // Limelight distance config (inches/degrees)
@@ -162,8 +163,8 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                 double RStickY = gamepad1.right_stick_y;
                 double RStickX = -gamepad1.right_stick_x;
 
-                double LTrigger1 = gamepad1.left_trigger;
-                double RTrigger1 = gamepad1.right_trigger;
+                double LTrigger1 = gamepad1.left_trigger; // need to be a value between 0 and 1
+                double RTrigger1 = gamepad1.right_trigger; // need to be a value between 0 and 1
 
                 boolean a1 = gamepad1.a;
                 boolean b1 = gamepad1.b;
@@ -199,7 +200,18 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
 
       
                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
-                    double rotation = 0;
+                    //Orientation angles = imu.getAngularOrientation();
+                    double rotation = 0; //Math.toRadians(angles.firstAngle);
+                /*
+                if (Math.abs(LStickX) < .05 && Math.abs(RStickX) < .05) {
+                    SetPower(LStickY, LStickY, LStickY, LStickY);
+                }
+                else if (Math.abs(LStickY) < .05 && Math.abs(RStickX) < .05) {
+                    SetPower(LStickX, -LStickX, -LStickX, LStickX);//+--+
+                }
+                */
+
+                  
 
                     double r = Math.hypot(LStickX, LStickY);
                     double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
@@ -210,7 +222,12 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                     double v3 = r * Math.sin(robotAngle) + rightX * gear; //lb
                     double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
+
+
                   SetPower(v1, v3, v2, v4);
+
+
+
 
                 } else if (LBumper1) {
                     SetPower(gear, -gear, gear, -gear);
@@ -219,13 +236,14 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                     SetPower(gear, -gear, gear, -gear);
 
                 }  else if (dpadUp1) {
-                    SetPower(1 , 1 , 1 , 1 );
+                    SetPower(1 , 1 , 1 , 1 ); //0.3
                 } else if (dpadRight1) {
-                    SetPower(1, -1, -1, 1);
+                    SetPower(1, -1, -1, 1); //0.5
                 } else if (dpadLeft1) {
                     SetPower(-1, 1, 1, -1);
                 } else if (dpadDown1) {
                     SetPower(-1, -1, -1, -1);
+
 
                 } else {
                     frontLeft.setPower(0);
@@ -235,6 +253,9 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                 }
 
 
+
+
+
                 // AUXILIARY CODE
 
 
@@ -242,10 +263,10 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             telemetry.addData("spindexer pos", spindexer.getPosition());
             if(dpadRight2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.03);
+                spindexer.setPosition(CPoS + 0.03);;
             } else if (dpadLeft2){
                 double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.03);
+                spindexer.setPosition(CPoS - 0.03);;
             }
 
 
@@ -291,13 +312,15 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                 sdx.setShootRpm(baseRpm);
                 double currentHoodPos = hood.getPosition();
                 if (dpadUp2){
-                     hood.setPosition(Math.min(1.0, currentHoodPos + 0.01));
+                     hood.setPosition(Math.min(1.0, currentHoodPos + 0.01)); // Slide up
                  } else if (dpadDown2){
-                     hood.setPosition(Math.max(0.0, currentHoodPos - 0.01));
+                     hood.setPosition(Math.max(0.0, currentHoodPos - 0.01)); // Slide down
                 }
             }
 
-            // Shooting sequence — SpindexerController handles everything
+            // Shooting sequence — SpindexerController handles everything:
+            //   slot tracking, skip empties, smart direction, flicker timing
+            //   RBumper2 = shoot, LBumper2 = kill switch
             sdx.updateShoot(RBumper2, LBumper2, flywheel); 
 
             // Mag sensor state tracking
@@ -321,12 +344,13 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             double robotHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
 
             // --- Layer 1: Yaw-rate feedforward (ALWAYS active, even when no target) ---
-            // Sign: positive yawRate (CCW robot spin) needs positive turret power
+            // Sign: positive yawRate (CCW robot spin) needs positive turret power (CW turret)
+            // to keep camera aimed at the same field point.
             double yawFF = yawRate * K_YAW_FF;
 
-            // --- Cache Limelight data ONCE per loop — TARGET RED GOAL ---
-            boolean redGoalVisible = hasRedGoal();
-            double redGoalTx = redGoalVisible ? getRedGoalX() : 0;
+            // --- Cache Limelight data ONCE per loop ---
+            boolean blueGoalVisible = hasBlueGoal();
+            double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
 
             // --- Manual turret control — gamepad2 left stick X ---
             double manualInput = LStickX2 / 1.75;
@@ -335,10 +359,10 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             // --- PID delta time ---
             double dt = pidTimer.seconds();
             pidTimer.reset();
-            if (dt <= 0 || dt > 0.5) dt = 0.02;
+            if (dt <= 0 || dt > 0.5) dt = 0.02; // guard first frame / stalls
 
             if (manualTurret) {
-                // === MANUAL OVERRIDE ===
+                // === MANUAL OVERRIDE — bypasses all automatic tracking ===
                 turretPower = manualInput * MAX_TURRET_SPEED;
                 positionHeld = false;
                 hasFieldLock = false;
@@ -347,13 +371,14 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                 pidInitialized = false;
                 turretMode = "MANUAL";
 
-            } else if (redGoalVisible) {
+            } else if (blueGoalVisible) {
                 // === TARGET VISIBLE: Layer 1 (FF) + Layer 2 (Vision PID) ===
-                double tx = redGoalTx;
+                double tx = blueGoalTx;
                 positionHeld = false;
                 turretMode = "TRACKING";
 
                 // -- Layer 2: Vision PID --
+                // Low-pass filter on tx to smooth noisy Limelight readings
                 if (!pidInitialized) {
                     filteredTx = tx;
                     pidLastError = tx;
@@ -365,31 +390,40 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                 double error = filteredTx;
 
                 if (Math.abs(error) > TURRET_DEADBAND) {
+                    // P term
                     double pTerm = KP_TURRET * error;
 
+                    // I term with anti-windup
                     pidIntegral += error * dt;
                     double maxIntegral = MAX_TURRET_SPEED / Math.max(Math.abs(KI_TURRET), 0.0001);
                     pidIntegral = Math.max(-maxIntegral, Math.min(maxIntegral, pidIntegral));
                     double iTerm = KI_TURRET * pidIntegral;
 
+                    // D term
                     double dTerm = KD_TURRET * ((error - pidLastError) / dt);
 
                     double visionPID = pTerm + iTerm + dTerm;
 
+                    // Static friction compensation
                     if (Math.abs(visionPID) > 0.001 && Math.abs(visionPID) < 0.02) {
                         visionPID = Math.signum(visionPID) * 0.02;
                     }
 
+                    // Combine Layer 1 + Layer 2
                     turretPower = visionPID + yawFF;
+
                 } else {
+                    // On target — feedforward only (keeps it centered during spin)
                     turretPower = yawFF;
-                    pidIntegral *= 0.9;
+                    pidIntegral *= 0.9; // bleed integral to prevent wind-up
                     turretMode = "ON TARGET";
                 }
 
                 pidLastError = error;
 
-                // --- Update field-angle lock ---
+                // --- Update field-angle lock (continuously while tracking) ---
+                // Save the absolute direction the turret is pointing in field space.
+                // If the target disappears next frame, we know exactly where to aim.
                 lockedFieldAngle = normalizeAngle(robotHeading + turretDeg);
                 hasFieldLock = true;
 
@@ -397,18 +431,25 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
 
             } else if (hasFieldLock) {
                 // === TARGET BLOCKED: Layer 1 (FF) + Layer 3 (Field Lock) ===
+                // We know where the goal WAS in field space. The IMU tells us how
+                // the robot has rotated since then. Aim the turret accordingly.
                 turretMode = "FIELD LOCK";
                 positionHeld = false;
                 pidIntegral = 0;
                 pidLastError = 0;
                 pidInitialized = false;
 
+                // Desired turret angle = where the goal is in field space minus current robot heading
                 double desiredTurretDeg = normalizeAngle(lockedFieldAngle - robotHeading);
+
+                // If desired angle is outside turret range, clamp it
                 desiredTurretDeg = Math.max(turretMinDeg, Math.min(turretMaxDeg, desiredTurretDeg));
 
+                // P-control to drive turret to desired angle
                 double lockError = normalizeAngle(desiredTurretDeg - turretDeg);
                 double lockPower = lockError * K_FIELD_LOCK;
 
+                // Combine Layer 1 (FF) + Layer 3 (lock P-control)
                 turretPower = lockPower + yawFF;
                 turretPower = Math.max(-LOCK_MAX_POWER, Math.min(LOCK_MAX_POWER, turretPower));
 
@@ -425,9 +466,10 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             }
 
             // ================================================================
-            //  HARD LIMIT ENFORCEMENT
+            //  HARD LIMIT ENFORCEMENT — turret CANNOT move past limits
             // ================================================================
             if (limitsEnabled) {
+                // ---- HARD STOPS ----
                 if (turretDeg >= turretMaxDeg && turretPower > 0) {
                     turretPower = 0;
                 }
@@ -435,6 +477,7 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                     turretPower = 0;
                 }
 
+                // ---- SLOW ZONES ----
                 if (turretPower > 0 && turretDeg > turretMaxDeg - LIMIT_SLOW_ZONE_DEG) {
                     double s = (turretMaxDeg - turretDeg) / LIMIT_SLOW_ZONE_DEG;
                     turretPower *= Math.max(0.0, Math.min(1.0, s));
@@ -444,6 +487,7 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
                     turretPower *= Math.max(0.0, Math.min(1.0, s));
                 }
 
+                // ---- OVERSHOOT RECOVERY ----
                 if (turretDeg > turretMaxDeg) {
                     turretPower = -0.15;
                 }
@@ -454,12 +498,12 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
 
             turret.setPower(turretPower);
 
-            // Display telemetry
+            // Display telemetry (use cached values — same data the PID used)
             telemetry.addData("=== LIMELIGHT STATUS ===", "");
             telemetry.addData("LL Connected", hasTarget() ? "YES" : "CHECKING...");
-            telemetry.addData("Red Goal Visible", redGoalVisible ? "YES" : "NO");
-            if (redGoalVisible) {
-                telemetry.addData("Target X Error", String.format("%.2f°", redGoalTx));
+            telemetry.addData("Blue Goal Visible", blueGoalVisible ? "YES" : "NO");
+            if (blueGoalVisible) {
+                telemetry.addData("Target X Error", String.format("%.2f°", blueGoalTx));
             }
             
             telemetry.addData("=== TURRET (3-LAYER) ===", "");
@@ -478,7 +522,7 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
             sdx.addTelemetry(telemetry);
             
-            // === LOOKUP TABLE TEST ===
+            // === LOOKUP TABLE TEST — always show what the table would output ===
             telemetry.addData("=== LOOKUP TABLE TEST ===", "");
             telemetry.addData("LL Distance (in)", hasDistance ? String.format("%.1f", distanceInches) : "NO TARGET");
             if (hasDistance) {
@@ -508,7 +552,7 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             }
             
             // Push key data to Panels
-            telemetryM.debug("Red Goal: " + (redGoalVisible ? "YES" : "NO"));
+            telemetryM.debug("Blue Goal: " + (blueGoalVisible ? "YES" : "NO"));
             telemetryM.debug("Turret: " + String.format("%.1f°", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
             telemetryM.debug("L1 YawFF: " + String.format("%.3f", yawFF) + " | Rate: " + String.format("%.1f°/s", yawRate));
             telemetryM.debug("L3 Lock: " + (hasFieldLock ? String.format("%.1f°", lockedFieldAngle) : "NONE") + " | Hdg: " + String.format("%.1f°", robotHeading));
@@ -516,9 +560,9 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
-            displayTelemetry(this);
-            telemetry.update();
-            telemetryM.update();
+            displayTelemetry(this); // Shows Limelight FPS and additional info
+            telemetry.update(); // Push telemetry to Driver Station
+            telemetryM.update(); // Push Panels data separately
  
         }
 
@@ -540,3 +584,4 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
     }
 
 }
+

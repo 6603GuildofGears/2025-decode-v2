@@ -62,6 +62,10 @@ public class Cassius_Blue extends LinearOpMode {
     double cameraHeight = 11.125; // Camera lens center height in inches
     double cameraMountAngle = 22.85; // Camera angle from horizontal (calibrated)
     double targetHeight = 29.5; // AprilTag center height in inches
+
+    // Smoothing filter for distance — prevents hood jitter from noisy Limelight frames
+    double smoothedDistance = -1; // -1 means no value yet
+    double SMOOTHING_ALPHA = 0.3; // 0.0 = very smooth/slow, 1.0 = no smoothing (raw)
       
         // Turret safety limits in DEGREES
         double turretMinDeg = 5;
@@ -272,22 +276,39 @@ public class Cassius_Blue extends LinearOpMode {
 
 
             // Limelight-based shooter tuning (distance -> rpm + hood)
+            // Only use blue goal (AprilTag ID 20) for distance/hood
             LLResult limelightResult = getLatestResult();
             double distanceInches = 0.0;
             boolean hasDistance = false;
             if (limelightResult != null && limelightResult.isValid() &&
                 limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
-                double ty = limelightResult.getFiducialResults().get(0).getTargetYDegrees();
-                double totalAngle = cameraMountAngle + ty;
-                double heightDifference = targetHeight - cameraHeight;
-                if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
-                    distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
-                    hasDistance = true;
+                // Find blue goal tag (ID 20) specifically
+                LLResultTypes.FiducialResult blueGoalForHood = null;
+                for (LLResultTypes.FiducialResult f : limelightResult.getFiducialResults()) {
+                    if ((int) f.getFiducialId() == 20) {
+                        blueGoalForHood = f;
+                        break;
+                    }
+                }
+                if (blueGoalForHood != null) {
+                    double ty = blueGoalForHood.getTargetYDegrees();
+                    double totalAngle = cameraMountAngle + ty;
+                    double heightDifference = targetHeight - cameraHeight;
+                    if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
+                        distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                        hasDistance = true;
+                    }
                 }
             }
             if (hasDistance) {
+                // Smooth the distance to eliminate frame-to-frame jitter
+                if (smoothedDistance < 0) {
+                    smoothedDistance = distanceInches; // first reading — use raw
+                } else {
+                    smoothedDistance = smoothedDistance + SMOOTHING_ALPHA * (distanceInches - smoothedDistance);
+                }
                 // Lookup table is primary — always applies when target is visible
-                ShooterLookup.Result tuned = ShooterLookup.lookup(distanceInches);
+                ShooterLookup.Result tuned = ShooterLookup.lookup(smoothedDistance);
                 targetRpm = tuned.rpm;
                 targetHoodPos = tuned.hoodPos;
                 hood.setPosition(targetHoodPos);

@@ -1,7 +1,9 @@
 
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -13,7 +15,7 @@ import java.util.List;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
-
+@Disabled
 @TeleOp(name = "Auto-aiming turret", group = "Iterative Opmode")
 public class Turret_try extends OpMode {
 

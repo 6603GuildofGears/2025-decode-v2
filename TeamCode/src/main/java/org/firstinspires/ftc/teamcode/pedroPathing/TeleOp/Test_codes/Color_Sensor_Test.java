@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.Servo;
 
@@ -21,6 +22,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
  *   Y  (gp1)     = spindexer to p3
  *   dpad L/R     = nudge spindexer
  */
+@Disabled
 @TeleOp(name = "Color Sensor Test", group = "Testing")
 public class Color_Sensor_Test extends LinearOpMode {
 

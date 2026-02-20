@@ -1,8 +1,10 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.Turret;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.Pose;
@@ -28,6 +30,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
  * CONTROLS (gamepad1):
  *   Left stick / Right stick — Drive (mecanum)
  */
+@Disabled
 @TeleOp(name = "Turret Test Bench", group = "Testing")
 public class TurretTestBench extends OpMode {
 

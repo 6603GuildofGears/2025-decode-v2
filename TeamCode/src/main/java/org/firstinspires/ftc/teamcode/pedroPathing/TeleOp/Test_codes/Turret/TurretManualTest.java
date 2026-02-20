@@ -1,6 +1,7 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.Turret;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -50,6 +51,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.TurretSubsystem;
  * Enter your tuned PID gains here after running the auto-tuner.
  * These are the STARTING DEFAULTS — replace with your tuned values!
  */
+@Disabled
 @TeleOp(name = "Turret Manual Test", group = "Test")
 public class TurretManualTest extends LinearOpMode {
 

@@ -1,5 +1,5 @@
 
-package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.Turret;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -22,7 +22,7 @@ import com.qualcomm.robotcore.hardware.Servo;
  */
 
 
-
+@Disabled
 @TeleOp(name = "!! Encoder Diag", group = "Testing")
 public class EncoderDiag extends OpMode {
 

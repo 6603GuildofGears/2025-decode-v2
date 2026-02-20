@@ -11,6 +11,8 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import java.util.List;
 
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
+
 @TeleOp(name = "Auto-aiming turret", group = "Iterative Opmode")
 public class Turret_try extends OpMode {
 
@@ -40,9 +42,13 @@ public class Turret_try extends OpMode {
 
     private boolean targetWasVisible = false;
 
+    double gear = 1.25;
+
     @Override
     public void init() {
         try {
+            intMotors(this);
+
             turretMotor = hardwareMap.get(DcMotorEx.class, "turret");
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
@@ -62,6 +68,87 @@ public class Turret_try extends OpMode {
 
     @Override
     public void loop() {
+
+        // === Gamepad Inputs ===
+        boolean LStickIn2 = gamepad2.left_stick_button;
+        boolean RStickIn2 = gamepad2.right_stick_button;
+        boolean LBumper1 = gamepad1.left_bumper;
+        boolean RBumper1 = gamepad1.right_bumper;
+        double LStickY = gamepad1.left_stick_y;
+        double LStickX = -gamepad1.left_stick_x;
+        double RStickY = gamepad1.right_stick_y;
+        double RStickX = -gamepad1.right_stick_x;
+
+        double LTrigger1 = gamepad1.left_trigger;
+        double RTrigger1 = gamepad1.right_trigger;
+
+        boolean a1 = gamepad1.a;
+        boolean b1 = gamepad1.b;
+        boolean x1 = gamepad1.x;
+        boolean y1 = gamepad1.y;
+
+        boolean a2 = gamepad2.a;
+        boolean b2 = gamepad2.b;
+        boolean x2 = gamepad2.x;
+        boolean y2 = gamepad2.y;
+
+        double LTrigger2 = gamepad2.left_trigger;
+        double RTrigger2 = gamepad2.right_trigger;
+        boolean LBumper2 = gamepad2.left_bumper;
+        boolean RBumper2 = gamepad2.right_bumper;
+
+        double RStickY2 = -gamepad2.right_stick_y;
+        double RStickX2 = gamepad2.right_stick_x;
+        double LStickY2 = -gamepad2.left_stick_y;
+        double LStickX2 = gamepad2.left_stick_x;
+
+        boolean dpadUp1 = gamepad1.dpad_up;
+        boolean dpadDown1 = gamepad1.dpad_down;
+        boolean dpadRight1 = gamepad1.dpad_right;
+        boolean dpadLeft1 = gamepad1.dpad_left;
+
+        boolean dpadUp2 = gamepad2.dpad_up;
+        boolean dpadDown2 = gamepad2.dpad_down;
+        boolean dpadRight2 = gamepad2.dpad_right;
+        boolean dpadLeft2 = gamepad2.dpad_left;
+
+        // === Drive Code ===
+        if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
+            double rotation = 0;
+
+            double r = Math.hypot(LStickX, LStickY);
+            double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
+            double rightX = RStickX;
+
+            double v1 = r * Math.cos(robotAngle) + rightX * gear; //lf
+            double v2 = r * Math.sin(robotAngle) - rightX * gear; //rf
+            double v3 = r * Math.sin(robotAngle) + rightX * gear; //lb
+            double v4 = r * Math.cos(robotAngle) - rightX * gear; //rb
+
+            SetPower(v1, v3, v2, v4);
+
+        } else if (LBumper1) {
+            SetPower(gear, -gear, gear, -gear);
+
+        } else if (LTrigger1 > 0.25) {
+            SetPower(gear, -gear, gear, -gear);
+
+        } else if (dpadUp1) {
+            SetPower(1, 1, 1, 1);
+        } else if (dpadRight1) {
+            SetPower(1, -1, -1, 1);
+        } else if (dpadLeft1) {
+            SetPower(-1, 1, 1, -1);
+        } else if (dpadDown1) {
+            SetPower(-1, -1, -1, -1);
+        } else {
+            frontLeft.setPower(0);
+            backLeft.setPower(0);
+            frontRight.setPower(0);
+            backRight.setPower(0);
+        }
+
+        // === Turret Auto-Aim ===
         try {
             LLResult result = limelight.getLatestResult();
 
@@ -70,13 +157,24 @@ public class Turret_try extends OpMode {
                 List<LLResultTypes.FiducialResult> fiducials =
                     result.getFiducialResults();
 
-                if (fiducials != null && !fiducials.isEmpty()) {
-                    // Target found!
+                // Find the blue goal tag (ID 20) specifically
+                LLResultTypes.FiducialResult blueGoal = null;
+                if (fiducials != null) {
+                    for (LLResultTypes.FiducialResult f : fiducials) {
+                        if ((int) f.getFiducialId() == 20) {
+                            blueGoal = f;
+                            break;
+                        }
+                    }
+                }
+
+                if (blueGoal != null) {
+                    // Blue goal tag found!
                     targetWasVisible = true;
                     targetLostTimer.reset();
 
-                    // Get the first (closest/best) fiducial
-                    LLResultTypes.FiducialResult fiducial = fiducials.get(0);
+                    // Get the blue goal fiducial
+                    LLResultTypes.FiducialResult fiducial = blueGoal;
 
                     // Get horizontal offset from center (tx)
                     double tx = fiducial.getTargetXDegrees();

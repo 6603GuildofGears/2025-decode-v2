@@ -1,7 +1,8 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.Turret;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
@@ -35,6 +36,7 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
  *   DEADBAND — ignore errors smaller than this (degrees)
  *              1° is reasonable. Lower if you need more precision.
  */
+@Disabled
 @Configurable
 @TeleOp(name = "Simple Turret Tracker", group = "Testing")
 public class Simple_Turret_Tracker extends LinearOpMode {

@@ -92,6 +92,7 @@ public class Cassius_Blue extends LinearOpMode {
 
         boolean targetWasVisible = false;
         boolean homingToMag = false;
+        double lastTurretPower = 0; // remember last power for coasting (matches Turret_try)
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -398,7 +399,8 @@ public class Cassius_Blue extends LinearOpMode {
                     } else {
                         // No blue goal visible — handle target loss
                         if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
-                            // Coast briefly
+                            // Coast briefly — keep last motor power (matches Turret_try)
+                            turretPower = lastTurretPower;
                             turretMode = "COASTING";
                         } else {
                             // Home to mag sensor
@@ -446,6 +448,7 @@ public class Cassius_Blue extends LinearOpMode {
             }
 
             turret.setPower(turretPower);
+            lastTurretPower = turretPower; // save for coasting next cycle
 
             // Display telemetry
             telemetry.addData("=== LIMELIGHT STATUS ===", "");

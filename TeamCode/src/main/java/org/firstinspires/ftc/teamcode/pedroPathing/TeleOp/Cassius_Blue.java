@@ -3,21 +3,18 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.limelightvision.LLResult;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
-import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
+import java.util.List;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
-import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
 
@@ -36,17 +33,8 @@ public class Cassius_Blue extends LinearOpMode {
         initLimelight(this);
         initSensors(this);
 
-        // Reset turret encoder to 0 at current position (should be centered manually before init)
-        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
-        // IMU for yaw-rate feedforward (counter-rotates turret when chassis spins)
-        // Hub is mounted with logo facing BACKWARD, USB ports facing UP (~75° tilt)
-        IMU imu = hardwareMap.get(IMU.class, "imu");
-        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.BACKWARD,
-                RevHubOrientationOnRobot.UsbFacingDirection.UP)));
-        imu.resetYaw();
+        // Direct Limelight reference for turret PID (bypasses pipeline abstraction)
+        Limelight3A limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();
@@ -75,37 +63,35 @@ public class Cassius_Blue extends LinearOpMode {
     double cameraMountAngle = 22.85; // Camera angle from horizontal (calibrated)
     double targetHeight = 29.5; // AprilTag center height in inches
       
-        // Turret safety limits in DEGREES (converted to ticks internally)
-        double turretMinDeg = 5;       // Left limit (degrees) — avoid cable strain
-        double turretMaxDeg = 300;     // Right limit (degrees)
+        // Turret safety limits in DEGREES
+        double turretMinDeg = 5;
+        double turretMaxDeg = 300;
         boolean limitsEnabled = true;
-        double LIMIT_SLOW_ZONE_DEG = 15; // Ramp-down zone in degrees
-        
-        // Mag sensor = turret home (position 0). Turret starts here at init.
-        boolean lastMagState = false; // Track mag sensor state changes
+        double LIMIT_SLOW_ZONE_DEG = 15;
+        double TICKS_PER_DEG = 2.64;
 
-        // Turret values in TurretConfig.java (KP_TURRET, KI_TURRET, KD_TURRET, etc.)
+        // Mag sensor = turret home (position 0)
+        boolean lastMagState = false;
 
-        // === 3-LAYER TURRET TRACKING STATE ===
-        // Layer 1: IMU yaw-rate feedforward (proactive — cancels chassis rotation instantly)
-        // Layer 2: Vision PID (reactive — cleans up residual error from Limelight tx)
-        // Layer 3: Field-angle lock (fallback — holds aim direction when target is blocked)
+        // === TURRET PID (from Turret_try — direct Limelight, no IMU) ===
+        double kP = 0.015;
+        double kI = 0.0001;
+        double kD = 0.002;
+        double targetX = 0.0;
+        double turretIntegral = 0.0;
+        double turretLastError = 0.0;
+        ElapsedTime turretTimer = new ElapsedTime();
+        ElapsedTime targetLostTimer = new ElapsedTime();
 
-        // PID state (Layer 2)
-        double pidIntegral = 0;
-        double pidLastError = 0;
-        double filteredTx = 0;
-        boolean pidInitialized = false;
-        ElapsedTime pidTimer = new ElapsedTime();
+        double POSITION_TOLERANCE = 1.5;
+        double MIN_POWER = 0.05;
+        double MAX_TURRET_POWER = 0.4;
+        double TARGET_LOST_TIMEOUT = 2.0;
+        double HOME_POWER = -0.2;
+        boolean INVERT_MOTOR = false;
 
-        // Field-angle lock state (Layer 3)
-        double lockedFieldAngle = 0;   // Field-space angle the turret was pointing when target was last seen
-        boolean hasFieldLock = false;  // True once we've captured a lock angle
-
-        // Position hold for manual mode
-        int holdPosition = 0;
-        boolean positionHeld = false;
-        double K_HOLD = 0.005; // P gain for position hold (ticks)
+        boolean targetWasVisible = false;
+        boolean homingToMag = false;
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -118,7 +104,7 @@ public class Cassius_Blue extends LinearOpMode {
         updateSensors();
         if (isMagPressed()) {
             turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             homed = true;
         }
         while (!homed && !isStarted() && !isStopRequested()) {
@@ -126,7 +112,7 @@ public class Cassius_Blue extends LinearOpMode {
             if (isMagPressed()) {
                 turret.setPower(0);
                 turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
                 homed = true;
             } else {
                 turret.setPower(-0.15); // slow left toward mag sensor
@@ -151,6 +137,8 @@ public class Cassius_Blue extends LinearOpMode {
         while (opModeIsActive()) {
                // Poll Limelight ONCE per loop — all getters below see the SAME frame
                pollOnce();
+               // Update sensors every loop so isMagPressed() stays current
+               updateSensors();
                boolean LStickIn2 = gamepad2.left_stick_button;
                 boolean RStickIn2 = gamepad2.right_stick_button;
                 boolean LBumper1 = gamepad1.left_bumper;
@@ -325,10 +313,8 @@ public class Cassius_Blue extends LinearOpMode {
             lastMagState = currentMagState;
 
             // ================================================================
-            //  3-LAYER TURRET TRACKING
-            //  Layer 1: IMU yaw-rate feedforward (PROACTIVE — instant)
-            //  Layer 2: Vision PID on Limelight tx (REACTIVE — cleans up residual)
-            //  Layer 3: Field-angle lock (FALLBACK — holds aim when blocked)
+            //  TURRET TRACKING (from Turret_try — direct Limelight PID)
+            //  Only tracks blue goal (AprilTag ID 20)
             // ================================================================
 
             int turretPosition = turret.getCurrentPosition();
@@ -336,145 +322,116 @@ public class Cassius_Blue extends LinearOpMode {
             double turretPower = 0;
             String turretMode = "IDLE";
 
-            // --- Read IMU data (used by Layer 1 and Layer 3) ---
-            double yawRate = imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate;
-            double robotHeading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
-
-            // --- Layer 1: Yaw-rate feedforward (ALWAYS active, even when no target) ---
-            // Sign: positive yawRate (CCW robot spin) needs positive turret power (CW turret)
-            // to keep camera aimed at the same field point.
-            double yawFF = yawRate * K_YAW_FF;
-
-            // --- Cache Limelight data ONCE per loop ---
-            boolean blueGoalVisible = hasBlueGoal();
-            double blueGoalTx = blueGoalVisible ? getBlueGoalX() : 0;
-
             // --- Manual turret control — gamepad2 left stick X ---
             double manualInput = LStickX2 / 1.75;
             boolean manualTurret = Math.abs(manualInput) > 0.03;
 
-            // --- PID delta time ---
-            double dt = pidTimer.seconds();
-            pidTimer.reset();
-            if (dt <= 0 || dt > 0.5) dt = 0.02; // guard first frame / stalls
-
             if (manualTurret) {
-                // === MANUAL OVERRIDE — bypasses all automatic tracking ===
-                turretPower = manualInput * MAX_TURRET_SPEED;
-                positionHeld = false;
-                hasFieldLock = false;
-                pidIntegral = 0;
-                pidLastError = 0;
-                pidInitialized = false;
+                // === MANUAL OVERRIDE ===
+                turretPower = manualInput * MAX_TURRET_POWER;
+                targetWasVisible = false;
+                homingToMag = false;
+                turretIntegral = 0;
+                turretLastError = 0;
                 turretMode = "MANUAL";
 
-            } else if (blueGoalVisible) {
-                // === TARGET VISIBLE: Layer 1 (FF) + Layer 2 (Vision PID) ===
-                double tx = blueGoalTx;
-                positionHeld = false;
-                turretMode = "TRACKING";
+            } else {
+                // === AUTO-AIM: read Limelight directly, filter for blue goal (tag 20) ===
+                try {
+                    LLResult result = limelight.getLatestResult();
 
-                // -- Layer 2: Vision PID --
-                // Low-pass filter on tx to smooth noisy Limelight readings
-                if (!pidInitialized) {
-                    filteredTx = tx;
-                    pidLastError = tx;
-                    pidInitialized = true;
-                } else {
-                    filteredTx = FILTER_ALPHA * tx + (1.0 - FILTER_ALPHA) * filteredTx;
-                }
-
-                double error = filteredTx;
-
-                if (Math.abs(error) > TURRET_DEADBAND) {
-                    // P term
-                    double pTerm = KP_TURRET * error;
-
-                    // I term with anti-windup
-                    pidIntegral += error * dt;
-                    double maxIntegral = MAX_TURRET_SPEED / Math.max(Math.abs(KI_TURRET), 0.0001);
-                    pidIntegral = Math.max(-maxIntegral, Math.min(maxIntegral, pidIntegral));
-                    double iTerm = KI_TURRET * pidIntegral;
-
-                    // D term
-                    double dTerm = KD_TURRET * ((error - pidLastError) / dt);
-
-                    double visionPID = pTerm + iTerm + dTerm;
-
-                    // Static friction compensation
-                    if (Math.abs(visionPID) > 0.001 && Math.abs(visionPID) < 0.02) {
-                        visionPID = Math.signum(visionPID) * 0.02;
+                    LLResultTypes.FiducialResult blueGoal = null;
+                    if (result != null && result.isValid()) {
+                        List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
+                        if (fiducials != null) {
+                            for (LLResultTypes.FiducialResult f : fiducials) {
+                                if ((int) f.getFiducialId() == 20) {
+                                    blueGoal = f;
+                                    break;
+                                }
+                            }
+                        }
                     }
 
-                    // Combine Layer 1 + Layer 2
-                    turretPower = visionPID + yawFF;
+                    if (blueGoal != null) {
+                        // Blue goal found — PID tracking
+                        targetWasVisible = true;
+                        targetLostTimer.reset();
+                        homingToMag = false;
+                        turretMode = "LOCKED ON";
 
-                } else {
-                    // On target — feedforward only (keeps it centered during spin)
-                    turretPower = yawFF;
-                    pidIntegral *= 0.9; // bleed integral to prevent wind-up
-                    turretMode = "ON TARGET";
+                        double tx = blueGoal.getTargetXDegrees();
+
+                        double dt = turretTimer.seconds();
+                        turretTimer.reset();
+                        if (dt < 0.001) dt = 0.001;
+                        if (dt > 1.0) dt = 1.0;
+
+                        double error = tx - targetX;
+
+                        turretIntegral += error * dt;
+                        turretIntegral = Math.max(-50, Math.min(50, turretIntegral));
+
+                        double derivative = (error - turretLastError) / dt;
+
+                        double pidOutput = (kP * error) + (kI * turretIntegral) + (kD * derivative);
+
+                        if (Math.abs(error) < POSITION_TOLERANCE) {
+                            pidOutput = 0;
+                            turretIntegral = 0;
+                        }
+
+                        if (pidOutput != 0 && Math.abs(pidOutput) < MIN_POWER) {
+                            pidOutput = MIN_POWER * Math.signum(pidOutput);
+                        }
+
+                        turretPower = Math.max(-MAX_TURRET_POWER, Math.min(MAX_TURRET_POWER, pidOutput));
+                        if (INVERT_MOTOR) turretPower = -turretPower;
+                        if (!Double.isFinite(turretPower)) {
+                            turretPower = 0;
+                            turretIntegral = 0;
+                            turretLastError = 0;
+                        }
+
+                        turretLastError = error;
+
+                    } else {
+                        // No blue goal visible — handle target loss
+                        if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
+                            // Coast briefly
+                            turretMode = "COASTING";
+                        } else {
+                            // Home to mag sensor
+                            homingToMag = true;
+                            if (isMagPressed()) {
+                                turretPower = 0;
+                                turretIntegral = 0;
+                                turretLastError = 0;
+                                turretMode = "HOME";
+                            } else {
+                                turretPower = HOME_POWER;
+                                turretMode = "HOMING";
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    turretPower = 0;
+                    turretIntegral = 0;
+                    turretLastError = 0;
+                    targetWasVisible = false;
+                    homingToMag = false;
+                    turretMode = "ERROR";
+                    telemetry.addData("Turret Error", e.getMessage());
                 }
-
-                pidLastError = error;
-
-                // --- Update field-angle lock (continuously while tracking) ---
-                // Save the absolute direction the turret is pointing in field space.
-                // If the target disappears next frame, we know exactly where to aim.
-                lockedFieldAngle = normalizeAngle(robotHeading + turretDeg);
-                hasFieldLock = true;
-
-                turretPower = Math.max(-MAX_TURRET_SPEED, Math.min(MAX_TURRET_SPEED, turretPower));
-
-            } else if (hasFieldLock) {
-                // === TARGET BLOCKED: Layer 1 (FF) + Layer 3 (Field Lock) ===
-                // We know where the goal WAS in field space. The IMU tells us how
-                // the robot has rotated since then. Aim the turret accordingly.
-                turretMode = "FIELD LOCK";
-                positionHeld = false;
-                pidIntegral = 0;
-                pidLastError = 0;
-                pidInitialized = false;
-
-                // Desired turret angle = where the goal is in field space minus current robot heading
-                double desiredTurretDeg = normalizeAngle(lockedFieldAngle - robotHeading);
-
-                // If desired angle is outside turret range, clamp it
-                desiredTurretDeg = Math.max(turretMinDeg, Math.min(turretMaxDeg, desiredTurretDeg));
-
-                // P-control to drive turret to desired angle
-                double lockError = normalizeAngle(desiredTurretDeg - turretDeg);
-                double lockPower = lockError * K_FIELD_LOCK;
-
-                // Combine Layer 1 (FF) + Layer 3 (lock P-control)
-                turretPower = lockPower + yawFF;
-                turretPower = Math.max(-LOCK_MAX_POWER, Math.min(LOCK_MAX_POWER, turretPower));
-
-            } else {
-                // === NO TARGET, NO LOCK — hold encoder position ===
-                turretMode = "HOLD";
-                if (!positionHeld) {
-                    holdPosition = turretPosition;
-                    positionHeld = true;
-                }
-                int posError = turretPosition - holdPosition;
-                turretPower = -posError * K_HOLD + yawFF;
-                turretPower = Math.max(-0.15, Math.min(0.15, turretPower));
             }
 
             // ================================================================
             //  HARD LIMIT ENFORCEMENT — turret CANNOT move past limits
             // ================================================================
             if (limitsEnabled) {
-                // ---- HARD STOPS ----
-                if (turretDeg >= turretMaxDeg && turretPower > 0) {
-                    turretPower = 0;
-                }
-                if (turretDeg <= turretMinDeg && turretPower < 0) {
-                    turretPower = 0;
-                }
+                if (turretDeg >= turretMaxDeg && turretPower > 0) turretPower = 0;
+                if (turretDeg <= turretMinDeg && turretPower < 0) turretPower = 0;
 
-                // ---- SLOW ZONES ----
                 if (turretPower > 0 && turretDeg > turretMaxDeg - LIMIT_SLOW_ZONE_DEG) {
                     double s = (turretMaxDeg - turretDeg) / LIMIT_SLOW_ZONE_DEG;
                     turretPower *= Math.max(0.0, Math.min(1.0, s));
@@ -484,36 +441,22 @@ public class Cassius_Blue extends LinearOpMode {
                     turretPower *= Math.max(0.0, Math.min(1.0, s));
                 }
 
-                // ---- OVERSHOOT RECOVERY ----
-                if (turretDeg > turretMaxDeg) {
-                    turretPower = -0.15;
-                }
-                if (turretDeg < turretMinDeg) {
-                    turretPower = 0.15;
-                }
+                if (turretDeg > turretMaxDeg) turretPower = -0.15;
+                if (turretDeg < turretMinDeg) turretPower = 0.15;
             }
 
             turret.setPower(turretPower);
 
-            // Display telemetry (use cached values — same data the PID used)
+            // Display telemetry
             telemetry.addData("=== LIMELIGHT STATUS ===", "");
             telemetry.addData("LL Connected", hasTarget() ? "YES" : "CHECKING...");
-            telemetry.addData("Blue Goal Visible", blueGoalVisible ? "YES" : "NO");
-            if (blueGoalVisible) {
-                telemetry.addData("Target X Error", String.format("%.2f°", blueGoalTx));
-            }
             
-            telemetry.addData("=== TURRET (3-LAYER) ===", "");
+            telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
             telemetry.addData("Turret Power", String.format("%.3f", turretPower));
-            telemetry.addData("L1 Yaw FF", String.format("%.3f (rate=%.1f°/s)", yawFF, yawRate));
-            telemetry.addData("L3 Field Lock", hasFieldLock ?
-                    String.format("%.1f° (heading=%.1f°)", lockedFieldAngle, robotHeading) : "NONE");
-            telemetry.addData("--- TUNING (Panels) ---", "");
-            telemetry.addData("KP/KI/KD", String.format("%.4f / %.5f / %.5f", KP_TURRET, KI_TURRET, KD_TURRET));
-            telemetry.addData("K_YAW_FF", String.format("%.4f", K_YAW_FF));
-            telemetry.addData("K_FIELD_LOCK", String.format("%.4f", K_FIELD_LOCK));
+            telemetry.addData("PID", String.format("kP=%.4f kI=%.5f kD=%.4f", kP, kI, kD));
+            telemetry.addData("Mag Sensor", isMagPressed() ? "PRESSED" : "---");
             
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
@@ -549,11 +492,9 @@ public class Cassius_Blue extends LinearOpMode {
             }
             
             // Push key data to Panels
-            telemetryM.debug("Blue Goal: " + (blueGoalVisible ? "YES" : "NO"));
-            telemetryM.debug("Turret: " + String.format("%.1f°", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
-            telemetryM.debug("L1 YawFF: " + String.format("%.3f", yawFF) + " | Rate: " + String.format("%.1f°/s", yawRate));
-            telemetryM.debug("L3 Lock: " + (hasFieldLock ? String.format("%.1f°", lockedFieldAngle) : "NONE") + " | Hdg: " + String.format("%.1f°", robotHeading));
-            telemetryM.debug("PID: KP=" + String.format("%.4f", KP_TURRET) + " FF=" + String.format("%.4f", K_YAW_FF));
+            telemetryM.debug("Turret: " + String.format("%.1f\u00b0", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
+            telemetryM.debug("PID: kP=" + String.format("%.4f", kP) + " kI=" + String.format("%.5f", kI) + " kD=" + String.format("%.4f", kD));
+            telemetryM.debug("Mag: " + (isMagPressed() ? "PRESSED" : "---"));
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
@@ -570,14 +511,6 @@ public class Cassius_Blue extends LinearOpMode {
     // Helper method to convert RPM to ticks per second
     private double getTickSpeed(double rpm) {
         return rpm * 28 / 60; // 28 ticks per revolution, 60 seconds per minute
-    }
-
-    /** Normalize any angle to [-180, +180] degrees. */
-    private double normalizeAngle(double deg) {
-        deg = deg % 360;
-        if (deg > 180)  deg -= 360;
-        if (deg < -180) deg += 360;
-        return deg;
     }
 
 }

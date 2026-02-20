@@ -12,6 +12,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import java.util.List;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 
 @TeleOp(name = "Auto-aiming turret", group = "Iterative Opmode")
 public class Turret_try extends OpMode {
@@ -35,12 +36,16 @@ public class Turret_try extends OpMode {
     private static final double POSITION_TOLERANCE = 1.5; // degrees
     private static final double MIN_POWER = 0.05; // Minimum power to overcome friction
     private static final double MAX_POWER = 0.4; // Maximum turret speed
-    private static final double TARGET_LOST_TIMEOUT = 0.5; // seconds before resetting
+    private static final double TARGET_LOST_TIMEOUT = 2.0; // seconds before homing to mag sensor
+
+    // Homing speed toward mag sensor
+    private static final double HOME_POWER = -0.2; // negative = toward mag sensor (left)
 
     // Direction tuning - CHANGE THIS IF TURRET MOVES WRONG WAY
     private static final boolean INVERT_MOTOR = false; // Set to true if it moves backwards
 
     private boolean targetWasVisible = false;
+    private boolean homingToMag = false;
 
     double gear = 1.25;
 
@@ -48,6 +53,7 @@ public class Turret_try extends OpMode {
     public void init() {
         try {
             intMotors(this);
+            initSensors(this);
 
             turretMotor = hardwareMap.get(DcMotorEx.class, "turret");
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -68,6 +74,9 @@ public class Turret_try extends OpMode {
 
     @Override
     public void loop() {
+
+        // Update sensors each loop
+        updateSensors();
 
         // === Gamepad Inputs ===
         boolean LStickIn2 = gamepad2.left_stick_button;
@@ -172,6 +181,7 @@ public class Turret_try extends OpMode {
                     // Blue goal tag found!
                     targetWasVisible = true;
                     targetLostTimer.reset();
+                    homingToMag = false;
 
                     // Get the blue goal fiducial
                     LLResultTypes.FiducialResult fiducial = blueGoal;
@@ -281,10 +291,19 @@ public class Turret_try extends OpMode {
             telemetry.addData("Status", "TRACKING LOST - Coasting");
             telemetry.addData("Time Lost", "%.2f s", targetLostTimer.seconds());
         } else {
-            // Target lost for too long - stop and reset
-            stopTurret();
-            telemetry.addData("Status", "SEARCHING");
-            telemetry.addData("Target Visible", "No");
+            // Lost for more than 2 seconds - drive turret to mag sensor (home)
+            homingToMag = true;
+            if (isMagPressed()) {
+                // Arrived at home position
+                turretMotor.setPower(0);
+                resetPID();
+                telemetry.addData("Status", "HOME (mag sensor)");
+            } else {
+                // Drive toward mag sensor
+                turretMotor.setPower(HOME_POWER);
+                telemetry.addData("Status", "HOMING TO MAG SENSOR");
+            }
+            telemetry.addData("Mag Sensor", isMagPressed() ? "PRESSED" : "not pressed");
         }
     }
 
@@ -292,6 +311,7 @@ public class Turret_try extends OpMode {
         turretMotor.setPower(0);
         resetPID();
         targetWasVisible = false;
+        homingToMag = false;
     }
 
     private void resetPID() {

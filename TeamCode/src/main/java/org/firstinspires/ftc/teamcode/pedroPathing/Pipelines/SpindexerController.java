@@ -30,15 +30,15 @@ public class SpindexerController {
     private static final double[] POSITIONS = {P1, P2, P3};
 
     // ========== Timing constants ==========
-    private static final double SETTLE_SEC    = 0.35;  // wait after servo arrives before reading sensor
-    private static final double CONFIRM_SEC   = 0.03;  // ball must be seen continuously this long
+    private static final double SETTLE_SEC    = 0.5;   // wait after servo arrives before reading sensor
+    private static final double CONFIRM_SEC   = 0.1;   // ball must be seen continuously this long
     private static final double HOLD_SEC      = 0.05;  // pause after ball confirmed before rotating
 
     private static final double SPINUP_SEC    = 1;   // flywheel spin-up time
     public static double FLICK_SEC     = 0.45;   // flicker hold time — how long flicker stays extended
     public static double FLICK2_DELAY  = 0.02;   // right flicker fires after left
     public static double POST_FLICK_SEC = 0.25;   // pause after flicker retracts before advancing
-    public static double SHOOT_SETTLE_SEC = 0.25; // settle time before firing each shot
+    public static double SHOOT_SETTLE_SEC = 0.5; // settle time before firing each shot
 
     // ========== Misfire retry ==========
     private static final int    MAX_RETRIES       = 1;    // how many times to retry a misfire before giving up
@@ -52,6 +52,7 @@ public class SpindexerController {
     public static double FLICKER_STEP = 0.875;   // flicker speed per SECOND (position units/sec)
     private double servoPos  = P1;   // current commanded position
     private double servoTarget = P1; // where we're heading
+    private double lastWrittenServo = P1;  // last position actually sent to servo
     private ElapsedTime servoTimer = new ElapsedTime();  // for time-based spindexer stepping
 
     // Flicker position tracking (for smooth stepping)
@@ -87,7 +88,7 @@ public class SpindexerController {
 
     // Flicker positions
     private double flickRest1  = 0.06875;
-    private double flickRest2  = 0.05;
+    private double flickRest2  = 0.06875;
     private double flickShoot1 = 0.53;
     private double flickShoot2 = 0.5;
 
@@ -151,6 +152,7 @@ public class SpindexerController {
         currentSlot = startSlot;
         servoPos = POSITIONS[startSlot];
         servoTarget = POSITIONS[startSlot];
+        lastWrittenServo = POSITIONS[startSlot];
     }
 
     /** Get start slot index based on direction */
@@ -203,13 +205,6 @@ public class SpindexerController {
             iState = IState.IDLE;
             ballSeen = false;
             return false;
-        }
-
-        // --- All slots full — no reason to run intake ---
-        if (getBallCount() >= 3) {
-            iState = IState.IDLE;
-            ballSeen = false;
-            return false;  // motor OFF even if trigger held
         }
 
         // --- Auto-spin state machine runs ALWAYS (trigger only controls motor) ---
@@ -513,8 +508,9 @@ public class SpindexerController {
     private void stepFlickers() {
         double dt = flickerTimer.seconds();
         flickerTimer.reset();
-        double step = FLICKER_STEP * dt;  // position change this loop
-        if (step < 0.0001) step = 0.0001; // guard against first-call zero dt
+        if (dt > 0.05) dt = 0.05;           // cap dt to 50ms — prevents huge jump from accumulated time
+        double step = FLICKER_STEP * dt;   // position change this loop
+        if (step < 0.0001) step = 0.0001;  // guard against first-call zero dt
 
         // Flicker 1: step up smoothly, snap down instantly
         if (flick1Target > flick1Pos) {
@@ -556,6 +552,7 @@ public class SpindexerController {
     private boolean stepServo(double stepPerSec) {
         double dt = servoTimer.seconds();
         servoTimer.reset();
+        if (dt > 0.05) dt = 0.05;  // cap dt to prevent huge jump from accumulated time
         double step = stepPerSec * dt;
         if (step < 0.0001) step = 0.0001; // guard against first-call zero dt
 
@@ -564,11 +561,16 @@ public class SpindexerController {
             // Close enough — snap to target
             servoPos = servoTarget;
             spindexer.setPosition(servoPos);
+            lastWrittenServo = servoPos;
             return true;
         }
         // Step toward target
         servoPos += Math.signum(diff) * step;
-        spindexer.setPosition(servoPos);
+        // Only write to servo when change is significant (>= 0.01) to avoid micro-stutter
+        if (Math.abs(servoPos - lastWrittenServo) >= 0.01) {
+            spindexer.setPosition(servoPos);
+            lastWrittenServo = servoPos;
+        }
         return false;
     }
 
@@ -578,6 +580,7 @@ public class SpindexerController {
             currentSlot = slot;
             servoPos = POSITIONS[slot];
             servoTarget = POSITIONS[slot];
+            lastWrittenServo = POSITIONS[slot];
             spindexer.setPosition(POSITIONS[slot]);
         }
     }

@@ -525,7 +525,7 @@ public class Blue_Front extends OpMode {
         Servo_Pipeline.flicker1.setPosition(0.1);
         Servo_Pipeline.flicker2.setPosition(0.0875);
         Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
-        Servo_Pipeline.hood.setPosition(0.5);
+        Servo_Pipeline.hood.setPosition(0.4);
         opmodeTimer.resetTimer();
         pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
         spindexerController.goToSlot(0);

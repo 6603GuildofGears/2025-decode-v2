@@ -40,9 +40,7 @@ public class Cassius_Blue_Simple extends LinearOpMode {
 
         double gear = 1.25; // speed modifier for drive train
         double F1Rest = 0.1;
-        double F2Rest = 0.0875;
         double F1Shoot = 0.5;
-        double F2Shoot = 0.5;
         double servoTolerance = 0.05;
         
         ElapsedTime shootTimer = new ElapsedTime();
@@ -54,7 +52,6 @@ public class Cassius_Blue_Simple extends LinearOpMode {
         boolean autoTrackingEnabled = true;
         boolean y2Pressed = false;
         flicker1.setPosition(F1Rest);
-        flicker2.setPosition(F2Rest);
 
         double baseRpm = 3000;
         double targetRpm = baseRpm;
@@ -231,7 +228,6 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                 sShot = 0;
                 flywheel.setVelocity(0);
                 flicker1.setPosition(F1Rest);
-                flicker2.setPosition(F2Rest);
                 shootTimer.reset();
             } 
             if (RBumper2 && sShot == 0) {
@@ -254,20 +250,16 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                     case 0:
                         flywheel.setVelocity(0);
                         flicker1.setPosition(F1Rest);
-                        flicker2.setPosition(F2Rest);
                         break;
                     case 1:
                         flywheel.setVelocity(getTickSpeed(targetRpm));
                         if (shootTimer.milliseconds() < 1500) {
                         } else if (shootTimer.milliseconds() < 1900) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 2100) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 2000) {
+                            if (f1Ready || shootTimer.milliseconds() > 2000) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 3200) {
                             spindexerTargetPos = p2;
@@ -281,13 +273,10 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                         flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 600) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 1000) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                            if (f1Ready || shootTimer.milliseconds() > 900) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 2500) {
                             spindexerTargetPos = p3;
@@ -301,13 +290,10 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                         flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 600) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 1000) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                            if (f1Ready || shootTimer.milliseconds() > 900) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 2000) {
                         } else {
@@ -320,20 +306,16 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                     case 0:
                         flywheel.setVelocity(0);
                         flicker1.setPosition(F1Rest);
-                        flicker2.setPosition(F2Rest);
                         break;
                     case 1:
                         flywheel.setVelocity(getTickSpeed(targetRpm));
                         if (shootTimer.milliseconds() < 1500) {
                         } else if (shootTimer.milliseconds() < 1900) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 2100) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 2000) {
+                            if (f1Ready || shootTimer.milliseconds() > 2000) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 3200) {
                             spindexerTargetPos = p2;
@@ -347,13 +329,10 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                         flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 600) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 1000) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                            if (f1Ready || shootTimer.milliseconds() > 900) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 2500) {
                             spindexerTargetPos = p1;
@@ -367,13 +346,10 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                         flywheel.setVelocity(getTickSpeed(targetRpm + 200));
                         if (shootTimer.milliseconds() < 300) {
                             flicker1.setPosition(F1Shoot);
-                            flicker2.setPosition(F2Shoot);
                         } else if (shootTimer.milliseconds() < 1000) {
                             boolean f1Ready = Math.abs(flicker1.getPosition() - F1Shoot) < servoTolerance;
-                            boolean f2Ready = Math.abs(flicker2.getPosition() - F2Shoot) < servoTolerance;
-                            if (f1Ready && f2Ready || shootTimer.milliseconds() > 900) {
+                            if (f1Ready || shootTimer.milliseconds() > 900) {
                                 flicker1.setPosition(F1Rest);
-                                flicker2.setPosition(F2Rest);
                             }
                         } else if (shootTimer.milliseconds() < 2000) {
                         } else {

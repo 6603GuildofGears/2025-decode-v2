@@ -49,9 +49,8 @@ public class Color_Sensor_Test extends LinearOpMode {
         spindexer.setPosition(p1);
         currentSlot = 1;
 
-        // Flickers to rest
+        // Flicker to rest
         flicker1.setPosition(0.1);
-        flicker2.setPosition(0.0875);
 
         telemetry.addData("Status", "Ready — press START");
         telemetry.addData("", "");

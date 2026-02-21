@@ -36,7 +36,6 @@ public class SpindexerController {
 
     private static final double SPINUP_SEC    = 1;   // flywheel spin-up time
     public static double FLICK_SEC     = 0.45;   // flicker hold time — how long flicker stays extended
-    public static double FLICK2_DELAY  = 0.02;   // right flicker fires after left
     public static double POST_FLICK_SEC = 0.25;   // pause after flicker retracts before advancing
     public static double SHOOT_SETTLE_SEC = 0.5; // settle time before firing each shot
 
@@ -56,10 +55,8 @@ public class SpindexerController {
     private ElapsedTime servoTimer = new ElapsedTime();  // for time-based spindexer stepping
 
     // Flicker position tracking (for smooth stepping)
-    private double flick1Pos = 0.06875;
-    private double flick2Pos = 0.05;
-    private double flick1Target = 0.06875;
-    private double flick2Target = 0.05;
+    private double flickPos = 0.06875;
+    private double flickTarget = 0.06875;
     private ElapsedTime flickerTimer = new ElapsedTime();  // for time-based stepping
 
     // ========== Slot tracking ==========
@@ -87,10 +84,8 @@ public class SpindexerController {
     private int shootDirection = -1;  // -1 = P3→P1, +1 = P1→P3 (set dynamically)
 
     // Flicker positions
-    private double flickRest1  = 0.06875;
-    private double flickRest2  = 0.06875;
-    private double flickShoot1 = 0.53;
-    private double flickShoot2 = 0.5;
+    private double flickRest  = 0.06875;
+    private double flickShoot = 0.53;
 
     // Flywheel
     private double shootRpm = 3000;
@@ -115,11 +110,10 @@ public class SpindexerController {
     // ========== Constructor ==========
     public SpindexerController() {}
 
-    public void setFlickerPositions(double r1, double r2, double s1, double s2) {
-        flickRest1 = r1; flickRest2 = r2; flickShoot1 = s1; flickShoot2 = s2;
-        // Init tracking to rest positions
-        flick1Pos = r1; flick1Target = r1;
-        flick2Pos = r2; flick2Target = r2;
+    public void setFlickerPositions(double rest, double shoot) {
+        flickRest = rest; flickShoot = shoot;
+        // Init tracking to rest position
+        flickPos = rest; flickTarget = rest;
     }
 
     public void setShootRpm(double rpm) { this.shootRpm = rpm; }
@@ -311,17 +305,15 @@ public class SpindexerController {
         // Kill switch
         if (killSwitch && sState != SState.IDLE) {
             flywheel.setVelocity(0);
-            flick1Target = flickRest1;
-            flick2Target = flickRest2;
-            flick1Pos = flickRest1; flick2Pos = flickRest2;
-            flicker1.setPosition(flickRest1);
-            flicker2.setPosition(flickRest2);
+            flickTarget = flickRest;
+            flickPos = flickRest;
+            flicker1.setPosition(flickRest);
             sState = SState.IDLE;
             return;
         }
 
-        // Step flickers toward their targets every loop
-        stepFlickers();
+        // Step flicker toward its target every loop
+        stepFlicker();
 
         switch (sState) {
 
@@ -336,9 +328,8 @@ public class SpindexerController {
 
                     currentSlot = shootSlot;
                     servoTarget = POSITIONS[shootSlot];
-                    // Ensure flickers at rest
-                    flick1Target = flickRest1;
-                    flick2Target = flickRest2;
+                    // Ensure flicker at rest
+                    flickTarget = flickRest;
                     shotNumber = 0;  // first shot
                     retryCount = 0;  // fresh retries for this slot
                     // First shot gets its own boost
@@ -363,17 +354,13 @@ public class SpindexerController {
                 if (sTimer.seconds() >= SHOOT_SETTLE_SEC) {
                     preFlickTPS = flywheel.getVelocity();
                     shotDetected = false;
-                    flick1Target = flickShoot1;
+                    flickTarget = flickShoot;
                     sTimer.reset();
                     sState = SState.FIRE;
                 }
                 break;
 
             case FIRE:
-                // Fire right flicker after delay
-                if (sTimer.seconds() >= FLICK2_DELAY) {
-                    flick2Target = flickShoot2;
-                }
                 // Check for RPM drop — counts confirmed shots
                 if (!shotDetected) {
                     double currentTPS = flywheel.getVelocity();
@@ -383,12 +370,11 @@ public class SpindexerController {
                         totalShotsFired++;
                     }
                 }
-                // Wait for flick to complete AND flickers to reach shoot position
-                boolean flickersAtShoot = flickersArrived();
-                if (sTimer.seconds() >= FLICK_SEC && flickersAtShoot) {
-                    // Command flickers back to rest (stepped smoothly)
-                    flick1Target = flickRest1;
-                    flick2Target = flickRest2;
+                // Wait for flick to complete AND flicker to reach shoot position
+                boolean flickerAtShoot = flickerArrived();
+                if (sTimer.seconds() >= FLICK_SEC && flickerAtShoot) {
+                    // Command flicker back to rest (stepped smoothly)
+                    flickTarget = flickRest;
 
                     // Mark slot as fired
                     slotColor[shootSlot] = "NONE";
@@ -416,7 +402,7 @@ public class SpindexerController {
 
             case RETRACTING:
                 // Wait for flickers to fully retract before moving spindexer
-                if (sTimer.seconds() >= POST_FLICK_SEC && flickersArrived()) {
+                if (sTimer.seconds() >= POST_FLICK_SEC && flickerArrived()) {
                     currentSlot = shootSlot;
                     servoTarget = POSITIONS[shootSlot];
                     sState = SState.ADVANCING;
@@ -501,33 +487,25 @@ public class SpindexerController {
     }
 
     /**
-     * Step both flicker servos toward their targets.
+     * Step flicker servo toward its target.
      * Time-based so speed is consistent regardless of loop rate.
      * Only steps when flicking UP (toward shoot); snaps instantly when returning to rest.
      */
-    private void stepFlickers() {
+    private void stepFlicker() {
         double dt = flickerTimer.seconds();
         flickerTimer.reset();
         if (dt > 0.05) dt = 0.05;           // cap dt to 50ms — prevents huge jump from accumulated time
         double step = FLICKER_STEP * dt;   // position change this loop
         if (step < 0.0001) step = 0.0001;  // guard against first-call zero dt
 
-        // Flicker 1: step up smoothly, snap down instantly
-        if (flick1Target > flick1Pos) {
-            flick1Pos = stepToward(flick1Pos, flick1Target, step);
+        // Step up smoothly, snap down instantly
+        if (flickTarget > flickPos) {
+            flickPos = stepToward(flickPos, flickTarget, step);
         } else {
-            flick1Pos = flick1Target;
+            flickPos = flickTarget;
         }
 
-        // Flicker 2: step up smoothly, snap down instantly
-        if (flick2Target > flick2Pos) {
-            flick2Pos = stepToward(flick2Pos, flick2Target, step);
-        } else {
-            flick2Pos = flick2Target;
-        }
-
-        flicker1.setPosition(flick1Pos);
-        flicker2.setPosition(flick2Pos);
+        flicker1.setPosition(flickPos);
     }
 
     /** Step a value toward a target by at most 'step' per call */
@@ -537,10 +515,9 @@ public class SpindexerController {
         return current + Math.signum(diff) * step;
     }
 
-    /** Check if both flickers have reached their targets */
-    private boolean flickersArrived() {
-        return Math.abs(flick1Pos - flick1Target) < 0.005
-            && Math.abs(flick2Pos - flick2Target) < 0.005;
+    /** Check if flicker has reached its target */
+    private boolean flickerArrived() {
+        return Math.abs(flickPos - flickTarget) < 0.005;
     }
 
     /**
@@ -610,10 +587,8 @@ public class SpindexerController {
         shotNumber = 0;
         retryCount = 0;
         // Sync flicker tracking to rest so stale positions don't cause an extra flick
-        flick1Pos = flickRest1;
-        flick2Pos = flickRest2;
-        flick1Target = flickRest1;
-        flick2Target = flickRest2;
+        flickPos = flickRest;
+        flickTarget = flickRest;
     }
 
     // ========== Getters ==========

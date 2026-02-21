@@ -14,9 +14,8 @@ public class Servo_Pipeline {
     public static Servo hood;
     
 
-    // //flicker servo's
+    // //flicker servo
     public static Servo flicker1;
-    public static Servo flicker2;
     
 
     // spindexer
@@ -30,9 +29,8 @@ public class Servo_Pipeline {
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
 
 
-        // //flicker servo's
+        // //flicker servo
         flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
-        flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2");
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
@@ -43,9 +41,8 @@ public class Servo_Pipeline {
         hood.setDirection(Servo.Direction.FORWARD);
 
 
-        // //flicker servo directions
-         flicker1.setDirection(Servo.Direction.FORWARD); 
-         flicker2.setDirection(Servo.Direction.REVERSE);
+        // //flicker servo direction
+         flicker1.setDirection(Servo.Direction.FORWARD);
 
 
     // spindexer direction
@@ -62,9 +59,8 @@ public class Servo_Pipeline {
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
         
 
-//         //flicker servo's
+//         //flicker servo
         flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
-        flicker2 = opMode.hardwareMap.get(Servo.class, "flicker2");
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
@@ -75,9 +71,8 @@ public class Servo_Pipeline {
           hood.setDirection(Servo.Direction.FORWARD);
 
 
-//         //flicker servo directions
-         flicker1.setDirection(Servo.Direction.FORWARD); 
-         flicker2.setDirection(Servo.Direction.REVERSE);
+//         //flicker servo direction
+         flicker1.setDirection(Servo.Direction.FORWARD);
 
     // spindexer direction
     spindexer.setDirection(Servo.Direction.FORWARD);

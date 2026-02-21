@@ -19,9 +19,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
 
     // All values controlled ONLY by HoodTestConfig via Pedro Pathing Panels
     private double flickRest1  = 0.1;
-    private double flickRest2  = 0.1;
     private double flickShoot1 = 0.55;
-    private double flickShoot2 = 0.5;
 
     // Flicker state machine
     private ElapsedTime flickTimer = new ElapsedTime();
@@ -29,7 +27,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
     private enum FlickState { REST, SWEEPING_TO_SHOOT, HOLDING, SWEEPING_TO_REST }
     private FlickState flickState = FlickState.REST;
     private boolean lastA = false;
-    private double flickPos1, flickPos2; // current interpolated positions
+    private double flickPos1; // current interpolated position
 
     
     @Override
@@ -55,7 +53,6 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
         waitForStart();
         
         flickPos1 = flickRest1;
-        flickPos2 = flickRest2;
         loopTimer.reset();
         while (opModeIsActive()) {
             
@@ -115,12 +112,10 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
             switch (flickState) {
                 case REST:
                     flickPos1 = flickRest1;
-                    flickPos2 = flickRest2;
                     break;
                 case SWEEPING_TO_SHOOT:
                     flickPos1 = moveToward(flickPos1, flickShoot1, step);
-                    flickPos2 = moveToward(flickPos2, flickShoot2, step);
-                    if (flickPos1 == flickShoot1 && flickPos2 == flickShoot2) {
+                    if (flickPos1 == flickShoot1) {
                         flickState = FlickState.HOLDING;
                         flickTimer.reset();
                     }
@@ -132,14 +127,12 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                     break;
                 case SWEEPING_TO_REST:
                     flickPos1 = moveToward(flickPos1, flickRest1, step);
-                    flickPos2 = moveToward(flickPos2, flickRest2, step);
-                    if (flickPos1 == flickRest1 && flickPos2 == flickRest2) {
+                    if (flickPos1 == flickRest1) {
                         flickState = FlickState.REST;
                     }
                     break;
             }
             flicker1.setPosition(flickPos1);
-            flicker2.setPosition(flickPos2);
             
             // Display telemetry
             telemetry.addData("=== LIMELIGHT ===", "");

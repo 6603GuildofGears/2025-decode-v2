@@ -61,9 +61,8 @@ public class Cassius_Red_BACKUP_IMU_ONLY extends LinearOpMode {
         
         // Spindexer controller — handles intake detection, slot tracking, and shooting
         SpindexerController sdx = new SpindexerController();
-        sdx.setFlickerPositions(0.1, 0.0875, 0.5, 0.5);
+        sdx.setFlickerPositions(0.1, 0.5);
         flicker1.setPosition(0.1);
-        flicker2.setPosition(0.0875);
 
 
        

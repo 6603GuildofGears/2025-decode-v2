@@ -191,7 +191,6 @@ public class Red_Front extends OpMode {
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
                     Servo_Pipeline.flicker1.setPosition(0.1);
-                    Servo_Pipeline.flicker2.setPosition(0.0875);
 
                     if (confirmed <= 0) {
                         pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
@@ -321,7 +320,6 @@ public class Red_Front extends OpMode {
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
                     Servo_Pipeline.flicker1.setPosition(0.1);
-                    Servo_Pipeline.flicker2.setPosition(0.0875);
 
                     if (ballsNeeded <= 0) {
                         // No balls left — skip intake 2
@@ -463,7 +461,6 @@ public class Red_Front extends OpMode {
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
                     Servo_Pipeline.flicker1.setPosition(0.1);
-                    Servo_Pipeline.flicker2.setPosition(0.0875);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                 }
 
@@ -513,7 +510,7 @@ public class Red_Front extends OpMode {
         Sensor.initSensors(this);
         servoPipeline = new Servo_Pipeline(this);
         spindexerController = new SpindexerController();
-        spindexerController.setFlickerPositions(0.1, 0.0875, 0.5, 0.5);
+        spindexerController.setFlickerPositions(0.1, 0.5);
         spindexerController.setShootRpm(3000);
         spindexerController.prefillAllSlots();
 
@@ -523,7 +520,6 @@ public class Red_Front extends OpMode {
 
     public void start() {
         Servo_Pipeline.flicker1.setPosition(0.1);
-        Servo_Pipeline.flicker2.setPosition(0.0875);
         Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
         Servo_Pipeline.hood.setPosition(0.5);
         opmodeTimer.resetTimer();

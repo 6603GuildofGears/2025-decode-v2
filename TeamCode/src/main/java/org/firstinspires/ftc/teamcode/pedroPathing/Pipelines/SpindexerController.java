@@ -672,12 +672,9 @@ public class SpindexerController {
             telemetry.addData("Last Shot", shotDetected ? "FIRED" : "MISSED");
         }
         telemetry.addData("Total Shots Fired", totalShotsFired);
-        telemetry.addData("Servo Pos/Target", String.format("%.3f / %.3f", servoPos, servoTarget));
         telemetry.addData("Spindexer Pos", String.format("%.3f", spindexer.getPosition()));
         telemetry.addData("Ball Present?", isBallPresent() ? "YES" : "NO");
         telemetry.addData("Verified Color", detectBallColor());
         telemetry.addData("Sensor Compliance?", sensorsAgree() ? "YES" : "NO");
-        telemetry.addData("Sensor1", getColorSensorDebug());
-        telemetry.addData("Sensor2", getColorSensor2Debug());
     }
 }

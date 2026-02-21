@@ -16,6 +16,11 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
+import org.firstinspires.ftc.robotcore.external.stream.CameraStreamServer;
+import android.util.Size;
 
 
 
@@ -35,6 +40,15 @@ public class Cassius_Blue extends LinearOpMode {
 
         // Direct Limelight reference for turret PID (bypasses pipeline abstraction)
         Limelight3A limelight = hardwareMap.get(Limelight3A.class, "limelight");
+
+        // Open Logitech webcam via VisionPortal so Panels CameraStream widget can display it
+        VisionPortal cameraPortal = new VisionPortal.Builder()
+                .setCamera(hardwareMap.get(WebcamName.class, "logitech"))
+                .setCameraResolution(new Size(640, 480))
+                .build();
+
+        // Route this portal to the DS / Panels camera stream
+        CameraStreamServer.getInstance().setSource(cameraPortal);
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();
@@ -472,48 +486,30 @@ public class Cassius_Blue extends LinearOpMode {
             lastTurretPower = turretPower; // save for coasting next cycle
 
             // Display telemetry
-            telemetry.addData("=== LIMELIGHT STATUS ===", "");
-            telemetry.addData("LL Connected", hasTarget() ? "YES" : "CHECKING...");
+            telemetry.addData("=== LIMELIGHT ===", "");
+            if (hasTarget()) {
+                LLResult llCheck = getLatestResult();
+                if (llCheck != null && llCheck.isValid() && llCheck.getFiducialResults() != null && !llCheck.getFiducialResults().isEmpty()) {
+                    int firstTag = (int) llCheck.getFiducialResults().get(0).getFiducialId();
+                    telemetry.addData("Tag ID", firstTag);
+                } else {
+                    telemetry.addData("Tag ID", "NONE");
+                }
+            } else {
+                telemetry.addData("Tag ID", "NONE");
+            }
             
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
-            telemetry.addData("Turret Power", String.format("%.3f", turretPower));
-            telemetry.addData("PID", String.format("kP=%.4f kI=%.5f kD=%.4f", kP, kI, kD));
-            telemetry.addData("Mag Sensor", isMagPressed() ? "PRESSED" : "---");
             
             telemetry.addData("=== SHOOTER ===", "");
-            telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
+            telemetry.addData("Target RPM", String.format("%.0f", targetRpm));
+            telemetry.addData("Actual RPM", String.format("%.0f", flywheel.getVelocity() * 60.0 / 28.0));
+            telemetry.addData("Hood Angle", String.format("%.3f", hood.getPosition()));
             sdx.addTelemetry(telemetry);
             
-            // === LOOKUP TABLE TEST — always show what the table would output ===
-            telemetry.addData("=== LOOKUP TABLE TEST ===", "");
-            telemetry.addData("LL Distance (in)", hasDistance ? String.format("%.1f", distanceInches) : "NO TARGET");
-            if (hasDistance) {
-                ShooterLookup.Result preview = ShooterLookup.lookup(distanceInches);
-                telemetry.addData("Lookup RPM", String.format("%.0f", preview.rpm));
-                telemetry.addData("Lookup Hood Pos", String.format("%.3f", preview.hoodPos));
-                telemetry.addData("Active RPM", String.format("%.0f", targetRpm));
-                telemetry.addData("Active Hood", String.format("%.3f", hood.getPosition()));
-                telemetry.addData("RPM Match?", Math.abs(targetRpm - preview.rpm) < 1 ? "YES ✓" : "NO (manual/base)");
-            }
-            
-            telemetry.addData("=== LIMELIGHT DEBUG ===", "");
-            LLResult llResult = getLatestResult();
-            if (llResult != null && llResult.isValid() && llResult.getFiducialResults() != null && !llResult.getFiducialResults().isEmpty()) {
-                int tagId = (int) llResult.getFiducialResults().get(0).getFiducialId();
-                double tx = llResult.getFiducialResults().get(0).getTargetXDegrees();
-                double ty = llResult.getFiducialResults().get(0).getTargetYDegrees();
-                telemetry.addData("Tag ID", tagId);
-                telemetry.addData("TX", String.format("%.2f°", tx));
-                telemetry.addData("TY", String.format("%.2f°", ty));
-                telemetry.addData("Targets", llResult.getFiducialResults().size());
-            } else {
-                telemetry.addData("Tag ID", "NONE");
-                telemetry.addData("TX", "--");
-                telemetry.addData("TY", "--");
-                telemetry.addData("Targets", 0);
-            }
+
             
             // Push key data to Panels
             telemetryM.debug("Turret: " + String.format("%.1f\u00b0", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
@@ -522,7 +518,6 @@ public class Cassius_Blue extends LinearOpMode {
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
-            displayTelemetry(this); // Shows Limelight FPS and additional info
             telemetry.update(); // Push telemetry to Driver Station
             telemetryM.update(); // Push Panels data separately
  

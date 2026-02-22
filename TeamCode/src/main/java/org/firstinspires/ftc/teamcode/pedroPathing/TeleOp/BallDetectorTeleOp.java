@@ -21,8 +21,13 @@ import java.util.List;
  *   Right Stick X — Rotation
  *   D-Pad        — Slow cardinal movement
  *
+ * Motor Controls (Gamepad 1):
+ *   X  — Toggle intake forward on/off
+ *   Y  — Toggle intake reverse on/off
+ *   A  — Toggle flywheel on/off
+ *
  * Vision Controls (Gamepad 1):
- *   A  — Toggle live camera view on/off
+ *   Left Bumper — Toggle live camera view on/off
  *   B  — Cycle confidence threshold (50% → 70% → 90% → 50%)
  */
 @TeleOp(name = "Ball Detector TeleOp", group = "Vision")
@@ -41,6 +46,14 @@ public class BallDetectorTeleOp extends LinearOpMode {
     private boolean liveViewEnabled = true;
     private boolean prevA = false;
     private boolean prevB = false;
+    private boolean prevX = false;
+    private boolean prevY = false;
+    private boolean prevLB = false;
+
+    // Intake state: 0 = off, 1 = forward, -1 = reverse
+    private int intakeState = 0;
+    // Flywheel state
+    private boolean flywheelOn = false;
 
     // Drive speed modifier
     private double gear = 1.25;
@@ -50,6 +63,10 @@ public class BallDetectorTeleOp extends LinearOpMode {
     private DcMotorEx frontRight;
     private DcMotorEx backLeft;
     private DcMotorEx backRight;
+
+    // Mechanism motors
+    private DcMotorEx intake;
+    private DcMotorEx flywheel;
 
     @Override
     public void runOpMode() {
@@ -74,6 +91,13 @@ public class BallDetectorTeleOp extends LinearOpMode {
         frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        // Initialize mechanism motors
+        intake   = hardwareMap.get(DcMotorEx.class, "intake");
+        flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
+        flywheel.setDirection(DcMotor.Direction.REVERSE);
+        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Initialize ball detector camera (Logitech webcam) with ONNX model
         BallDetectorPipeline.init(this, "logitech");
@@ -207,16 +231,48 @@ public class BallDetectorTeleOp extends LinearOpMode {
     }
 
     /**
-     * Reads gamepad1 buttons for toggling vision settings.
+     * Reads gamepad1 buttons for motor and vision controls.
      */
     private void handleControls() {
-        // A — toggle live camera view
+        // X — toggle intake forward on/off
+        boolean currX = gamepad1.x;
+        if (currX && !prevX) {
+            if (intakeState == 1) {
+                intakeState = 0;       // was forward → off
+            } else {
+                intakeState = 1;       // off or reverse → forward
+            }
+            intake.setPower(intakeState == 1 ? 0.5 : 0.0);
+        }
+        prevX = currX;
+
+        // Y — toggle intake reverse on/off
+        boolean currY = gamepad1.y;
+        if (currY && !prevY) {
+            if (intakeState == -1) {
+                intakeState = 0;       // was reverse → off
+            } else {
+                intakeState = -1;      // off or forward → reverse
+            }
+            intake.setPower(intakeState == -1 ? -0.5 : 0.0);
+        }
+        prevY = currY;
+
+        // A — toggle flywheel on/off
         boolean currA = gamepad1.a;
         if (currA && !prevA) {
+            flywheelOn = !flywheelOn;
+            flywheel.setPower(flywheelOn ? 0.5 : 0.0);
+        }
+        prevA = currA;
+
+        // Left Bumper — toggle live camera view
+        boolean currLB = gamepad1.left_bumper;
+        if (currLB && !prevLB) {
             liveViewEnabled = !liveViewEnabled;
             BallDetectorPipeline.setLiveViewEnabled(liveViewEnabled);
         }
-        prevA = currA;
+        prevLB = currLB;
 
         // B — cycle confidence threshold
         boolean currB = gamepad1.b;

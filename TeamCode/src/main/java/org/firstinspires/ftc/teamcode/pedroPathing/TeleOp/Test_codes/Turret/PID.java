@@ -49,7 +49,7 @@
 //     public void loop() {
 //         // Get gamepad inputs
 //         double turretPower = -gamepad2.right_stick_x; // Right stick X for turret
-//         boolean flicker1Shoot = gamepad2.a; // A button for flicker1
+//         boolean flickerShoot = gamepad2.a; // A button for flicker
 //         boolean flicker2Shoot = gamepad2.b; // B button for flicker2
 //         boolean spindexerForward = gamepad2.dpad_right; // Dpad right for spindexer forward
 //         boolean spindexerReverse = gamepad2.dpad_left; // Dpad left for spindexer reverse
@@ -112,11 +112,11 @@
 //         // Turret control with position tracking
 //         turret.setPower(turretPower * 0.5); // Half power for precise control
         
-//         // Flicker1 control
-//         if (flicker1Shoot) {
-//             flicker1.setPosition(0.325); // Shoot position
+//         // Flicker control
+//         if (flickerShoot) {
+//             flicker.setPosition(0.325); // Shoot position
 //         } else {
-//             flicker1.setPosition(0.0); // Rest position
+//             flicker.setPosition(0.0); // Rest position
 //         }
         
 //         // Flicker2 control
@@ -162,7 +162,7 @@
 //         telemetry.addData("", "");
 //         telemetry.addData("=== GAMEPAD 2 CONTROLS ===", "");
 //         telemetry.addData("Right Stick X", "Turret (Pos: " + turret.getCurrentPosition() + ")");
-//         telemetry.addData("A Button", "Flicker1 (" + String.format("%.2f", flicker1.getPosition()) + ")");
+//         telemetry.addData("A Button", "Flicker (" + String.format("%.2f", flicker.getPosition()) + ")");
 //         telemetry.addData("B Button", "Flicker2 (" + String.format("%.2f", flicker2.getPosition()) + ")");
 //         telemetry.addData("Dpad L/R", "Spindexer (" + (spindexerForward ? "FWD" : (spindexerReverse ? "REV" : "OFF")) + ")");
 //         telemetry.addData("", "");

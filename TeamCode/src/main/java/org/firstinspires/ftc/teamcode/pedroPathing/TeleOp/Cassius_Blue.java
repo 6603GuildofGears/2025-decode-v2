@@ -61,7 +61,7 @@ public class Cassius_Blue extends LinearOpMode {
         // Spindexer controller — handles intake detection, slot tracking, and shooting
         SpindexerController sdx = new SpindexerController();
         sdx.setFlickerPositions(0.1, 0.5);
-        flicker1.setPosition(0.1);
+        flicker.setPosition(0.1);
 
 
        
@@ -279,12 +279,16 @@ public class Cassius_Blue extends LinearOpMode {
 
             if (runIntakeMotor) {
                 intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
+                intakeS.setPower(1);
             } else if (sdx.isShooting()) {
                 intake.setPower(0.25); // slow feed during shoot sequence
+                intakeS.setPower(0.25);
             } else if (RBumper1) {
                 intake.setPower(-1); // intake out (reverse)
+                intakeS.setPower(-1);
             } else {
                 intake.setPower(0);
+                intakeS.setPower(0);
             }
 
 

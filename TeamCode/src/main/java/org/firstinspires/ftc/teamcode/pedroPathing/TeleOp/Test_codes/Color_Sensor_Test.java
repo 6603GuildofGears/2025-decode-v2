@@ -50,7 +50,7 @@ public class Color_Sensor_Test extends LinearOpMode {
         currentSlot = 1;
 
         // Flicker to rest
-        flicker1.setPosition(0.1);
+        flicker.setPosition(0.1);
 
         telemetry.addData("Status", "Ready — press START");
         telemetry.addData("", "");

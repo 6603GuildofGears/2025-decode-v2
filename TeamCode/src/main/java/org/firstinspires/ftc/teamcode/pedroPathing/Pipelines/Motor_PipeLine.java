@@ -53,7 +53,7 @@ public class Motor_PipeLine {
 
     //     //flywheel and intake motor directions
     //    flywheel.setDirection(DcMotor.Direction.FORWARD);
-       intake.setDirection(DcMotor.Direction.REVERSE);
+       intake.setDirection(DcMotor.Direction.FORWARD);
        flywheel.setDirection(DcMotor.Direction.REVERSE);
 
         // turret motor direction
@@ -151,7 +151,7 @@ public class Motor_PipeLine {
 
     //     //flywheel and intake motor directions
         flywheel.setDirection(DcMotor.Direction.REVERSE);
-        intake.setDirection(DcMotor.Direction.FORWARD);
+        intake.setDirection(DcMotor.Direction.REVERSE);
 
     //     // turret motor direction
         turret.setDirection(DcMotor.Direction.FORWARD);

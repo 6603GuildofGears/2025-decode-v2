@@ -7,15 +7,15 @@ import com.qualcomm.robotcore.hardware.CRServo;
 
 public class Servo_Pipeline {
 
-   
-
+    // intake servo
+    public static CRServo intakeS;
 
     // //Hood servo
     public static Servo hood;
     
 
     // //flicker servo
-    public static Servo flicker1;
+    public static Servo flicker;
     
 
     // spindexer
@@ -24,13 +24,14 @@ public class Servo_Pipeline {
 
     public Servo_Pipeline(OpMode opMode) {
 
+   intakeS = opMode.hardwareMap.get(CRServo.class, "intakeS");
 
         // //Hood servo
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
 
 
         // //flicker servo
-        flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
+        flicker = opMode.hardwareMap.get(Servo.class, "flicker"); 
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
@@ -42,7 +43,7 @@ public class Servo_Pipeline {
 
 
         // //flicker servo direction
-         flicker1.setDirection(Servo.Direction.FORWARD);
+         flicker.setDirection(Servo.Direction.FORWARD);
 
 
     // spindexer direction
@@ -53,14 +54,15 @@ public class Servo_Pipeline {
 
     public static void intServos(OpMode opMode) {
 
-
+// intake
+   intakeS = opMode.hardwareMap.get(CRServo.class, "intakeS");
 
 //         //Hood servo
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
         
 
 //         //flicker servo
-        flicker1 = opMode.hardwareMap.get(Servo.class, "flicker1"); 
+        flicker = opMode.hardwareMap.get(Servo.class, "flicker"); 
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
@@ -72,10 +74,12 @@ public class Servo_Pipeline {
 
 
 //         //flicker servo direction
-         flicker1.setDirection(Servo.Direction.FORWARD);
+         flicker.setDirection(Servo.Direction.FORWARD);
 
     // spindexer direction
     spindexer.setDirection(Servo.Direction.FORWARD);
+
+    intakeS.setDirection(CRServo.Direction.FORWARD);
 //       
    
     

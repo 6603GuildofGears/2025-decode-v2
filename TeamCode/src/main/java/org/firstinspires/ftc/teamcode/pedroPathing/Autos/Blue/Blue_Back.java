@@ -191,7 +191,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0.1);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
                 }
                 break;
@@ -295,7 +295,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0.1);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
                 }
                 break;
@@ -415,7 +415,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker1.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0.1);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                 }
                 break;
@@ -465,7 +465,7 @@ public class Blue_Back extends OpMode {
         spindexerController.setFlickerPositions(0.1, 0.5);
         spindexerController.setShootRpm(3000);
         spindexerController.prefillAllSlots();
-        Servo_Pipeline.flicker1.setPosition(0.1);
+        Servo_Pipeline.flicker.setPosition(0.1);
         Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
 
         buildPaths();

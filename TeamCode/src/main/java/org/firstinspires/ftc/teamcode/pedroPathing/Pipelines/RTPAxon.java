@@ -28,7 +28,11 @@ public class RTPAxon {
     private boolean rtp;
     private double power;
     private double maxPower;
+    private double minPower;
     private Direction direction;
+
+    // Ramp-down: within this many degrees of target, power scales from maxPower → minPower
+    private double rampZoneDeg;
 
     private double previousAngle;
     private double totalRotation;
@@ -111,6 +115,8 @@ public class RTPAxon {
         filterInitialized = true;
 
         maxPower = 0.25;
+        minPower = 0.05;
+        rampZoneDeg = 60.0;   // start slowing down within 60° of target
         cliffs = 0;
     }
 
@@ -127,8 +133,12 @@ public class RTPAxon {
 
     public double getPower() { return power; }
 
-    public void setMaxPower(double maxPower) { this.maxPower = maxPower; }
+    public void setMaxPower(double maxPower) { this.maxPower = Math.min(1.0, maxPower); }
     public double getMaxPower() { return maxPower; }
+    public void setMinPower(double minPower) { this.minPower = minPower; }
+    public double getMinPower() { return minPower; }
+    public void setRampZoneDeg(double deg) { this.rampZoneDeg = deg; }
+    public double getRampZoneDeg() { return rampZoneDeg; }
 
     // ── Run-to-position mode ──
 
@@ -220,46 +230,28 @@ public class RTPAxon {
     // ── Main update — MUST call every loop ──
 
     public synchronized void update() {
-        // Use raw encoder angle directly (0–360°) — no accumulation needed
-        double currentAngle = getCurrentAngle();
-        totalRotation = currentAngle;  // just store for telemetry/getters
+        // Use RAW angle — the filter lags too much and causes overshoot
+        double currentAngle = getRawAngle();
+        totalRotation = currentAngle;
         previousAngle = currentAngle;
+        // Still update the filter for telemetry comparison
+        getCurrentAngle();
 
         if (!rtp) return;
 
-        double dt = pidTimer.seconds();
-        pidTimer.reset();
-        if (dt < 0.001 || dt > 1.0) return;
-
-        // Shortest-path error: always goes the short way around the circle
+        // Shortest-path error
         double error = targetRotation - currentAngle;
         while (error > 180) error -= 360;
         while (error < -180) error += 360;
 
-        // Integral with clamping
-        integralSum += error * dt;
-        integralSum = Math.max(-maxIntegralSum, Math.min(maxIntegralSum, integralSum));
-
-        // Wind-down near target
-        final double INTEGRAL_DEADZONE = 2.0;
-        if (Math.abs(error) < INTEGRAL_DEADZONE) {
-            integralSum *= 0.95;
-        }
-
-        double rawDerivative = (error - lastError) / dt;
-        // Clamp derivative to avoid noise spikes
-        rawDerivative = Math.max(-MAX_DERIVATIVE, Math.min(MAX_DERIVATIVE, rawDerivative));
-        // Low-pass filter the derivative too (smooths out remaining jitter)
-        double derivative = 0.4 * rawDerivative + 0.6 * lastDerivative;
-        lastError = error;
-        lastDerivative = derivative;
-
-        double output = (kP * error) + (kI * integralSum) + (kD * derivative);
-
-        // Deadzone — stop jittering when close
+        // Dead simple: power = error * P, clamped to maxPower
+        // NEGATIVE because positive error needs negative power to close the gap
         final double DEADZONE = 3.0;
         if (Math.abs(error) > DEADZONE) {
-            double pwr = Math.min(maxPower, Math.abs(output)) * Math.signum(output);
+            double pwr = -error * kP;
+            // Clamp to maxPower
+            if (pwr > maxPower)  pwr = maxPower;
+            if (pwr < -maxPower) pwr = -maxPower;
             setPower(pwr);
         } else {
             setPower(0);
@@ -270,28 +262,22 @@ public class RTPAxon {
 
     @SuppressLint("DefaultLocale")
     public String log() {
-        double err = targetRotation - getCurrentAngle();
+        double raw = getRawAngle();
+        double err = targetRotation - raw;
         while (err > 180) err -= 360;
         while (err < -180) err += 360;
         return String.format(
-                "Encoder Volts: %.3f\n" +
-                "Raw Angle: %.2f°\n" +
-                "Filtered Angle: %.2f°\n" +
-                "Target: %.2f°\n" +
-                "Error (wrapped): %.2f°\n" +
-                "Power: %.3f\n" +
-                "PID: P=%.4f I=%.5f D=%.4f\n" +
-                "Integral Sum: %.2f\n" +
-                "Last Derivative: %.1f",
+                "Volts: %.3f | Raw: %.1f deg\n" +
+                "Target: %.1f deg | Error: %.1f deg\n" +
+                "Power: %.3f | kP: %.4f\n" +
+                "P*err = %.4f",
                 servoEncoder.getVoltage(),
-                getRawAngle(),
-                filteredAngle,
+                raw,
                 targetRotation,
                 err,
                 power,
-                kP, kI, kD,
-                integralSum,
-                lastDerivative
+                kP,
+                kP * err
         );
     }
 }

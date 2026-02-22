@@ -307,7 +307,7 @@ public class SpindexerController {
             flywheel.setVelocity(0);
             flickTarget = flickRest;
             flickPos = flickRest;
-            flicker1.setPosition(flickRest);
+            flicker.setPosition(flickRest);
             sState = SState.IDLE;
             return;
         }
@@ -505,7 +505,7 @@ public class SpindexerController {
             flickPos = flickTarget;
         }
 
-        flicker1.setPosition(flickPos);
+        flicker.setPosition(flickPos);
     }
 
     /** Step a value toward a target by at most 'step' per call */

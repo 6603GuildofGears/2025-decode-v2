@@ -132,7 +132,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                     }
                     break;
             }
-            flicker1.setPosition(flickPos1);
+            flicker.setPosition(flickPos1);
             
             // Display telemetry
             telemetry.addData("=== LIMELIGHT ===", "");

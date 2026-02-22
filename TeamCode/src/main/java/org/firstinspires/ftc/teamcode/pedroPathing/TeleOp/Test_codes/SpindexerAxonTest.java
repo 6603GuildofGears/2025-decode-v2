@@ -60,10 +60,10 @@ public class SpindexerAxonTest extends LinearOpMode {
 
         // ── Create RTPAxon (no direction flip — motor and encoder already agree) ──
         RTPAxon spindexer = new RTPAxon(crServo, encoder);
-        spindexer.setMaxPower(0.3);
-        spindexer.setKP(0.008);    // moderate P — now safe with filtered encoder
-        spindexer.setKI(0.0);      // no integral for now
-        spindexer.setKD(0.004);    // moderate damping — filtered, won't blow up
+        spindexer.setMaxPower(1.0);    // full power allowed (ramps down near target via P)
+        spindexer.setKP(0.0025);       // sweet spot — no overshoot
+        spindexer.setKI(0.0);          // no integral for now
+        spindexer.setKD(0.0);          // no D for now — tune P first
 
         telemetry.addData("Status", "RTPAxon initialized");
         telemetry.addData("Start Angle", String.format("%.1f°", spindexer.STARTPOS));
@@ -106,10 +106,11 @@ public class SpindexerAxonTest extends LinearOpMode {
             // ── Live PID tuning (bumpers & triggers) ──
             boolean rb = gamepad1.right_bumper;
             boolean lb = gamepad1.left_bumper;
-            if (rb && !prevRB) spindexer.setKP(spindexer.getKP() + 0.0005);
-            if (lb && !prevLB) spindexer.setKP(Math.max(0, spindexer.getKP() - 0.0005));
-            if (gamepad1.right_trigger > 0.5) spindexer.setKD(spindexer.getKD() + 0.0001);
-            if (gamepad1.left_trigger  > 0.5) spindexer.setKD(Math.max(0, spindexer.getKD() - 0.0001));
+            if (rb && !prevRB) spindexer.setKP(spindexer.getKP() + 0.0001);
+            if (lb && !prevLB) spindexer.setKP(Math.max(0, spindexer.getKP() - 0.0001));
+            // Triggers: adjust maxPower ± 0.01
+            if (gamepad1.right_trigger > 0.5) spindexer.setMaxPower(spindexer.getMaxPower() + 0.005);
+            if (gamepad1.left_trigger  > 0.5) spindexer.setMaxPower(Math.max(0.02, spindexer.getMaxPower() - 0.005));
 
             // ── Manual drive when RTP is off ──
             if (!spindexer.getRtp()) {
@@ -121,21 +122,13 @@ public class SpindexerAxonTest extends LinearOpMode {
             spindexer.update();
 
             // ── Telemetry ──
-            telemetry.addData("=== MODE ===", spindexer.getRtp() ? "RUN-TO-POSITION" : "MANUAL (left stick Y)");
-            telemetry.addData("kP", String.format("%.4f", spindexer.getKP()));
-            telemetry.addData("kD", String.format("%.4f", spindexer.getKD()));
-            telemetry.addData("Max Power", String.format("%.3f", spindexer.getMaxPower()));
-            telemetry.addData("At Target?", spindexer.isAtTarget() ? "YES ✓" : "NO");
-            telemetry.addLine("");
+            telemetry.addData("MODE", spindexer.getRtp() ? "RTP" : "MANUAL");
+            telemetry.addData("At Target?", spindexer.isAtTarget() ? "YES" : "NO");
             telemetry.addLine(spindexer.log());
-            telemetry.addLine("");
-            telemetry.addData("=== CONTROLS ===", "");
-            telemetry.addData("D-Up/Right/Down", "P1(0°) / P2(120°) / P3(240°)");
-            telemetry.addData("A / B", "Nudge ±15°");
-            telemetry.addData("X", "Reset to 0°");
-            telemetry.addData("Y", "Toggle RTP / Manual");
-            telemetry.addData("RB / LB", "kP ± 0.0005");
-            telemetry.addData("RT / LT", "kD ± 0.0001");
+            telemetry.addData("maxPower", String.format("%.3f", spindexer.getMaxPower()));
+            telemetry.addLine("---");
+            telemetry.addData("Dpad", "P1/P2/P3 | A/B nudge");
+            telemetry.addData("X:reset Y:mode", "RB/LB:kP RT/LT:maxPwr");
             telemetry.update();
 
             // ── Save edge states ──

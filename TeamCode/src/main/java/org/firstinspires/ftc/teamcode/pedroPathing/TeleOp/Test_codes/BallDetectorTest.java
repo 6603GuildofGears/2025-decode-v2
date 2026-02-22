@@ -5,8 +5,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.BallDetectorPipeline;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.BallDetectorPipeline.BallDetection;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline.BallDetection;
 
 import java.util.List;
 

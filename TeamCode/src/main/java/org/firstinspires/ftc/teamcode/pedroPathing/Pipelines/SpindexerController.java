@@ -22,12 +22,34 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeli
 @Configurable
 public class SpindexerController {
 
-    // ========== Slot positions (servo
-    //  values) ==========
-    public static final double P1 = 0.02;
-    public static final double P2 = 0.375;
-    public static final double P3 = 0.75;
-    private static final double[] POSITIONS = {P1, P2, P3};
+    // ========== Slot positions (degrees — RTPAxon) ==========
+    // 3 slots spaced 120° apart, two base angles for intake vs shoot
+    private static final double SLOT_SPACING = 120.0;
+    private static final double INTAKE_BASE = 100.0;
+    private static final double SHOOT_BASE  = 165.0;
+
+    // Derived positions
+    public static final double INTAKE_P1 = wrap(INTAKE_BASE);
+    public static final double INTAKE_P2 = wrap(INTAKE_BASE + SLOT_SPACING);
+    public static final double INTAKE_P3 = wrap(INTAKE_BASE + SLOT_SPACING * 2);
+    public static final double SHOOT_P1  = wrap(SHOOT_BASE);
+    public static final double SHOOT_P2  = wrap(SHOOT_BASE + SLOT_SPACING);
+    public static final double SHOOT_P3  = wrap(SHOOT_BASE + SLOT_SPACING * 2);
+
+    private static final double[] INTAKE_POSITIONS = {INTAKE_P1, INTAKE_P2, INTAKE_P3};
+    private static final double[] SHOOT_POSITIONS  = {SHOOT_P1,  SHOOT_P2,  SHOOT_P3};
+
+    /** Wrap degrees to 0–360 */
+    private static double wrap(double deg) {
+        deg %= 360;
+        if (deg < 0) deg += 360;
+        return deg;
+    }
+
+    // Legacy aliases for external code that references P1/P2/P3
+    public static final double P1 = INTAKE_P1;
+    public static final double P2 = INTAKE_P2;
+    public static final double P3 = INTAKE_P3;
 
     // ========== Timing constants ==========
     private static final double SETTLE_SEC    = 0.5;   // wait after servo arrives before reading sensor
@@ -46,13 +68,11 @@ public class SpindexerController {
     private int totalMisfires = 0;                        // lifetime misfire counter for telemetry
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.25;  // intake rotation speed (per second)
-    private static final double SHOOT_SERVO_STEP  = 0.25;   // shoot rotation speed (per second)
+    private static final double INTAKE_SERVO_STEP = 0.25;  // (unused — RTPAxon handles motion)
+    private static final double SHOOT_SERVO_STEP  = 0.25;   // (unused — RTPAxon handles motion)
     public static double FLICKER_STEP = 0.875;   // flicker speed per SECOND (position units/sec)
-    private double servoPos  = P1;   // current commanded position
-    private double servoTarget = P1; // where we're heading
-    private double lastWrittenServo = P1;  // last position actually sent to servo
-    private ElapsedTime servoTimer = new ElapsedTime();  // for time-based spindexer stepping
+    private double servoTarget = INTAKE_P1; // where we're heading (degrees)
+    private ElapsedTime servoTimer = new ElapsedTime();  // for time-based spindexer stepping (legacy)
 
     // Flicker position tracking (for smooth stepping)
     private double flickPos = 0.06875;
@@ -144,9 +164,7 @@ public class SpindexerController {
         this.direction = fromP3 ? -1 : 1;
         int startSlot = fromP3 ? 2 : 0;
         currentSlot = startSlot;
-        servoPos = POSITIONS[startSlot];
-        servoTarget = POSITIONS[startSlot];
-        lastWrittenServo = POSITIONS[startSlot];
+        servoTarget = INTAKE_POSITIONS[startSlot];
     }
 
     /** Get start slot index based on direction */
@@ -169,9 +187,10 @@ public class SpindexerController {
     private int findNearestEmptySlot() {
         int best = -1;
         double bestDist = Double.MAX_VALUE;
+        double currentAngle = spindexerAxon.getRawAngle();
         for (int i = 0; i < 3; i++) {
             if (slotEmpty[i]) {
-                double dist = Math.abs(POSITIONS[i] - servoPos);
+                double dist = Math.abs(shortestAngleDist(currentAngle, INTAKE_POSITIONS[i]));
                 if (dist < bestDist) {
                     bestDist = dist;
                     best = i;
@@ -179,6 +198,14 @@ public class SpindexerController {
             }
         }
         return best;
+    }
+
+    /** Shortest signed angle distance from a to b (wraps around 360°) */
+    private double shortestAngleDist(double from, double to) {
+        double d = to - from;
+        while (d > 180) d -= 360;
+        while (d < -180) d += 360;
+        return d;
     }
 
     // ======================================================================
@@ -202,11 +229,14 @@ public class SpindexerController {
         }
 
         // --- Auto-spin state machine runs ALWAYS (trigger only controls motor) ---
+        // Update RTPAxon PID every loop
+        spindexerAxon.update();
+
         switch (iState) {
 
             case IDLE:
                 // Start sensing: finish any pending move, or settle at current slot
-                if (Math.abs(servoPos - servoTarget) > 0.01) {
+                if (!spindexerAxon.isAtTarget(5)) {
                     iState = IState.MOVING;
                 } else {
                     iState = IState.SETTLING;
@@ -220,7 +250,8 @@ public class SpindexerController {
                     int nearest = findNearestEmptySlot();
                     if (nearest >= 0) {
                         currentSlot = nearest;
-                        servoTarget = POSITIONS[currentSlot];
+                        servoTarget = INTAKE_POSITIONS[currentSlot];
+                        spindexerAxon.setTargetRotation(servoTarget);
                         iState = IState.MOVING;
                     } else {
                         // All slots full — go idle (top-of-loop guard will also catch this)
@@ -265,7 +296,8 @@ public class SpindexerController {
                     if (nearest >= 0) {
                         // Move to closest empty slot
                         currentSlot = nearest;
-                        servoTarget = POSITIONS[currentSlot];
+                        servoTarget = INTAKE_POSITIONS[currentSlot];
+                        spindexerAxon.setTargetRotation(servoTarget);
                         iState = IState.MOVING;
                     } else {
                         // All slots full — go idle
@@ -275,8 +307,8 @@ public class SpindexerController {
                 break;
 
             case MOVING:
-                // Slowly step servo toward target position
-                if (stepServo(INTAKE_SERVO_STEP)) {
+                // RTPAxon handles the motion via PID — just check if arrived
+                if (spindexerAxon.isAtTarget(5)) {
                     // Arrived — now settle before reading sensor
                     iState = IState.SETTLING;
                     iTimer.reset();
@@ -315,6 +347,9 @@ public class SpindexerController {
         // Step flicker toward its target every loop
         stepFlicker();
 
+        // Update RTPAxon PID every loop (shoot side)
+        spindexerAxon.update();
+
         switch (sState) {
 
             case IDLE:
@@ -327,7 +362,8 @@ public class SpindexerController {
                     shootSlot = findFirstShootSlot();
 
                     currentSlot = shootSlot;
-                    servoTarget = POSITIONS[shootSlot];
+                    servoTarget = SHOOT_POSITIONS[shootSlot];
+                    spindexerAxon.setTargetRotation(servoTarget);
                     // Ensure flicker at rest
                     flickTarget = flickRest;
                     shotNumber = 0;  // first shot
@@ -340,8 +376,8 @@ public class SpindexerController {
                 break;
 
             case SPINUP:
-                // Move servo toward target during spinup (hides travel behind spin-up time)
-                boolean servoReady = stepServo(SHOOT_SERVO_STEP);
+                // RTPAxon handles servo motion — check if arrived
+                boolean servoReady = spindexerAxon.isAtTarget(5);
                 // Wait for BOTH flywheel speed AND servo arrival
                 if (sTimer.seconds() >= SPINUP_SEC && servoReady) {
                     sTimer.reset();
@@ -404,14 +440,15 @@ public class SpindexerController {
                 // Wait for flickers to fully retract before moving spindexer
                 if (sTimer.seconds() >= POST_FLICK_SEC && flickerArrived()) {
                     currentSlot = shootSlot;
-                    servoTarget = POSITIONS[shootSlot];
+                    servoTarget = SHOOT_POSITIONS[shootSlot];
+                    spindexerAxon.setTargetRotation(servoTarget);
                     sState = SState.ADVANCING;
                 }
                 break;
 
             case ADVANCING:
-                // Slowly step spindexer to next slot, then settle before firing
-                if (stepServo(SHOOT_SERVO_STEP)) {
+                // RTPAxon handles the motion — just check if arrived
+                if (spindexerAxon.isAtTarget(5)) {
                     // Arrived — settle before firing
                     sTimer.reset();
                     sState = SState.SHOOT_SETTLE;
@@ -436,8 +473,9 @@ public class SpindexerController {
      * Picks the nearest end (P1 or P3) to minimize travel, always fires all 3.
      */
     private int findFirstShootSlot() {
-        double distToP1 = Math.abs(servoPos - P1);
-        double distToP3 = Math.abs(servoPos - P3);
+        double currentAngle = spindexerAxon.getRawAngle();
+        double distToP1 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P1));
+        double distToP3 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P3));
 
         if (distToP1 <= distToP3) {
             shootDirection = 1;   // start at P1, sweep toward P3
@@ -521,44 +559,18 @@ public class SpindexerController {
     }
 
     /**
-     * Move servoPos one step toward servoTarget.
-     * Time-based so speed is consistent regardless of loop rate.
-     * @param stepPerSec  position increment per second (bigger = faster)
-     * @return true when arrived
+     * (Legacy — no longer used. RTPAxon PID handles spindexer motion now.)
      */
     private boolean stepServo(double stepPerSec) {
-        double dt = servoTimer.seconds();
-        servoTimer.reset();
-        if (dt > 0.05) dt = 0.05;  // cap dt to prevent huge jump from accumulated time
-        double step = stepPerSec * dt;
-        if (step < 0.0001) step = 0.0001; // guard against first-call zero dt
-
-        double diff = servoTarget - servoPos;
-        if (Math.abs(diff) <= step * 0.5) {
-            // Close enough — snap to target
-            servoPos = servoTarget;
-            spindexer.setPosition(servoPos);
-            lastWrittenServo = servoPos;
-            return true;
-        }
-        // Step toward target
-        servoPos += Math.signum(diff) * step;
-        // Only write to servo when change is significant (>= 0.01) to avoid micro-stutter
-        if (Math.abs(servoPos - lastWrittenServo) >= 0.01) {
-            spindexer.setPosition(servoPos);
-            lastWrittenServo = servoPos;
-        }
-        return false;
+        return spindexerAxon.isAtTarget(5);
     }
 
     /** Move spindexer to a specific slot (for init / manual use) */
     public void goToSlot(int slot) {
         if (slot >= 0 && slot <= 2) {
             currentSlot = slot;
-            servoPos = POSITIONS[slot];
-            servoTarget = POSITIONS[slot];
-            lastWrittenServo = POSITIONS[slot];
-            spindexer.setPosition(POSITIONS[slot]);
+            servoTarget = INTAKE_POSITIONS[slot];
+            spindexerAxon.setTargetRotation(servoTarget);
         }
     }
 
@@ -647,7 +659,7 @@ public class SpindexerController {
             telemetry.addData("Last Shot", shotDetected ? "FIRED" : "MISSED");
         }
         telemetry.addData("Total Shots Fired", totalShotsFired);
-        telemetry.addData("Spindexer Pos", String.format("%.3f", spindexer.getPosition()));
+        telemetry.addData("Spindexer Angle", String.format("%.1f°", spindexerAxon.getRawAngle()));\n        telemetry.addData("Spindexer Target", String.format("%.1f°", servoTarget));
         telemetry.addData("Ball Present?", isBallPresent() ? "YES" : "NO");
         telemetry.addData("Verified Color", detectBallColor());
         telemetry.addData("Sensor Compliance?", sensorsAgree() ? "YES" : "NO");

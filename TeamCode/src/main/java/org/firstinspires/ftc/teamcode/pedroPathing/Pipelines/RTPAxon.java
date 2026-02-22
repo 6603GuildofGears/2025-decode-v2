@@ -100,9 +100,9 @@ public class RTPAxon {
         homeAngle = previousAngle;
 
         // Default PID coefficients
-        kP = 0.015;
+        kP = 0.003;
         kI = 0.0005;
-        kD = 0.0025;
+        kD = 0.00012;
         integralSum = 0.0;
         lastError = 0.0;
         lastDerivative = 0.0;
@@ -114,7 +114,7 @@ public class RTPAxon {
         filteredAngle = getRawAngle();
         filterInitialized = true;
 
-        maxPower = 0.25;
+        maxPower = 0.4;
         minPower = 0.05;
         rampZoneDeg = 60.0;   // start slowing down within 60° of target
         cliffs = 0;
@@ -244,11 +244,20 @@ public class RTPAxon {
         while (error > 180) error -= 360;
         while (error < -180) error += 360;
 
-        // Dead simple: power = error * P, clamped to maxPower
-        // NEGATIVE because positive error needs negative power to close the gap
-        final double DEADZONE = 3.0;
+        // PD control: P drives toward target, D brakes to prevent overshoot
+        double dt = pidTimer.seconds();
+        pidTimer.reset();
+        double derivative = (dt > 0) ? (error - lastError) / dt : 0;
+        lastError = error;
+        lastDerivative = derivative;
+
+        final double DEADZONE = 1.0;
         if (Math.abs(error) > DEADZONE) {
-            double pwr = -error * kP;
+            double pwr = -(kP * error + kD * derivative);
+            // Ensure minimum power floor so small errors still move the servo
+            if (Math.abs(pwr) < minPower) {
+                pwr = minPower * Math.signum(pwr);
+            }
             // Clamp to maxPower
             if (pwr > maxPower)  pwr = maxPower;
             if (pwr < -maxPower) pwr = -maxPower;
@@ -269,15 +278,18 @@ public class RTPAxon {
         return String.format(
                 "Volts: %.3f | Raw: %.1f deg\n" +
                 "Target: %.1f deg | Error: %.1f deg\n" +
-                "Power: %.3f | kP: %.4f\n" +
-                "P*err = %.4f",
+                "Power: %.3f | kP: %.4f | kD: %.5f\n" +
+                "P=%.4f  D=%.4f | minPwr: %.3f",
                 servoEncoder.getVoltage(),
                 raw,
                 targetRotation,
                 err,
                 power,
                 kP,
-                kP * err
+                kD,
+                kP * err,
+                lastDerivative,
+                minPower
         );
     }
 }

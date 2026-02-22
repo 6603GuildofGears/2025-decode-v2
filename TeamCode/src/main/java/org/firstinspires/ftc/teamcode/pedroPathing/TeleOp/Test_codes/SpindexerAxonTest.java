@@ -8,24 +8,17 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon;
 
 /**
- * Test OpMode for RTPAxon spindexer.
+ * Spindexer RTPAxon Test
  *
- * Gamepad1 controls:
- *   D-pad Up    → go to P1 (0°)
- *   D-pad Right → go to P2 (120°)
- *   D-pad Down  → go to P3 (240°)
- *   A           → nudge target +15°
- *   B           → nudge target -15°
- *   X           → reset to 0°
- *   Y           → toggle RTP mode on/off (manual power with left stick Y)
+ * 3 slots spaced 120° apart. Two base angles define all 6 positions:
+ *   Intake: 100°, 220°, 340°
+ *   Shoot:  165°, 285°, 45°
  *
- *   Right bumper → increase kP by 0.0005
- *   Left bumper  → decrease kP by 0.0005
- *   Right trigger → increase kD by 0.0005
- *   Left trigger  → decrease kD by 0.0005
+ * Y toggles between INTAKE and SHOOT mode.
+ * D-pad Up/Right/Down goes to P1/P2/P3 of the current mode.
  *
  * ─────────────────────────────────────────────
- *  HARDWARE CONFIG — update these names to match your wiring:
+ *  HARDWARE:
  *    CR Servo:       "spindexerCR"
  *    Analog Encoder: "spindexerEncoder"
  * ─────────────────────────────────────────────
@@ -33,23 +26,48 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon;
 @TeleOp(name = "Spindexer RTPAxon Test", group = "Test")
 public class SpindexerAxonTest extends LinearOpMode {
 
-    // ── Slot positions in degrees ──
-    // These correspond to your current P1/P2/P3 positions
-    // Tune these to match where the slots actually line up
-    private static final double P1_DEG = 0;
-    private static final double P2_DEG = 120;
-    private static final double P3_DEG = 240;
+    // Slot spacing — 3 evenly spaced slots
+    private static final double SLOT_SPACING = 120.0;
+
+    // Tuned base angles
+    private static final double INTAKE_BASE = 100;
+    private static final double SHOOT_BASE  = 165;
+
+    // Mode: true = intake positions, false = shoot positions
+    private boolean intakeMode = true;
 
     // Button edge-detection
     private boolean prevY = false;
-    private boolean prevA = false;
-    private boolean prevB = false;
-    private boolean prevX = false;
     private boolean prevDU = false;
     private boolean prevDR = false;
     private boolean prevDD = false;
-    private boolean prevRB = false;
+    private boolean prevDL = false;
+    private boolean prevA = false;
     private boolean prevLB = false;
+    private boolean prevRB = false;
+
+    // Tuning parameter selector
+    // 0 = kP, 1 = kD, 2 = maxPower, 3 = minPower
+    private int tuneParam = 0;
+    private static final String[] PARAM_NAMES = {"kP", "kD", "maxPwr", "minPwr"};
+    private static final double[] PARAM_STEPS = {0.0001, 0.00001, 0.05, 0.005};
+
+    /** Wrap angle to 0–360 range */
+    private double wrap360(double deg) {
+        deg %= 360;
+        if (deg < 0) deg += 360;
+        return deg;
+    }
+
+    /** Adjust the selected tuning parameter by delta */
+    private void adjustParam(RTPAxon axon, int param, double delta) {
+        switch (param) {
+            case 0: axon.setKP(Math.max(0, axon.getKP() + delta)); break;
+            case 1: axon.setKD(Math.max(0, axon.getKD() + delta)); break;
+            case 2: axon.setMaxPower(Math.max(0.05, axon.getMaxPower() + delta)); break;
+            case 3: axon.setMinPower(Math.max(0, axon.getMinPower() + delta)); break;
+        }
+    }
 
     @Override
     public void runOpMode() {
@@ -58,83 +76,98 @@ public class SpindexerAxonTest extends LinearOpMode {
         CRServo crServo = hardwareMap.crservo.get("spindexerCR");
         AnalogInput encoder = hardwareMap.get(AnalogInput.class, "spindexerEncoder");
 
-        // ── Create RTPAxon (no direction flip — motor and encoder already agree) ──
+        // ── Create RTPAxon ──
         RTPAxon spindexer = new RTPAxon(crServo, encoder);
-        spindexer.setMaxPower(1.0);    // full power allowed (ramps down near target via P)
-        spindexer.setKP(0.0025);       // sweet spot — no overshoot
-        spindexer.setKI(0.0);          // no integral for now
-        spindexer.setKD(0.0);          // no D for now — tune P first
+        spindexer.setMaxPower(0.4);
+        spindexer.setMinPower(0.05);
+        spindexer.setKP(0.003);
+        spindexer.setKI(0.0);
+        spindexer.setKD(0.00012);
 
         telemetry.addData("Status", "RTPAxon initialized");
         telemetry.addData("Start Angle", String.format("%.1f°", spindexer.STARTPOS));
-        telemetry.addData(">", "Press START");
+        telemetry.addData(">", "Press START — Y toggles INTAKE/SHOOT");
         telemetry.update();
 
         waitForStart();
 
+        // Derive all 6 positions
+        double intakeP1 = wrap360(INTAKE_BASE);
+        double intakeP2 = wrap360(INTAKE_BASE + SLOT_SPACING);
+        double intakeP3 = wrap360(INTAKE_BASE + SLOT_SPACING * 2);
+        double shootP1  = wrap360(SHOOT_BASE);
+        double shootP2  = wrap360(SHOOT_BASE + SLOT_SPACING);
+        double shootP3  = wrap360(SHOOT_BASE + SLOT_SPACING * 2);
+
         while (opModeIsActive()) {
 
-            // ── Edge detection ──
+            // ── Read buttons ──
             boolean y  = gamepad1.y;
-            boolean a  = gamepad1.a;
-            boolean b  = gamepad1.b;
-            boolean x  = gamepad1.x;
             boolean du = gamepad1.dpad_up;
             boolean dr = gamepad1.dpad_right;
             boolean dd = gamepad1.dpad_down;
-
-            // ── Slot presets (D-pad) ──
-            if (du && !prevDU) spindexer.setTargetRotation(P1_DEG);
-            if (dr && !prevDR) spindexer.setTargetRotation(P2_DEG);
-            if (dd && !prevDD) spindexer.setTargetRotation(P3_DEG);
-
-            // ── Fine adjust ──
-            if (a && !prevA) spindexer.changeTargetRotation(15);
-            if (b && !prevB) spindexer.changeTargetRotation(-15);
-
-            // ── Reset ──
-            if (x && !prevX) {
-                spindexer.setTargetRotation(0);
-                spindexer.forceResetTotalRotation();
-            }
-
-            // ── Toggle RTP / Manual ──
-            if (y && !prevY) {
-                spindexer.setRtp(!spindexer.getRtp());
-            }
-
-            // ── Live PID tuning (bumpers & triggers) ──
-            boolean rb = gamepad1.right_bumper;
+            boolean dl = gamepad1.dpad_left;
+            boolean a  = gamepad1.a;
             boolean lb = gamepad1.left_bumper;
-            if (rb && !prevRB) spindexer.setKP(spindexer.getKP() + 0.0001);
-            if (lb && !prevLB) spindexer.setKP(Math.max(0, spindexer.getKP() - 0.0001));
-            // Triggers: adjust maxPower ± 0.01
-            if (gamepad1.right_trigger > 0.5) spindexer.setMaxPower(spindexer.getMaxPower() + 0.005);
-            if (gamepad1.left_trigger  > 0.5) spindexer.setMaxPower(Math.max(0.02, spindexer.getMaxPower() - 0.005));
+            boolean rb = gamepad1.right_bumper;
 
-            // ── Manual drive when RTP is off ──
-            if (!spindexer.getRtp()) {
-                double manual = -gamepad1.left_stick_y * spindexer.getMaxPower();
-                spindexer.setPower(manual);
+            // ── Toggle INTAKE / SHOOT mode ──
+            if (y && !prevY) intakeMode = !intakeMode;
+
+            // ── A cycles tuning parameter ──
+            if (a && !prevA) tuneParam = (tuneParam + 1) % PARAM_NAMES.length;
+
+            // ── Bumpers adjust selected parameter ──
+            if (lb && !prevLB) {
+                adjustParam(spindexer, tuneParam, -PARAM_STEPS[tuneParam]);
+            }
+            if (rb && !prevRB) {
+                adjustParam(spindexer, tuneParam, +PARAM_STEPS[tuneParam]);
             }
 
-            // ── Update PID loop ──
+            // ── Update controller FIRST so telemetry shows current-cycle values ──
             spindexer.update();
 
+            // ── D-pad selects P1/P2/P3 of current mode ──
+            if (intakeMode) {
+                if (du && !prevDU) spindexer.setTargetRotation(intakeP1);
+                if (dr && !prevDR) spindexer.setTargetRotation(intakeP2);
+                if (dd && !prevDD) spindexer.setTargetRotation(intakeP3);
+            } else {
+                if (du && !prevDU) spindexer.setTargetRotation(shootP1);
+                if (dr && !prevDR) spindexer.setTargetRotation(shootP2);
+                if (dd && !prevDD) spindexer.setTargetRotation(shootP3);
+            }
+
             // ── Telemetry ──
-            telemetry.addData("MODE", spindexer.getRtp() ? "RTP" : "MANUAL");
-            telemetry.addData("At Target?", spindexer.isAtTarget() ? "YES" : "NO");
+            telemetry.addData("MODE", intakeMode ? ">>> INTAKE <<<" : ">>> SHOOT <<<");
             telemetry.addLine(spindexer.log());
-            telemetry.addData("maxPower", String.format("%.3f", spindexer.getMaxPower()));
-            telemetry.addLine("---");
-            telemetry.addData("Dpad", "P1/P2/P3 | A/B nudge");
-            telemetry.addData("X:reset Y:mode", "RB/LB:kP RT/LT:maxPwr");
+            telemetry.addData("At Target?", spindexer.isAtTarget() ? "YES" : "NO");
+            telemetry.addLine("─── POSITIONS ───");
+            telemetry.addData("Intake", String.format("P1=%.0f°  P2=%.0f°  P3=%.0f°", intakeP1, intakeP2, intakeP3));
+            telemetry.addData("Shoot ", String.format("P1=%.0f°  P2=%.0f°  P3=%.0f°", shootP1, shootP2, shootP3));
+            telemetry.addLine("─── CONTROLS ───");
+            telemetry.addData("Y", "toggle INTAKE/SHOOT");
+            telemetry.addData("D-Up/Right/Down", "P1 / P2 / P3");
+            telemetry.addLine("─── TUNING ───");
+            telemetry.addData("A", "cycle param");
+            telemetry.addData("LB / RB", String.format("adjust (%s)", PARAM_NAMES[tuneParam]));
+            telemetry.addData("► " + PARAM_NAMES[0], String.format("%s%.4f  step=%.4f",
+                    tuneParam == 0 ? ">> " : "   ", spindexer.getKP(), PARAM_STEPS[0]));
+            telemetry.addData("► " + PARAM_NAMES[1], String.format("%s%.5f  step=%.5f",
+                    tuneParam == 1 ? ">> " : "   ", spindexer.getKD(), PARAM_STEPS[1]));
+            telemetry.addData("► " + PARAM_NAMES[2], String.format("%s%.3f  step=%.3f",
+                    tuneParam == 2 ? ">> " : "   ", spindexer.getMaxPower(), PARAM_STEPS[2]));
+            telemetry.addData("► " + PARAM_NAMES[3], String.format("%s%.4f  step=%.4f",
+                    tuneParam == 3 ? ">> " : "   ", spindexer.getMinPower(), PARAM_STEPS[3]));
+
+            // ── Telemetry flush ──
             telemetry.update();
 
             // ── Save edge states ──
-            prevY = y; prevA = a; prevB = b; prevX = x;
-            prevDU = du; prevDR = dr; prevDD = dd;
-            prevRB = rb; prevLB = lb;
+            prevY = y;
+            prevDU = du; prevDR = dr; prevDD = dd; prevDL = dl;
+            prevA = a; prevLB = lb; prevRB = rb;
         }
 
         spindexer.setPower(0);

@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.pedroPathing.Pipelines;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 
@@ -20,6 +21,11 @@ public class Servo_Pipeline {
 
     // spindexer
     public static Servo spindexer;
+
+    // spindexer RTPAxon (CR servo + analog encoder)
+    public static CRServo spindexerCR;
+    public static AnalogInput spindexerEncoder;
+    public static RTPAxon spindexerAxon;
    
 
     public Servo_Pipeline(OpMode opMode) {
@@ -35,7 +41,16 @@ public class Servo_Pipeline {
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
-     
+
+        // spindexer RTPAxon
+        spindexerCR = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
+        spindexerEncoder = opMode.hardwareMap.get(AnalogInput.class, "spindexerEncoder");
+        spindexerAxon = new RTPAxon(spindexerCR, spindexerEncoder);
+        spindexerAxon.setMaxPower(0.4);
+        spindexerAxon.setMinPower(0.05);
+        spindexerAxon.setKP(0.003);
+        spindexerAxon.setKD(0.00012);
+        spindexerAxon.setKI(0.0);
       
 
         // //hood servo direction
@@ -66,8 +81,16 @@ public class Servo_Pipeline {
 
         // spindexer
         spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
-//      
 
+        // spindexer RTPAxon
+        spindexerCR = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
+        spindexerEncoder = opMode.hardwareMap.get(AnalogInput.class, "spindexerEncoder");
+        spindexerAxon = new RTPAxon(spindexerCR, spindexerEncoder);
+        spindexerAxon.setMaxPower(0.4);
+        spindexerAxon.setMinPower(0.05);
+        spindexerAxon.setKP(0.003);
+        spindexerAxon.setKD(0.00012);
+        spindexerAxon.setKI(0.0);
 
 //         //hood servo direction
           hood.setDirection(Servo.Direction.FORWARD);

@@ -166,7 +166,7 @@ public class Red_Front extends OpMode {
             case DRIVE_STARTPOSE_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveStartPoseToShootPose, true);
-                    Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+                    Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
                     flywheel.setVelocity(3200.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
@@ -520,7 +520,7 @@ public class Red_Front extends OpMode {
 
     public void start() {
         Servo_Pipeline.flicker.setPosition(0.1);
-        Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+        Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
         Servo_Pipeline.hood.setPosition(0.5);
         opmodeTimer.resetTimer();
         pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;

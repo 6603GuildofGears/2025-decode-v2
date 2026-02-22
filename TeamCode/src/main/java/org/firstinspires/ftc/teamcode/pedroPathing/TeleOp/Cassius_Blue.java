@@ -151,7 +151,7 @@ public class Cassius_Blue extends LinearOpMode {
         }
 
         if (isStopRequested()) return;
-        spindexer.setPosition(SpindexerController.P1); // start at P1 once
+        spindexerAxon.setTargetRotation(SpindexerController.P1); // start at P1 once
         while (opModeIsActive()) {
                // Poll Limelight ONCE per loop — all getters below see the SAME frame
                pollOnce();
@@ -263,13 +263,11 @@ public class Cassius_Blue extends LinearOpMode {
 
 
             
-            telemetry.addData("spindexer pos", spindexer.getPosition());
+            telemetry.addData("spindexer angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             if(dpadRight2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.03);;
+                spindexerAxon.changeTargetRotation(5);;
             } else if (dpadLeft2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.03);;
+                spindexerAxon.changeTargetRotation(-5);;
             }
 
 

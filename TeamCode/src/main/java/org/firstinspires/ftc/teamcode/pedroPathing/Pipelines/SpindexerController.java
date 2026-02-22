@@ -416,16 +416,16 @@ public class SpindexerController {
                     slotColor[shootSlot] = "NONE";
                     slotEmpty[shootSlot] = true;
 
-                    // Always advance through all 3 slots
-                    int nextShoot = shootSlot + shootDirection;
-                    if (nextShoot < 0 || nextShoot > 2) {
+                    // Advance to next slot in the shoot queue
+                    shootQueueIndex++;
+                    if (shootQueueIndex >= 3) {
                         // All 3 slots fired — done
                         flywheel.setVelocity(0);
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {
-                        // Advance to next slot
-                        shootSlot = nextShoot;
+                        // Advance to next slot in queue
+                        shootSlot = shootQueue[shootQueueIndex];
                         shotNumber++;
                         // Boost RPM for 2nd and 3rd shots
                         double boostedRpm = shootRpm + (shotNumber >= 1 ? RPM_BOOST_2ND_3RD : 0);
@@ -470,20 +470,38 @@ public class SpindexerController {
 
     /**
      * Find the first slot to shoot.
-     * Picks the nearest end (P1 or P3) to minimize travel, always fires all 3.
+     * Picks the nearest slot (P1, P2, or P3), builds a shoot queue from there.
+     * From P2: fires P2 → nearest neighbor → far side (e.g. P2→P1→P3 or P2→P3→P1)
+     * From an end: sweeps linearly (P1→P2→P3 or P3→P2→P1)
      */
+    private int[] shootQueue = new int[3];  // ordered slot indices to fire
+    private int shootQueueIndex = 0;        // which queue entry we're on
+
     private int findFirstShootSlot() {
         double currentAngle = spindexerAxon.getRawAngle();
         double distToP1 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P1));
+        double distToP2 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P2));
         double distToP3 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P3));
 
-        if (distToP1 <= distToP3) {
-            shootDirection = 1;   // start at P1, sweep toward P3
-            return 0;
+        if (distToP2 <= distToP1 && distToP2 <= distToP3) {
+            // Closest to P2 — shoot P2 first, then nearest neighbor, then far side
+            shootQueue[0] = 1;
+            if (distToP1 <= distToP3) {
+                shootQueue[1] = 0; shootQueue[2] = 2;  // P2→P1→P3
+            } else {
+                shootQueue[1] = 2; shootQueue[2] = 0;  // P2→P3→P1
+            }
+        } else if (distToP1 <= distToP3) {
+            // Closest to P1 — sweep P1→P2→P3
+            shootQueue[0] = 0; shootQueue[1] = 1; shootQueue[2] = 2;
         } else {
-            shootDirection = -1;  // start at P3, sweep toward P1
-            return 2;
+            // Closest to P3 — sweep P3→P2→P1
+            shootQueue[0] = 2; shootQueue[1] = 1; shootQueue[2] = 0;
         }
+
+        shootQueueIndex = 0;
+        shootDirection = 1;  // legacy field, not used for ordering anymore
+        return shootQueue[0];
     }
 
     /**
@@ -659,7 +677,8 @@ public class SpindexerController {
             telemetry.addData("Last Shot", shotDetected ? "FIRED" : "MISSED");
         }
         telemetry.addData("Total Shots Fired", totalShotsFired);
-        telemetry.addData("Spindexer Angle", String.format("%.1f°", spindexerAxon.getRawAngle()));\n        telemetry.addData("Spindexer Target", String.format("%.1f°", servoTarget));
+        telemetry.addData("Spindexer Angle", String.format("%.1f°", spindexerAxon.getRawAngle()));
+        telemetry.addData("Spindexer Target", String.format("%.1f°", servoTarget));
         telemetry.addData("Ball Present?", isBallPresent() ? "YES" : "NO");
         telemetry.addData("Verified Color", detectBallColor());
         telemetry.addData("Sensor Compliance?", sensorsAgree() ? "YES" : "NO");

@@ -174,7 +174,7 @@ public class Red_Back extends OpMode {
             case DRIVE_STARTPOSE_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveStartPoseShootPose, true);
-                    Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+                    Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
                     flywheel.setVelocity(3000.0 * 28.0 / 60.0);
                     pathStarted = true;
                 }
@@ -478,7 +478,7 @@ public class Red_Back extends OpMode {
     spindexerController.setShootRpm(3000);
     spindexerController.prefillAllSlots();
     Servo_Pipeline.flicker.setPosition(0.1);
-    Servo_Pipeline.spindexer.setPosition(SpindexerController.P1);
+    Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
 
     buildPaths();
     follower.setPose(startPose);

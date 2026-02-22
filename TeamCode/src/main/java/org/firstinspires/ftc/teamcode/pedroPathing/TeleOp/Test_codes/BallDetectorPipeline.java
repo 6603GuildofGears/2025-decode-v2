@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.pedroPathing.Pipelines;
+package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
@@ -47,7 +47,7 @@ import java.util.List;
 public class BallDetectorPipeline implements VisionProcessor {
 
     // ── Model configuration ──
-    private static final String   MODEL_ASSET    = "ftc_ball_nano_320.tflite";
+    private static final String   MODEL_ASSET    = "pico_v3.tflite";
     private static final String[] LABELS         = {"green_ball", "purple_ball"};
     private static final int      MODEL_INPUT    = 320;
     private static final float    MIN_CONF_DEF   = 0.5f;
@@ -134,7 +134,7 @@ public class BallDetectorPipeline implements VisionProcessor {
 
         visionPortal = new VisionPortal.Builder()
                 .setCamera(opMode.hardwareMap.get(WebcamName.class, webcamName))
-                .setCameraResolution(new Size(640, 480))
+                .setCameraResolution(new Size(320, 240))
                 .addProcessor(instance)
                 .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .enableLiveView(true)

@@ -45,8 +45,8 @@ public class Color_Sensor_Test extends LinearOpMode {
         String[] slotColors = {"NONE", "NONE", "NONE"};
         boolean[] slotLoaded = {false, false, false};
 
-        spindexer.setDirection(Servo.Direction.REVERSE);
-        spindexer.setPosition(p1);
+        spindexerAxon.setDirection(org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon.Direction.REVERSE);
+        spindexerAxon.setTargetRotation(p1);
         currentSlot = 1;
 
         // Flicker to rest
@@ -96,17 +96,14 @@ public class Color_Sensor_Test extends LinearOpMode {
             }
 
             // === Gradual slew toward target ===
-            double currentPos = spindexer.getPosition();
-            double error = targetPos - currentPos;
-            if (Math.abs(error) > 0.001) {
-                double step = Math.signum(error) * Math.min(slewSpeed, Math.abs(error));
-                spindexer.setPosition(currentPos + step);
-            }
+            spindexerAxon.setTargetRotation(targetPos);
+            spindexerAxon.update();
+            double currentPos = spindexerAxon.getRawAngle();
 
             // === Color sensor — only read at actual slot positions, never override ===
-            boolean atSlotPos = (Math.abs(spindexer.getPosition() - p1) < 0.005)
-                             || (Math.abs(spindexer.getPosition() - p2) < 0.005)
-                             || (Math.abs(spindexer.getPosition() - p3) < 0.005);
+            boolean atSlotPos = (Math.abs(currentPos - p1) < 2.0)
+                             || (Math.abs(currentPos - p2) < 2.0)
+                             || (Math.abs(currentPos - p3) < 2.0);
             String detectedColor = "---";
             boolean ballPresent = false;
 
@@ -146,7 +143,7 @@ public class Color_Sensor_Test extends LinearOpMode {
             telemetry.addData("", "");
             telemetry.addData("=== SPINDEXER ===", "");
             telemetry.addData("Current Slot", "p" + currentSlot);
-            telemetry.addData("Servo Pos", String.format("%.3f", spindexer.getPosition()));
+            telemetry.addData("Angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
 
             telemetry.addData("", "");
             telemetry.addData("=== SLOT TRACKING ===", "");
@@ -165,7 +162,7 @@ public class Color_Sensor_Test extends LinearOpMode {
             } else {
                 telemetryM.debug("MOVING...");
             }
-            telemetryM.debug("Slot: p" + currentSlot + " | Servo: " + String.format("%.3f", spindexer.getPosition()));
+            telemetryM.debug("Slot: p" + currentSlot + " | Angle: " + String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             telemetryM.debug("p1: " + (slotLoaded[0] ? "● " : "○ ") + slotColors[0]
                     + "  p2: " + (slotLoaded[1] ? "● " : "○ ") + slotColors[1]
                     + "  p3: " + (slotLoaded[2] ? "● " : "○ ") + slotColors[2]);

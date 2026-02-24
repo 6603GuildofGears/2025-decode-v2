@@ -12,7 +12,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * via a built-in PID controller.
  *
  * Usage:
- *   CRServo cr = hardwareMap.crservo.get("spindexerCR");
+ *   CRServo cr = hardwareMap.crservo.get("spindexer");
  *   AnalogInput enc = hardwareMap.get(AnalogInput.class, "spindexerEncoder");
  *   RTPAxon axon = new RTPAxon(cr, enc);
  *

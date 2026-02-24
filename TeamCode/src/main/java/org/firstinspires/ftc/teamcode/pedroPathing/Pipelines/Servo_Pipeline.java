@@ -19,11 +19,8 @@ public class Servo_Pipeline {
     public static Servo flicker;
     
 
-    // spindexer
-    public static Servo spindexer;
-
-    // spindexer RTPAxon (CR servo + analog encoder)
-    public static CRServo spindexerCR;
+    // spindexer CRServo (used by RTPAxon)
+    public static CRServo spindexer;
     public static AnalogInput spindexerEncoder;
     public static RTPAxon spindexerAxon;
    
@@ -39,13 +36,10 @@ public class Servo_Pipeline {
         // //flicker servo
         flicker = opMode.hardwareMap.get(Servo.class, "flicker"); 
 
-        // spindexer
-        spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
-
         // spindexer RTPAxon
-        spindexerCR = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
+        spindexer = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
         spindexerEncoder = opMode.hardwareMap.get(AnalogInput.class, "spindexerEncoder");
-        spindexerAxon = new RTPAxon(spindexerCR, spindexerEncoder);
+        spindexerAxon = new RTPAxon(spindexer, spindexerEncoder);
         spindexerAxon.setMaxPower(0.4);
         spindexerAxon.setMinPower(0.05);
         spindexerAxon.setKP(0.003);
@@ -59,10 +53,6 @@ public class Servo_Pipeline {
 
         // //flicker servo direction
          flicker.setDirection(Servo.Direction.FORWARD);
-
-
-    // spindexer direction
-    spindexer.setDirection(Servo.Direction.FORWARD);
 
 
     }
@@ -79,13 +69,10 @@ public class Servo_Pipeline {
 //         //flicker servo
         flicker = opMode.hardwareMap.get(Servo.class, "flicker"); 
 
-        // spindexer
-        spindexer = opMode.hardwareMap.get(Servo.class, "spindexer");
-
         // spindexer RTPAxon
-        spindexerCR = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
+        spindexer = opMode.hardwareMap.get(CRServo.class, "spindexerCR");
         spindexerEncoder = opMode.hardwareMap.get(AnalogInput.class, "spindexerEncoder");
-        spindexerAxon = new RTPAxon(spindexerCR, spindexerEncoder);
+        spindexerAxon = new RTPAxon(spindexer, spindexerEncoder);
         spindexerAxon.setMaxPower(0.4);
         spindexerAxon.setMinPower(0.05);
         spindexerAxon.setKP(0.003);
@@ -98,9 +85,6 @@ public class Servo_Pipeline {
 
 //         //flicker servo direction
          flicker.setDirection(Servo.Direction.FORWARD);
-
-    // spindexer direction
-    spindexer.setDirection(Servo.Direction.FORWARD);
 
     intakeS.setDirection(CRServo.Direction.FORWARD);
 //       

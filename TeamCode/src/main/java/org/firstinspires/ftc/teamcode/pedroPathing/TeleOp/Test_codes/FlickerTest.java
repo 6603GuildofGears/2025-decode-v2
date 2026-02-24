@@ -23,7 +23,7 @@ public class FlickerTest extends LinearOpMode {
         waitForStart();
 
         // Spin up flywheel (ticks/sec = RPM * 28 / 60)
-        double targetRPM = 6000;
+        double targetRPM = 3000;
         flywheel.setVelocity(targetRPM * 28.0 / 60.0);
 
         while (opModeIsActive()) {

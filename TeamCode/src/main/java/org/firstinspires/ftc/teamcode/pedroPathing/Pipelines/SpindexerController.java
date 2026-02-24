@@ -25,8 +25,8 @@ public class SpindexerController {
     // ========== Slot positions (degrees — RTPAxon) ==========
     // 3 slots spaced 120° apart, two base angles for intake vs shoot
     private static final double SLOT_SPACING = 120.0;
-    private static final double INTAKE_BASE = 100.0;
-    private static final double SHOOT_BASE  = 165.0;
+    private static final double INTAKE_BASE = 60.0;
+    private static final double SHOOT_BASE  = 12.5;
 
     // Derived positions
     public static final double INTAKE_P1 = wrap(INTAKE_BASE);
@@ -56,10 +56,10 @@ public class SpindexerController {
     private static final double CONFIRM_SEC   = 0.1;   // ball must be seen continuously this long
     private static final double HOLD_SEC      = 0.05;  // pause after ball confirmed before rotating
 
-    private static final double SPINUP_SEC    = 1;   // flywheel spin-up time
-    public static double FLICK_SEC     = 0.45;   // flicker hold time — how long flicker stays extended
-    public static double POST_FLICK_SEC = 0.25;   // pause after flicker retracts before advancing
-    public static double SHOOT_SETTLE_SEC = 0.5; // settle time before firing each shot
+    private static final double SPINUP_SEC    = 1.5;   // flywheel spin-up time
+    public static double FLICK_SEC     = 0.25;   // flicker hold time — how long flicker stays extended
+    public static double POST_FLICK_SEC = 0.25;    // pause after flicker retracts before advancing (must be long enough for servo to fully return)
+    public static double SHOOT_SETTLE_SEC = 0.25; // settle time before firing each shot
 
     // ========== Misfire retry ==========
     private static final int    MAX_RETRIES       = 1;    // how many times to retry a misfire before giving up
@@ -68,16 +68,8 @@ public class SpindexerController {
     private int totalMisfires = 0;                        // lifetime misfire counter for telemetry
 
     // ========== Servo movement speed ==========
-    private static final double INTAKE_SERVO_STEP = 0.25;  // (unused — RTPAxon handles motion)
-    private static final double SHOOT_SERVO_STEP  = 0.25;   // (unused — RTPAxon handles motion)
-    public static double FLICKER_STEP = 0.875;   // flicker speed per SECOND (position units/sec)
     private double servoTarget = INTAKE_P1; // where we're heading (degrees)
     private ElapsedTime servoTimer = new ElapsedTime();  // for time-based spindexer stepping (legacy)
-
-    // Flicker position tracking (for smooth stepping)
-    private double flickPos = 0.06875;
-    private double flickTarget = 0.06875;
-    private ElapsedTime flickerTimer = new ElapsedTime();  // for time-based stepping
 
     // ========== Slot tracking ==========
     private String[] slotColor = {"NONE", "NONE", "NONE"};
@@ -104,8 +96,8 @@ public class SpindexerController {
     private int shootDirection = -1;  // -1 = P3→P1, +1 = P1→P3 (set dynamically)
 
     // Flicker positions
-    private double flickRest  = 0.06875;
-    private double flickShoot = 0.53;
+    private double flickRest  = 0;
+    private double flickShoot = 0.375;
 
     // Flywheel
     private double shootRpm = 3000;
@@ -132,8 +124,6 @@ public class SpindexerController {
 
     public void setFlickerPositions(double rest, double shoot) {
         flickRest = rest; flickShoot = shoot;
-        // Init tracking to rest position
-        flickPos = rest; flickTarget = rest;
     }
 
     public void setShootRpm(double rpm) { this.shootRpm = rpm; }
@@ -337,18 +327,19 @@ public class SpindexerController {
         // Kill switch
         if (killSwitch && sState != SState.IDLE) {
             flywheel.setVelocity(0);
-            flickTarget = flickRest;
-            flickPos = flickRest;
             flicker.setPosition(flickRest);
             sState = SState.IDLE;
             return;
         }
 
-        // Step flicker toward its target every loop
-        stepFlicker();
-
-        // Update RTPAxon PID every loop (shoot side)
-        spindexerAxon.update();
+        // Update RTPAxon PID every loop — during FIRE/RETRACTING, actively
+        // brake the CRServo (power=0) instead of skipping update entirely,
+        // so the servo doesn't float and the PID doesn't accumulate drift.
+        if (sState == SState.FIRE || sState == SState.RETRACTING) {
+            spindexerAxon.setPower(0);   // active brake — holds position
+        } else {
+            spindexerAxon.update();       // normal PID control
+        }
 
         switch (sState) {
 
@@ -365,7 +356,7 @@ public class SpindexerController {
                     servoTarget = SHOOT_POSITIONS[shootSlot];
                     spindexerAxon.setTargetRotation(servoTarget);
                     // Ensure flicker at rest
-                    flickTarget = flickRest;
+                    flicker.setPosition(flickRest);
                     shotNumber = 0;  // first shot
                     retryCount = 0;  // fresh retries for this slot
                     // First shot gets its own boost
@@ -390,7 +381,7 @@ public class SpindexerController {
                 if (sTimer.seconds() >= SHOOT_SETTLE_SEC) {
                     preFlickTPS = flywheel.getVelocity();
                     shotDetected = false;
-                    flickTarget = flickShoot;
+                    flicker.setPosition(flickShoot);
                     sTimer.reset();
                     sState = SState.FIRE;
                 }
@@ -406,11 +397,10 @@ public class SpindexerController {
                         totalShotsFired++;
                     }
                 }
-                // Wait for flick to complete AND flicker to reach shoot position
-                boolean flickerAtShoot = flickerArrived();
-                if (sTimer.seconds() >= FLICK_SEC && flickerAtShoot) {
-                    // Command flicker back to rest (stepped smoothly)
-                    flickTarget = flickRest;
+                // Wait for flick to complete
+                if (sTimer.seconds() >= FLICK_SEC) {
+                    // Command flicker back to rest
+                    flicker.setPosition(flickRest);
 
                     // Mark slot as fired
                     slotColor[shootSlot] = "NONE";
@@ -437,8 +427,8 @@ public class SpindexerController {
                 break;
 
             case RETRACTING:
-                // Wait for flickers to fully retract before moving spindexer
-                if (sTimer.seconds() >= POST_FLICK_SEC && flickerArrived()) {
+                // Wait for flicker to retract before moving spindexer
+                if (sTimer.seconds() >= POST_FLICK_SEC) {
                     currentSlot = shootSlot;
                     servoTarget = SHOOT_POSITIONS[shootSlot];
                     spindexerAxon.setTargetRotation(servoTarget);
@@ -457,7 +447,15 @@ public class SpindexerController {
 
             case DONE:
                 if (sTimer.seconds() >= 0.3) {
-                    // Stay at current position — don't reset servo back to P1
+                    // Move spindexer back to first intake position so intake can resume
+                    currentSlot = 0;
+                    servoTarget = INTAKE_POSITIONS[0];
+                    spindexerAxon.setTargetRotation(servoTarget);
+                    // Clear all slots — everything was shot
+                    for (int i = 0; i < 3; i++) {
+                        slotEmpty[i] = true;
+                        slotColor[i] = "NONE";
+                    }
                     sState = SState.IDLE;
                 }
                 break;
@@ -543,37 +541,10 @@ public class SpindexerController {
     }
 
     /**
-     * Step flicker servo toward its target.
-     * Time-based so speed is consistent regardless of loop rate.
-     * Only steps when flicking UP (toward shoot); snaps instantly when returning to rest.
+     * Set flicker directly to target position.
      */
-    private void stepFlicker() {
-        double dt = flickerTimer.seconds();
-        flickerTimer.reset();
-        if (dt > 0.05) dt = 0.05;           // cap dt to 50ms — prevents huge jump from accumulated time
-        double step = FLICKER_STEP * dt;   // position change this loop
-        if (step < 0.0001) step = 0.0001;  // guard against first-call zero dt
-
-        // Step up smoothly, snap down instantly
-        if (flickTarget > flickPos) {
-            flickPos = stepToward(flickPos, flickTarget, step);
-        } else {
-            flickPos = flickTarget;
-        }
-
-        flicker.setPosition(flickPos);
-    }
-
-    /** Step a value toward a target by at most 'step' per call */
-    private double stepToward(double current, double target, double step) {
-        double diff = target - current;
-        if (Math.abs(diff) <= step * 0.5) return target;
-        return current + Math.signum(diff) * step;
-    }
-
-    /** Check if flicker has reached its target */
-    private boolean flickerArrived() {
-        return Math.abs(flickPos - flickTarget) < 0.005;
+    private void setFlicker(double pos) {
+        flicker.setPosition(pos);
     }
 
     /**
@@ -616,9 +587,7 @@ public class SpindexerController {
         sState = SState.IDLE;
         shotNumber = 0;
         retryCount = 0;
-        // Sync flicker tracking to rest so stale positions don't cause an extra flick
-        flickPos = flickRest;
-        flickTarget = flickRest;
+        flicker.setPosition(flickRest);
     }
 
     // ========== Getters ==========

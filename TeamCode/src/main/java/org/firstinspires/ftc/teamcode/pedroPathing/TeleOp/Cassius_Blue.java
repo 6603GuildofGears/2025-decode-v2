@@ -14,6 +14,7 @@ import java.util.List;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -38,8 +39,8 @@ public class Cassius_Blue extends LinearOpMode {
         initLimelight(this);
         initSensors(this);
 
-        // Direct Limelight reference for turret PID (bypasses pipeline abstraction)
-        Limelight3A limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        // Use the Limelight that was already initialized and started by initLimelight()
+        Limelight3A limelight = Limelight_Pipeline.limelight;
 
         // Open Logitech webcam via VisionPortal so Panels CameraStream widget can display it
         VisionPortal cameraPortal = new VisionPortal.Builder()
@@ -60,8 +61,8 @@ public class Cassius_Blue extends LinearOpMode {
         
         // Spindexer controller — handles intake detection, slot tracking, and shooting
         SpindexerController sdx = new SpindexerController();
-        sdx.setFlickerPositions(0.1, 0.5);
-        flicker.setPosition(0.1);
+        sdx.setFlickerPositions(0, 0.375);
+        flicker.setPosition(0);
 
 
        
@@ -102,7 +103,7 @@ public class Cassius_Blue extends LinearOpMode {
 
         double POSITION_TOLERANCE = 1.5;
         double MIN_POWER = 0.05;
-        double MAX_TURRET_POWER = 0.4;
+        double MAX_TURRET_POWER = 0.875;
         double TARGET_LOST_TIMEOUT = 2.0;
         double HOME_POWER = -0.2;
         boolean INVERT_MOTOR = false;
@@ -279,8 +280,8 @@ public class Cassius_Blue extends LinearOpMode {
                 intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
                 intakeS.setPower(1);
             } else if (sdx.isShooting()) {
-                intake.setPower(0.25); // slow feed during shoot sequence
-                intakeS.setPower(0.25);
+                intake.setPower(0); // stop intake during shoot sequence
+                intakeS.setPower(0);
             } else if (RBumper1) {
                 intake.setPower(-1); // intake out (reverse)
                 intakeS.setPower(-1);
@@ -360,7 +361,7 @@ public class Cassius_Blue extends LinearOpMode {
             String turretMode = "IDLE";
 
             // --- Manual turret control — gamepad2 left stick X ---
-            double manualInput = LStickX2 / 1.75;
+            double manualInput = LStickX2 / 1.5;
             boolean manualTurret = Math.abs(manualInput) > 0.03;
 
             if (manualTurret) {
@@ -508,6 +509,7 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("Target RPM", String.format("%.0f", targetRpm));
             telemetry.addData("Actual RPM", String.format("%.0f", flywheel.getVelocity() * 60.0 / 28.0));
             telemetry.addData("Hood Angle", String.format("%.3f", hood.getPosition()));
+            telemetry.addData(">>>  SENSOR COLOR  <<<", isBallPresent() ? detectBallColor() : "-- empty --");
             sdx.addTelemetry(telemetry);
             
 

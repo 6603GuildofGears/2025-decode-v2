@@ -95,9 +95,9 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
         int magSensorPosition = -149; // Turret position when mag sensor triggers (-145 to -153 range)
         boolean lastMagState = false; // Track mag sensor state changes
 
-        double p1 = 0;
-        double p2 = 0.375;
-        double p3 = .75;
+        double p1 = 100;
+        double p2 = 220;
+        double p3 = 340;
 
         int startSpindexer = 0;
 
@@ -242,13 +242,11 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                 headingOffset = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
             }
             
-            telemetry.addData("spindexer pos", spindexer.getPosition());
+            telemetry.addData("spindexer angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             if(dpadRight2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.03);;
+                spindexerAxon.changeTargetRotation(5);
             } else if (dpadLeft2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.03);;
+                spindexerAxon.changeTargetRotation(-5);
             }
 
 
@@ -258,16 +256,16 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                 intake.setPower(0.75); // intake in
                 
                 // Oscillate spindexer back and forth
-                double currentPos = spindexer.getPosition();
+                double currentAngle = spindexerAxon.getRawAngle();
 
                 if(spindexerForward){
-                spindexer.setPosition(currentPos + 0.005);
-                    if(currentPos >= 0.995) {
+                spindexerAxon.changeTargetRotation(2);
+                    if(currentAngle >= 355) {
                         spindexerForward = false; // Reverse direction
                     }
                 } else {
-                    spindexer.setPosition(currentPos - 0.005);
-                    if(currentPos <= 0.005) {
+                    spindexerAxon.changeTargetRotation(-2);
+                    if(currentAngle <= 5) {
                         spindexerForward = true; // Reverse direction
                     }
                 }
@@ -293,7 +291,7 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                 // Start sequence
                 sShot = 1;
                 shootTimer.reset();
-                spindexer.setPosition(p1);
+                spindexerAxon.setTargetRotation(p1);
             }
             
             // Run shooting sequence based purely on sShot and timer
@@ -321,7 +319,7 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                         }
                     } else if (shootTimer.milliseconds() < 3200) {
                         // Move spindexer to p2
-                        spindexer.setPosition(p2);
+                        spindexerAxon.setTargetRotation(p2);
                     } else if (shootTimer.milliseconds() < 4000) {
                         // Wait for spindexer to finish
                     } else {
@@ -346,7 +344,7 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
                         }
                     } else if (shootTimer.milliseconds() < 2500) {
                         // Move spindexer to p3
-                        spindexer.setPosition(p3);
+                        spindexerAxon.setTargetRotation(p3);
                     } else if (shootTimer.milliseconds() < 3200) {
                         // Wait for spindexer to finish
                     } else {
@@ -519,7 +517,7 @@ public class Cassius_Blue_FieldOriented extends LinearOpMode {
             telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
             
             telemetry.addData("=== SERVOS ===", "");
-            telemetry.addData("Spindexer Pos", String.format("%.2f", spindexer.getPosition()));
+            telemetry.addData("Spindexer Angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             telemetry.addData("Flicker", String.format("%.2f", flicker.getPosition()));
             
             displayTelemetry(this);

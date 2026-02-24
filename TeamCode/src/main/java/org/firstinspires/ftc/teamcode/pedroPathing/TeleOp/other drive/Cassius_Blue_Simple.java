@@ -67,9 +67,9 @@ public class Cassius_Blue_Simple extends LinearOpMode {
         int magSensorPosition = -149;
         boolean lastMagState = false;
 
-        double p1 = 0;
-        double p2 = 0.375;
-        double p3 = .75;
+        double p1 = 100;
+        double p2 = 220;
+        double p3 = 340;
 
         int startSpindexer = 0;
         double spindexerTargetPos = p3;
@@ -182,13 +182,11 @@ public class Cassius_Blue_Simple extends LinearOpMode {
 
                 // AUXILIARY CODE
 
-            telemetry.addData("spindexer pos", spindexer.getPosition());
+            telemetry.addData("spindexer angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             if(dpadRight2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS + 0.03);;
+                spindexerAxon.changeTargetRotation(5);
             } else if (dpadLeft2){
-                double CPoS = spindexer.getPosition();
-                spindexer.setPosition(CPoS - 0.03);;
+                spindexerAxon.changeTargetRotation(-5);
             }
 
             // intake with spindexer slow rotation
@@ -234,13 +232,13 @@ public class Cassius_Blue_Simple extends LinearOpMode {
                 sShot = 1;
                 shootTimer.reset();
                 
-                if(spindexer.getPosition() < p2){
+                if(spindexerAxon.getRawAngle() < p2){
                     spindexerTargetPos = p1;
-                    spindexer.setPosition(p1);
+                    spindexerAxon.setTargetRotation(p1);
                     sfpo = true;
                 } else {
                     spindexerTargetPos = p3;
-                    spindexer.setPosition(p3);
+                    spindexerAxon.setTargetRotation(p3);
                     sfpo = false;
                 }
             }
@@ -361,17 +359,8 @@ public class Cassius_Blue_Simple extends LinearOpMode {
             
             // Gradual spindexer movement
             if (sShot != 0) {
-                double currentSpindexerPos = spindexer.getPosition();
-                double error = spindexerTargetPos - currentSpindexerPos;
-                if (Math.abs(error) > 0.01) {
-                    double newPosition;
-                    if (error > 0) {
-                        newPosition = Math.min(currentSpindexerPos + spindexerIncrementSpeed, spindexerTargetPos);
-                    } else {
-                        newPosition = Math.max(currentSpindexerPos - spindexerIncrementSpeed, spindexerTargetPos);
-                    }
-                    spindexer.setPosition(newPosition);
-                }
+                spindexerAxon.setTargetRotation(spindexerTargetPos);
+                spindexerAxon.update();
             }
 
             // Hood control
@@ -476,7 +465,7 @@ public class Cassius_Blue_Simple extends LinearOpMode {
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Shot State", sShot == 0 ? "IDLE" : "Shot " + sShot);
             telemetry.addData("Flywheel Velocity", String.format("%.0f", flywheel.getVelocity()));
-            telemetry.addData("Spindexer Pos", String.format("%.2f", spindexer.getPosition()));
+            telemetry.addData("Spindexer Angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             
             displayTelemetry(this);
             telemetry.update();

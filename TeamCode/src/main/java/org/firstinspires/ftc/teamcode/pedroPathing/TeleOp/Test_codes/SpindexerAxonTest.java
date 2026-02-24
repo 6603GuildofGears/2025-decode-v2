@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon;
  *
  * ─────────────────────────────────────────────
  *  HARDWARE:
- *    CR Servo:       "spindexerCR"
+ *    CR Servo:       "spindexer"
  *    Analog Encoder: "spindexerEncoder"
  * ─────────────────────────────────────────────
  */
@@ -73,7 +73,7 @@ public class SpindexerAxonTest extends LinearOpMode {
     public void runOpMode() {
 
         // ── Hardware ──
-        CRServo crServo = hardwareMap.crservo.get("spindexerCR");
+        CRServo crServo = hardwareMap.crservo.get("spindexer");
         AnalogInput encoder = hardwareMap.get(AnalogInput.class, "spindexerEncoder");
 
         // ── Create RTPAxon ──

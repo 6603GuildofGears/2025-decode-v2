@@ -14,7 +14,9 @@ import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibra
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.VisionProcessor;
 
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import org.tensorflow.lite.Interpreter;
@@ -47,7 +49,7 @@ import java.util.List;
 public class BallDetectorPipeline implements VisionProcessor {
 
     // ── Model configuration ──
-    private static final String   MODEL_ASSET    = "new_pico_v3_int8.tflite";
+    private static final String   MODEL_ASSET    = "pico_new_lens_int8.tflite";
     private static final String[] LABELS         = {"green_ball", "purple_ball"};
     private static final int      MODEL_INPUT    = 320;
     private static final float    MIN_CONF_DEF   = 0.5f;
@@ -142,7 +144,7 @@ public class BallDetectorPipeline implements VisionProcessor {
 
         visionPortal = new VisionPortal.Builder()
                 .setCamera(opMode.hardwareMap.get(WebcamName.class, webcamName))
-                .setCameraResolution(new Size(640, 480))
+                .setCameraResolution(new Size(800, 448))
                 .addProcessor(instance)
                 .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .enableLiveView(true)
@@ -260,6 +262,11 @@ public class BallDetectorPipeline implements VisionProcessor {
     // Reusable byte array for bulk pixel read (allocated once)
     private byte[] pixelBytes;
 
+    // Letterbox parameters (computed once per frame, used in post-processing)
+    private float lbScale;   // scale factor used to fit frame into MODEL_INPUT
+    private int   lbPadX;    // left/right padding in pixels (on the 320×320 image)
+    private int   lbPadY;    // top/bottom padding in pixels (on the 320×320 image)
+
     @Override
     public Object processFrame(Mat frame, long captureTimeNanos) {
         // Bail out immediately if we're shutting down
@@ -268,21 +275,43 @@ public class BallDetectorPipeline implements VisionProcessor {
 
         try {
 
-        // ── 1. Pre-process: resize → RGB → bulk read → normalise ──
+        // ── 1. Pre-process: letterbox resize (preserve aspect ratio) ──
         Mat rgb = new Mat();
         Imgproc.cvtColor(frame, rgb, Imgproc.COLOR_RGBA2RGB);
 
+        // Compute scale to fit the longest dimension into MODEL_INPUT
+        float scaleW = (float) MODEL_INPUT / rgb.cols();
+        float scaleH = (float) MODEL_INPUT / rgb.rows();
+        lbScale = Math.min(scaleW, scaleH);
+
+        int newW = Math.round(rgb.cols() * lbScale);
+        int newH = Math.round(rgb.rows() * lbScale);
+
         Mat resized = new Mat();
-        Imgproc.resize(rgb, resized, new org.opencv.core.Size(MODEL_INPUT, MODEL_INPUT));
+        Imgproc.resize(rgb, resized, new org.opencv.core.Size(newW, newH));
         rgb.release();
+
+        // Pad to MODEL_INPUT × MODEL_INPUT with black bars
+        int padTop    = (MODEL_INPUT - newH) / 2;
+        int padBottom = MODEL_INPUT - newH - padTop;
+        int padLeft   = (MODEL_INPUT - newW) / 2;
+        int padRight  = MODEL_INPUT - newW - padLeft;
+        lbPadX = padLeft;
+        lbPadY = padTop;
+
+        Mat letterboxed = new Mat();
+        Core.copyMakeBorder(resized, letterboxed,
+                padTop, padBottom, padLeft, padRight,
+                Core.BORDER_CONSTANT, new Scalar(0, 0, 0));
+        resized.release();
 
         // Bulk read all pixels in one JNI call
         int totalBytes = MODEL_INPUT * MODEL_INPUT * 3;
         if (pixelBytes == null || pixelBytes.length != totalBytes) {
             pixelBytes = new byte[totalBytes];
         }
-        resized.get(0, 0, pixelBytes);
-        resized.release();
+        letterboxed.get(0, 0, pixelBytes);
+        letterboxed.release();
 
         // Check again before the expensive work
         if (stopping) return null;
@@ -305,10 +334,12 @@ public class BallDetectorPipeline implements VisionProcessor {
             }
         }
 
-        // ── 3. Post-process (read output buffer directly) ──
+        // ── 3. Post-process (map letterboxed coords back to original frame) ──
         int numClasses = LABELS.length;   // 2
-        float scaleX = (float) frameWidth  / MODEL_INPUT;
-        float scaleY = (float) frameHeight / MODEL_INPUT;
+        // Model outputs are in 320×320 letterbox space.
+        // To convert back to original frame pixels:
+        //   x_frame = (x_model - lbPadX) / lbScale
+        //   y_frame = (y_model - lbPadY) / lbScale
         int stride = outCols;
 
         List<BallDetection> detections = new ArrayList<>();
@@ -328,10 +359,11 @@ public class BallDetectorPipeline implements VisionProcessor {
             }
             if (bestConf < minConfidence) continue;
 
-            float left   = (cx - w / 2f) * scaleX;
-            float top    = (cy - h / 2f) * scaleY;
-            float right  = (cx + w / 2f) * scaleX;
-            float bottom = (cy + h / 2f) * scaleY;
+            // Map from letterbox space back to original camera frame
+            float left   = (cx - w / 2f - lbPadX) / lbScale;
+            float top    = (cy - h / 2f - lbPadY)  / lbScale;
+            float right  = (cx + w / 2f - lbPadX) / lbScale;
+            float bottom = (cy + h / 2f - lbPadY)  / lbScale;
 
             detections.add(new BallDetection(
                     LABELS[bestIdx], bestConf, left, top, right, bottom, 0));

@@ -251,7 +251,7 @@ public class RTPAxon {
         lastError = error;
         lastDerivative = derivative;
 
-        final double DEADZONE = 1.0;
+        final double DEADZONE = 2.0;
         if (Math.abs(error) > DEADZONE) {
             double pwr = -(kP * error + kD * derivative);
             // Ensure minimum power floor so small errors still move the servo

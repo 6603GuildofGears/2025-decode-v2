@@ -8,8 +8,7 @@ import com.qualcomm.robotcore.hardware.CRServo;
 
 public class Servo_Pipeline {
 
-    // intake servo
-    public static CRServo intakeS;
+
 
     // //Hood servo
     public static Servo hood;
@@ -26,8 +25,6 @@ public class Servo_Pipeline {
    
 
     public Servo_Pipeline(OpMode opMode) {
-
-   intakeS = opMode.hardwareMap.get(CRServo.class, "intakeS");
 
         // //Hood servo
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
@@ -59,9 +56,6 @@ public class Servo_Pipeline {
 
     public static void intServos(OpMode opMode) {
 
-// intake
-   intakeS = opMode.hardwareMap.get(CRServo.class, "intakeS");
-
 //         //Hood servo
         hood = opMode.hardwareMap.get(Servo.class, "hood"); 
         
@@ -86,8 +80,7 @@ public class Servo_Pipeline {
 //         //flicker servo direction
          flicker.setDirection(Servo.Direction.FORWARD);
 
-    intakeS.setDirection(CRServo.Direction.FORWARD);
-//       
+//
    
     
 }

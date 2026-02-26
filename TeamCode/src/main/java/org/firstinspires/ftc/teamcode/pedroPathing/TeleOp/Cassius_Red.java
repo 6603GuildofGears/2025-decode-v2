@@ -91,9 +91,9 @@ public class Cassius_Red extends LinearOpMode {
         boolean lastMagState = false;
 
         // === TURRET PID (from Turret_try — direct Limelight, no IMU) ===
-        double kP = 0.015;
+        double kP = 0.027;
         double kI = 0.0001;
-        double kD = 0.002;
+        double kD = 0.005;
         double targetX = 0.0;
         double turretIntegral = 0.0;
         double turretLastError = 0.0;
@@ -102,7 +102,7 @@ public class Cassius_Red extends LinearOpMode {
 
         double POSITION_TOLERANCE = 1.5;
         double MIN_POWER = 0.05;
-        double MAX_TURRET_POWER = 0.4;
+        double MAX_TURRET_POWER = 0.7;
         double TARGET_LOST_TIMEOUT = 2.0;
         double HOME_POWER = -0.2;
         boolean INVERT_MOTOR = false;

@@ -19,6 +19,7 @@ public class Motor_PipeLine {
     // // flywheel/intake motors
      public static DcMotorEx flywheel;
      public static DcMotorEx intake;
+     public static DcMotorEx intake2;
 
      public static DcMotorEx turret;
 
@@ -37,6 +38,7 @@ public class Motor_PipeLine {
         // // flywheel/intake motors
          flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
         intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+        intake2 = opMode.hardwareMap.get(DcMotorEx.class, "intake2");
         turret = opMode.hardwareMap.get(DcMotorEx.class, "turret");
 
         // //lift motors
@@ -54,6 +56,7 @@ public class Motor_PipeLine {
     //     //flywheel and intake motor directions
     //    flywheel.setDirection(DcMotor.Direction.FORWARD);
        intake.setDirection(DcMotor.Direction.FORWARD);
+       intake2.setDirection(DcMotor.Direction.REVERSE);
        flywheel.setDirection(DcMotor.Direction.REVERSE);
 
         // turret motor direction
@@ -73,6 +76,7 @@ public class Motor_PipeLine {
         // //flywheel and intake
          flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
          intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+         intake2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
 
         // //lift motors
@@ -88,6 +92,7 @@ public class Motor_PipeLine {
         // // flywheel and intake motors
          flywheel.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);  
          intake.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+         intake2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
 
         // turret motor
@@ -104,6 +109,7 @@ public class Motor_PipeLine {
         // flywheel and intake motors
          flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
          intake.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+         intake2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         // turret motor
         turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -133,6 +139,7 @@ public class Motor_PipeLine {
         // // flywheel/intake motors
          flywheel = opMode.hardwareMap.get(DcMotorEx.class, "flywheel");
          intake = opMode.hardwareMap.get(DcMotorEx.class, "intake");
+         intake2 = opMode.hardwareMap.get(DcMotorEx.class, "intake2");
 
          // turret motor
         turret = opMode.hardwareMap.get(DcMotorEx.class, "turret");
@@ -152,6 +159,7 @@ public class Motor_PipeLine {
     //     //flywheel and intake motor directions
         flywheel.setDirection(DcMotor.Direction.REVERSE);
         intake.setDirection(DcMotor.Direction.REVERSE);
+        intake2.setDirection(DcMotor.Direction.REVERSE);
 
     //     // turret motor direction
         turret.setDirection(DcMotor.Direction.FORWARD);
@@ -170,6 +178,7 @@ public class Motor_PipeLine {
      //flywheel and intake
          flywheel.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
          intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+         intake2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // turret motor
         turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);

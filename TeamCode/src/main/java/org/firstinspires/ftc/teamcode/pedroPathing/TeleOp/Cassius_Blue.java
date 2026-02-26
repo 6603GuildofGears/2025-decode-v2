@@ -92,9 +92,9 @@ public class Cassius_Blue extends LinearOpMode {
         boolean lastMagState = false;
 
         // === TURRET PID (from Turret_try — direct Limelight, no IMU) ===
-        double kP = 0.015;
+        double kP = 0.027;
         double kI = 0.0001;
-        double kD = 0.002;
+        double kD = 0.005;
         double targetX = 0.0;
         double turretIntegral = 0.0;
         double turretLastError = 0.0;
@@ -103,10 +103,10 @@ public class Cassius_Blue extends LinearOpMode {
 
         double POSITION_TOLERANCE = 1.5;
         double MIN_POWER = 0.05;
-        double MAX_TURRET_POWER = 0.875;
+        double MAX_TURRET_POWER = 0.7;
         double TARGET_LOST_TIMEOUT = 2.0;
         double HOME_POWER = -0.2;
-        boolean INVERT_MOTOR = false;
+        boolean INVERT_MOTOR = true;
 
         boolean targetWasVisible = false;
         boolean homingToMag = false;
@@ -266,9 +266,9 @@ public class Cassius_Blue extends LinearOpMode {
             
             telemetry.addData("spindexer angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
             if(dpadRight2){
-                spindexerAxon.changeTargetRotation(5);;
+                turret.setPower(0.5);;
             } else if (dpadLeft2){
-                spindexerAxon.changeTargetRotation(-5);;
+                turret.setPower(-0.5);;
             }
 
 
@@ -278,16 +278,15 @@ public class Cassius_Blue extends LinearOpMode {
 
             if (runIntakeMotor) {
                 intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
-                intakeS.setPower(1);
+                intake2.setPower(1);
             } else if (sdx.isShooting()) {
                 intake.setPower(0); // stop intake during shoot sequence
-                intakeS.setPower(0);
+                intake2.setPower(0);
             } else if (RBumper1) {
-                intake.setPower(-1); // intake out (reverse)
-                intakeS.setPower(-1);
+                intake.setPower(-5); // intake out (reverse)
             } else {
                 intake.setPower(0);
-                intakeS.setPower(0);
+                intake2.setPower(0);
             }
 
 
@@ -361,108 +360,23 @@ public class Cassius_Blue extends LinearOpMode {
             String turretMode = "IDLE";
 
             // --- Manual turret control — gamepad2 left stick X ---
-            double manualInput = LStickX2 / 1.5;
+            double manualInput = LStickX2 / 1.125;
             boolean manualTurret = Math.abs(manualInput) > 0.03;
 
-            if (manualTurret) {
-                // === MANUAL OVERRIDE ===
-                turretPower = manualInput * MAX_TURRET_POWER;
-                targetWasVisible = false;
-                homingToMag = false;
-                turretIntegral = 0;
-                turretLastError = 0;
-                turretMode = "MANUAL";
+            // if (manualTurret) {
+            //     // === MANUAL OVERRIDE ===
+            //     turretPower = manualInput * MAX_TURRET_POWER;
+            //     targetWasVisible = false;
+            //     homingToMag = false;
+            //     turretIntegral = 0;
+            //     turretLastError = 0;
+            //     turretMode = "MANUAL";
 
-            } else {
-                // === AUTO-AIM: read Limelight directly, filter for blue goal (tag 20) ===
-                try {
-                    LLResult result = limelight.getLatestResult();
-
-                    LLResultTypes.FiducialResult blueGoal = null;
-                    if (result != null && result.isValid()) {
-                        List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
-                        if (fiducials != null) {
-                            for (LLResultTypes.FiducialResult f : fiducials) {
-                                if ((int) f.getFiducialId() == 20) {
-                                    blueGoal = f;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (blueGoal != null) {
-                        // Blue goal found — PID tracking
-                        targetWasVisible = true;
-                        targetLostTimer.reset();
-                        homingToMag = false;
-                        turretMode = "LOCKED ON";
-
-                        double tx = blueGoal.getTargetXDegrees();
-
-                        double dt = turretTimer.seconds();
-                        turretTimer.reset();
-                        if (dt < 0.001) dt = 0.001;
-                        if (dt > 1.0) dt = 1.0;
-
-                        double error = tx - targetX;
-
-                        turretIntegral += error * dt;
-                        turretIntegral = Math.max(-50, Math.min(50, turretIntegral));
-
-                        double derivative = (error - turretLastError) / dt;
-
-                        double pidOutput = (kP * error) + (kI * turretIntegral) + (kD * derivative);
-
-                        if (Math.abs(error) < POSITION_TOLERANCE) {
-                            pidOutput = 0;
-                            turretIntegral = 0;
-                        }
-
-                        if (pidOutput != 0 && Math.abs(pidOutput) < MIN_POWER) {
-                            pidOutput = MIN_POWER * Math.signum(pidOutput);
-                        }
-
-                        turretPower = Math.max(-MAX_TURRET_POWER, Math.min(MAX_TURRET_POWER, pidOutput));
-                        if (INVERT_MOTOR) turretPower = -turretPower;
-                        if (!Double.isFinite(turretPower)) {
-                            turretPower = 0;
-                            turretIntegral = 0;
-                            turretLastError = 0;
-                        }
-
-                        turretLastError = error;
-
-                    } else {
-                        // No blue goal visible — handle target loss
-                        if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
-                            // Coast briefly — keep last motor power (matches Turret_try)
-                            turretPower = lastTurretPower;
-                            turretMode = "COASTING";
-                        } else {
-                            // Home to mag sensor
-                            homingToMag = true;
-                            if (isMagPressed()) {
-                                turretPower = 0;
-                                turretIntegral = 0;
-                                turretLastError = 0;
-                                turretMode = "HOME";
-                            } else {
-                                turretPower = HOME_POWER;
-                                turretMode = "HOMING";
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    turretPower = 0;
-                    turretIntegral = 0;
-                    turretLastError = 0;
-                    targetWasVisible = false;
-                    homingToMag = false;
-                    turretMode = "ERROR";
-                    telemetry.addData("Turret Error", e.getMessage());
-                }
-            }
+            // } else {
+            //     // === AUTO-AIM DISABLED — turret stays where manual left it ===
+            //     turretPower = 0;
+            //     turretMode = "IDLE";
+            // }
 
             // ================================================================
             //  HARD LIMIT ENFORCEMENT — turret CANNOT move past limits

@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motif;
@@ -14,6 +15,7 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motif;
  * Tag 22 → PURPLE, GREEN, PURPLE
  * Tag 23 → PURPLE, PURPLE, GREEN
  */
+@Disabled
 @TeleOp(name = "Motif Test", group = "Test")
 public class MotifTest extends LinearOpMode {
 

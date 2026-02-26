@@ -23,28 +23,42 @@ public class Turret_try extends OpMode {
     private DcMotorEx turretMotor;
     private Limelight3A limelight;
 
-    // PID Controller variables
-    private double kP = 0.015; // Proportional gain - START LOW and increase
-    private double kI = 0.0001; // Integral gain - usually keep small
-    private double kD = 0.002; // Derivative gain - helps reduce overshoot
+    // ── Tunable PID values (adjusted with gamepad2 buttons) ──
+    private double kP = 0.027;
+    private double kI = 0.0001;
+    private double kD = 0.005;
+    private double maxPwr = 0.7;
+    private double minPwr = 0.05;
+    private double deadband = 1.5;
+    private boolean invertMotor = false;
 
-    private double targetX = 0.0; // Target is centered (tx = 0)
+    // Tuning state
+    // 0=kP, 1=kI, 2=kD, 3=maxPwr, 4=minPwr, 5=deadband
+    private int selectedParam = 0;
+    private final String[] PARAM_NAMES = {"kP", "kI", "kD", "maxPwr", "minPwr", "deadband"};
+    private final double[] STEP_FINE   = {0.001, 0.00005, 0.0005, 0.02, 0.01, 0.25};
+    private final double[] STEP_COARSE = {0.005, 0.0002,  0.002,  0.1,  0.05, 1.0};
+    private boolean useFineStep = true; // left bumper = fine (default), right bumper = coarse
+
+    // Debounce tracking
+    private boolean prevDpadUp2 = false;
+    private boolean prevDpadDown2 = false;
+    private boolean prevY2 = false;
+    private boolean prevB2 = false;
+    private boolean prevA2 = false;
+    private boolean prevX2 = false;
+    private boolean prevLStickIn2 = false;
+    private boolean prevLBumper2 = false;
+    private boolean prevRBumper2 = false;
+
+    private double targetX = 0.0;
     private double integral = 0.0;
     private double lastError = 0.0;
     private ElapsedTime timer = new ElapsedTime();
     private ElapsedTime targetLostTimer = new ElapsedTime();
 
-    // Deadband and limits
-    private static final double POSITION_TOLERANCE = 1.5; // degrees
-    private static final double MIN_POWER = 0.05; // Minimum power to overcome friction
-    private static final double MAX_POWER = 0.4; // Maximum turret speed
-    private static final double TARGET_LOST_TIMEOUT = 2.0; // seconds before homing to mag sensor
-
-    // Homing speed toward mag sensor
-    private static final double HOME_POWER = -0.2; // negative = toward mag sensor (left)
-
-    // Direction tuning - CHANGE THIS IF TURRET MOVES WRONG WAY
-    private static final boolean INVERT_MOTOR = false; // Set to true if it moves backwards
+    private static final double TARGET_LOST_TIMEOUT = 2.0;
+    private static final double HOME_POWER = -0.2;
 
     private boolean targetWasVisible = false;
     private boolean homingToMag = false;
@@ -67,8 +81,11 @@ public class Turret_try extends OpMode {
             timer.reset();
             targetLostTimer.reset();
 
-            telemetry.addData("Status", "Initialized");
-            telemetry.addData("Motor Inverted", INVERT_MOTOR);
+            telemetry.addData("Status", "Initialized — tune PID with GP2 buttons");
+            telemetry.addData("GP2 Y/B/A/X", "select kP/kI/kD/cycle others");
+            telemetry.addData("GP2 DpadUp/Down", "increase/decrease value");
+            telemetry.addData("GP2 LBumper/RBumper", "fine / coarse step");
+            telemetry.addData("GP2 LStickClick", "toggle invert");
         } catch (Exception e) {
             telemetry.addData("Init Error", e.getMessage());
         }
@@ -122,6 +139,46 @@ public class Turret_try extends OpMode {
         boolean dpadDown2 = gamepad2.dpad_down;
         boolean dpadRight2 = gamepad2.dpad_right;
         boolean dpadLeft2 = gamepad2.dpad_left;
+
+        // === Gamepad2: PID Tuning Buttons ===
+        // Select parameter: Y=kP, B=kI, A=kD, X=cycle(maxPwr/minPwr/deadband)
+        if (y2 && !prevY2) selectedParam = 0; // kP
+        if (b2 && !prevB2) selectedParam = 1; // kI
+        if (a2 && !prevA2) selectedParam = 2; // kD
+        if (x2 && !prevX2) {
+            // cycle through 3,4,5 (maxPwr, minPwr, deadband)
+            if (selectedParam >= 3 && selectedParam < 5) selectedParam++;
+            else selectedParam = 3;
+        }
+
+        // Step size: LBumper=fine, RBumper=coarse
+        if (LBumper2 && !prevLBumper2) useFineStep = true;
+        if (RBumper2 && !prevRBumper2) useFineStep = false;
+
+        // Adjust selected value
+        double step = useFineStep ? STEP_FINE[selectedParam] : STEP_COARSE[selectedParam];
+        if (dpadUp2 && !prevDpadUp2) {
+            adjustParam(selectedParam, step);
+        }
+        if (dpadDown2 && !prevDpadDown2) {
+            adjustParam(selectedParam, -step);
+        }
+
+        // Toggle invert
+        if (gamepad2.left_stick_button && !prevLStickIn2) {
+            invertMotor = !invertMotor;
+        }
+
+        // Save previous button states for debounce
+        prevDpadUp2 = dpadUp2;
+        prevDpadDown2 = dpadDown2;
+        prevY2 = y2;
+        prevB2 = b2;
+        prevA2 = a2;
+        prevX2 = x2;
+        prevLStickIn2 = gamepad2.left_stick_button;
+        prevLBumper2 = LBumper2;
+        prevRBumper2 = RBumper2;
 
         // === Drive Code ===
         if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
@@ -215,26 +272,26 @@ public class Turret_try extends OpMode {
                         (kP * error) + (kI * integral) + (kD * derivative);
 
                     // Apply deadband - stop if close enough
-                    if (Math.abs(error) < POSITION_TOLERANCE) {
+                    if (Math.abs(error) < deadband) {
                         pidOutput = 0;
-                        integral = 0; // Reset integral when on target
+                        integral = 0;
                     }
 
                     // Apply minimum power if not zero (overcome static friction)
                     if (pidOutput != 0) {
-                        if (Math.abs(pidOutput) < MIN_POWER) {
-                            pidOutput = MIN_POWER * Math.signum(pidOutput);
+                        if (Math.abs(pidOutput) < minPwr) {
+                            pidOutput = minPwr * Math.signum(pidOutput);
                         }
                     }
 
                     // Clamp output to max power
                     double motorPower = Math.max(
-                        -MAX_POWER,
-                        Math.min(MAX_POWER, pidOutput)
+                        -maxPwr,
+                        Math.min(maxPwr, pidOutput)
                     );
 
                     // Apply inversion if needed
-                    if (INVERT_MOTOR) {
+                    if (invertMotor) {
                         motorPower = -motorPower;
                     }
 
@@ -266,6 +323,8 @@ public class Turret_try extends OpMode {
                     );
                     telemetry.addData("Tag ID", fiducial.getFiducialId());
                     telemetry.addData("# Tags Detected", fiducials.size());
+                    // Show tuning controls
+                    showTuningTelemetry();
                 } else {
                     // Result valid but no fiducials detected
                     handleNoTarget();
@@ -281,7 +340,34 @@ public class Turret_try extends OpMode {
             stopTurret();
         }
 
+        // Always show tuning info even when no target
+        showTuningTelemetry();
         telemetry.update();
+    }
+
+    /** Adjust the selected PID parameter by the given delta. */
+    private void adjustParam(int param, double delta) {
+        switch (param) {
+            case 0: kP = Math.max(0, kP + delta); break;
+            case 1: kI = Math.max(0, kI + delta); break;
+            case 2: kD = Math.max(0, kD + delta); break;
+            case 3: maxPwr = Math.max(0.05, Math.min(1.0, maxPwr + delta)); break;
+            case 4: minPwr = Math.max(0, Math.min(maxPwr, minPwr + delta)); break;
+            case 5: deadband = Math.max(0, deadband + delta); break;
+        }
+    }
+
+    /** Display current PID tuning values and which parameter is selected. */
+    private void showTuningTelemetry() {
+        telemetry.addData("──── PID TUNING (GP2) ────", "");
+        telemetry.addData(selectedParam == 0 ? "▶ kP" : "  kP", "%.5f", kP);
+        telemetry.addData(selectedParam == 1 ? "▶ kI" : "  kI", "%.6f", kI);
+        telemetry.addData(selectedParam == 2 ? "▶ kD" : "  kD", "%.5f", kD);
+        telemetry.addData(selectedParam == 3 ? "▶ maxPwr" : "  maxPwr", "%.2f", maxPwr);
+        telemetry.addData(selectedParam == 4 ? "▶ minPwr" : "  minPwr", "%.2f", minPwr);
+        telemetry.addData(selectedParam == 5 ? "▶ deadband" : "  deadband", "%.2f", deadband);
+        telemetry.addData("Invert", invertMotor);
+        telemetry.addData("Step", useFineStep ? "FINE" : "COARSE");
     }
 
     private void handleNoTarget() {

@@ -47,7 +47,7 @@ import java.util.List;
 public class BallDetectorPipeline implements VisionProcessor {
 
     // ── Model configuration ──
-    private static final String   MODEL_ASSET    = "pico_v3.tflite";
+    private static final String   MODEL_ASSET    = "new_pico_v3_int8.tflite";
     private static final String[] LABELS         = {"green_ball", "purple_ball"};
     private static final int      MODEL_INPUT    = 320;
     private static final float    MIN_CONF_DEF   = 0.5f;
@@ -69,6 +69,10 @@ public class BallDetectorPipeline implements VisionProcessor {
 
     // Compute-time tracking (ms per processFrame call)
     private volatile double lastComputeMs = 0.0;
+
+    // Thread-safety: guards interpreter access between camera thread & stop()
+    private final Object tfliteLock = new Object();
+    private volatile boolean stopping = false;
 
     // ── Singleton + VisionPortal ──
     private static BallDetectorPipeline instance;
@@ -129,12 +133,16 @@ public class BallDetectorPipeline implements VisionProcessor {
 
     /** Initialise with a specific webcam name. */
     public static void init(OpMode opMode, String webcamName) {
-        instance = new BallDetectorPipeline();
-        instance.loadModel(opMode);
+        // Safely tear down any previous instance first
+        stop();
+
+        BallDetectorPipeline newInstance = new BallDetectorPipeline();
+        newInstance.loadModel(opMode);
+        instance = newInstance;
 
         visionPortal = new VisionPortal.Builder()
                 .setCamera(opMode.hardwareMap.get(WebcamName.class, webcamName))
-                .setCameraResolution(new Size(320, 240))
+                .setCameraResolution(new Size(640, 480))
                 .addProcessor(instance)
                 .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .enableLiveView(true)
@@ -190,11 +198,30 @@ public class BallDetectorPipeline implements VisionProcessor {
     }
 
     public static void stop() {
-        if (visionPortal != null) { visionPortal.close(); visionPortal = null; }
-        if (instance != null && instance.interpreter != null) {
-            instance.interpreter.close();
-            instance.interpreter = null;
+        // 1. Signal processFrame() to bail out immediately
+        if (instance != null) {
+            instance.stopping = true;
         }
+
+        // 2. Null out interpreter and buffers so processFrame() becomes a no-op
+        if (instance != null) {
+            synchronized (instance.tfliteLock) {
+                instance.interpreter = null;
+                instance.inputBuffer = null;
+                instance.outputBuffer = null;
+            }
+        }
+
+        // 3. Do NOT call visionPortal.close() — it causes a native crash
+        //    that reboots the Control Hub. The FTC SDK automatically cleans
+        //    up VisionPortal when the OpMode ends. Just stop streaming and
+        //    let the SDK handle the rest.
+        if (visionPortal != null) {
+            try { visionPortal.stopStreaming(); } catch (Exception ignored) {}
+            try { visionPortal.stopLiveView(); } catch (Exception ignored) {}
+            visionPortal = null;
+        }
+
         instance = null;
     }
 
@@ -235,8 +262,11 @@ public class BallDetectorPipeline implements VisionProcessor {
 
     @Override
     public Object processFrame(Mat frame, long captureTimeNanos) {
-        if (interpreter == null) return null;
+        // Bail out immediately if we're shutting down
+        if (stopping || interpreter == null) return null;
         long t0 = System.nanoTime();
+
+        try {
 
         // ── 1. Pre-process: resize → RGB → bulk read → normalise ──
         Mat rgb = new Mat();
@@ -254,16 +284,26 @@ public class BallDetectorPipeline implements VisionProcessor {
         resized.get(0, 0, pixelBytes);
         resized.release();
 
+        // Check again before the expensive work
+        if (stopping) return null;
+
         // Fill input buffer from byte array (pure Java — fast)
         inputBuffer.rewind();
         for (int i = 0; i < totalBytes; i++) {
             inputBuffer.putFloat((pixelBytes[i] & 0xFF) / 255.0f);
         }
 
-        // ── 2. Run inference ──
-        outputBuffer.rewind();
-        interpreter.run(inputBuffer, outputBuffer);
-        outputBuffer.rewind();
+        // ── 2. Run inference (under lock so stop() can't free interpreter mid-run) ──
+        synchronized (tfliteLock) {
+            if (stopping || interpreter == null || inputBuffer == null || outputBuffer == null) return null;
+            try {
+                outputBuffer.rewind();
+                interpreter.run(inputBuffer, outputBuffer);
+                outputBuffer.rewind();
+            } catch (Exception e) {
+                return null;
+            }
+        }
 
         // ── 3. Post-process (read output buffer directly) ──
         int numClasses = LABELS.length;   // 2
@@ -320,6 +360,12 @@ public class BallDetectorPipeline implements VisionProcessor {
         latestDetections = positioned;
         lastComputeMs = (System.nanoTime() - t0) / 1_000_000.0;
         return positioned;   // forwarded to onDrawFrame
+
+        } catch (Exception e) {
+            // Log error but don't crash — prevents Control Hub reboot
+            lastComputeMs = (System.nanoTime() - t0) / 1_000_000.0;
+            return latestDetections;
+        }
     }
 
     @SuppressWarnings("unchecked")

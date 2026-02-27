@@ -14,6 +14,12 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
@@ -32,6 +38,14 @@ public class Blue_Back extends OpMode {
     private boolean shootSequenceStarted = false;
     private ElapsedTime ballWaitTimer = new ElapsedTime();
     private boolean ballWaitStarted = false;
+
+    // Limelight-based shooter tuning
+    private Limelight3A limelight;
+    private double shootRpm = 3000;
+    private double shootHood = 0.0;
+    private double smoothedDistance = -1;
+    private static final double SMOOTHING_ALPHA = 0.3;
+    private static final int GOAL_TAG_ID = 20; // blue goal
 
     // Turret auto-aim
     private static final double TURRET_TARGET_DEG = 85.0;
@@ -158,15 +172,48 @@ public class Blue_Back extends OpMode {
         turret.setPower(power);
     }
 
+    /**
+     * Poll Limelight for distance to goal tag, use ShooterLookup to set RPM + hood.
+     */
+    private void updateShooterFromLimelight() {
+        try {
+            LLResult result = limelight.getLatestResult();
+            if (result != null && result.isValid() && result.getFiducialResults() != null) {
+                LLResultTypes.FiducialResult goalTag = null;
+                for (LLResultTypes.FiducialResult f : result.getFiducialResults()) {
+                    if ((int) f.getFiducialId() == GOAL_TAG_ID) { goalTag = f; break; }
+                }
+                if (goalTag != null) {
+                    Pose3D tagPose = goalTag.getTargetPoseCameraSpace();
+                    if (tagPose != null) {
+                        double x = tagPose.getPosition().x;
+                        double z = tagPose.getPosition().z;
+                        double dist = Math.sqrt(x * x + z * z) * 39.3701;
+                        if (smoothedDistance < 0) smoothedDistance = dist;
+                        else smoothedDistance += SMOOTHING_ALPHA * (dist - smoothedDistance);
+                        ShooterLookup.Result tuned = ShooterLookup.lookup(smoothedDistance);
+                        shootRpm = tuned.rpm;
+                        shootHood = tuned.hoodPos;
+                        spindexerController.setShootRpm(shootRpm);
+                        Servo_Pipeline.hood.setPosition(shootHood);
+                    }
+                }
+            }
+        } catch (Exception e) { /* keep last known values */ }
+    }
+
+    private double getTickSpeed(double rpm) { return rpm * 28.0 / 60.0; }
+
     public void statePathUpdate() {
         updateTurret();
+        updateShooterFromLimelight();
 
         switch (pathState) {
             case DRIVE_STARTPOSE_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveStartPoseToShootPose, true);
                     Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
-                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
+                    flywheel.setVelocity(getTickSpeed(shootRpm));
                     pathStarted = true;
                 }
                 if (pathStarted && !follower.isBusy()) {
@@ -191,7 +238,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE1;
                 }
                 break;
@@ -265,7 +312,7 @@ public class Blue_Back extends OpMode {
             case DRIVE_INTAKE1POSE3_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake1Pose3ToShootPose, true);
-                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
+                    flywheel.setVelocity(getTickSpeed(shootRpm));
                     pathStarted = true;
                 }
 
@@ -295,7 +342,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
                 }
                 break;
@@ -381,7 +428,7 @@ public class Blue_Back extends OpMode {
             case DRIVE_INTAKE2POSE3_TO_SHOOTPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveIntake2Pose3ToShootPose, true);
-                    flywheel.setVelocity(3000.0 * 28.0 / 60.0);
+                    flywheel.setVelocity(getTickSpeed(shootRpm));
                     pathStarted = true;
                 }
 
@@ -415,7 +462,7 @@ public class Blue_Back extends OpMode {
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
                     spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker.setPosition(0.1);
+                    Servo_Pipeline.flicker.setPosition(0);
                     pathState = PathState.DRIVE_SHOOTPOSE_TO_ENDPOSE;
                 }
                 break;
@@ -462,11 +509,15 @@ public class Blue_Back extends OpMode {
         Sensor.initSensors(this);
         servoPipeline = new Servo_Pipeline(this);
         spindexerController = new SpindexerController();
-        spindexerController.setFlickerPositions(0.1, 0.5);
-        spindexerController.setShootRpm(3000);
+        spindexerController.setFlickerPositions(0, 0.375);
+        spindexerController.setShootRpm(shootRpm);
         spindexerController.prefillAllSlots();
-        Servo_Pipeline.flicker.setPosition(0.1);
+        Servo_Pipeline.flicker.setPosition(0);
         Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
+
+        // Initialize Limelight for distance-based shooter tuning
+        Limelight_Pipeline.initLimelight(this);
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
         buildPaths();
         follower.setPose(startPose);

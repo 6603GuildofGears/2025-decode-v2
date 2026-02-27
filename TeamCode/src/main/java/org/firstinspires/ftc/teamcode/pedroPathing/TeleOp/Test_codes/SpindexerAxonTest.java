@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.CRServo;
 
@@ -11,8 +12,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon;
  * Spindexer RTPAxon Test
  *
  * 3 slots spaced 120° apart. Two base angles define all 6 positions:
- *   Intake: 100°, 220°, 340°
- *   Shoot:  165°, 285°, 45°
+ *   Intake: 60°, 180°, 300°
+ *   Shoot:  36.3°, 156.3°, 276.3°
  *
  * Y toggles between INTAKE and SHOOT mode.
  * D-pad Up/Right/Down goes to P1/P2/P3 of the current mode.
@@ -23,15 +24,16 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.RTPAxon;
  *    Analog Encoder: "spindexerEncoder"
  * ─────────────────────────────────────────────
  */
+
 @TeleOp(name = "Spindexer RTPAxon Test", group = "Test")
 public class SpindexerAxonTest extends LinearOpMode {
 
     // Slot spacing — 3 evenly spaced slots
     private static final double SLOT_SPACING = 120.0;
 
-    // Tuned base angles
-    private static final double INTAKE_BASE = 100;
-    private static final double SHOOT_BASE  = 165;
+    // Tuned base angles (must match SpindexerController)
+    private static final double INTAKE_BASE = 67;
+    private static final double SHOOT_BASE  = 36.3;
 
     // Mode: true = intake positions, false = shoot positions
     private boolean intakeMode = true;
@@ -73,7 +75,7 @@ public class SpindexerAxonTest extends LinearOpMode {
     public void runOpMode() {
 
         // ── Hardware ──
-        CRServo crServo = hardwareMap.crservo.get("spindexer");
+        CRServo crServo = hardwareMap.crservo.get("spindexerCR");
         AnalogInput encoder = hardwareMap.get(AnalogInput.class, "spindexerEncoder");
 
         // ── Create RTPAxon ──

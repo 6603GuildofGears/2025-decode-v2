@@ -15,7 +15,7 @@ import java.util.List;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
-@Disabled
+
 @TeleOp(name = "Auto-aiming turret", group = "Iterative Opmode")
 public class Turret_try extends OpMode {
 

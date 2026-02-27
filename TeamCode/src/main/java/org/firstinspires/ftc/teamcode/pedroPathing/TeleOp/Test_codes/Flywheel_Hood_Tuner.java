@@ -8,20 +8,19 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
+import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.HoodTestConfig.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
 
-
+@Disabled
 @TeleOp(name="Flywheel & Hood Tuner", group="Testing")
 public class Flywheel_Hood_Tuner extends LinearOpMode {
-
-    // All values controlled ONLY by HoodTestConfig via Pedro Pathing Panels
-    private double flickRest1  = 0.1;
-    private double flickShoot1 = 0.55;
 
     // Limelight distance config (same as Cassius_Blue)
     private double cameraHeight = 11.125;      // Camera lens center height in inches
@@ -37,44 +36,78 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
     private double targetRpm = 3000;
     private double targetHoodPos = 0.0;
 
-    // Flicker state machine
-    private ElapsedTime flickTimer = new ElapsedTime();
-    private ElapsedTime loopTimer = new ElapsedTime();
-    private enum FlickState { REST, SWEEPING_TO_SHOOT, HOLDING, SWEEPING_TO_REST }
-    private FlickState flickState = FlickState.REST;
-    private boolean lastA = false;
-    private double flickPos1; // current interpolated position
-
-    
     @Override
     public void runOpMode() throws InterruptedException {
-        
+
         intMotors(this);
         intServos(this);
         initLimelight(this);
-        
+        initSensors(this);
+
         // Set flywheel to velocity mode for RPM control
         flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        
+
+        // SpindexerController — same as Cassius_Blue
+        // Handles: intake ball detection, slot tracking, 3-slot shoot sequence,
+        //          RPM boosting, flicker timing, misfire retry
+        SpindexerController sdx = new SpindexerController();
+        sdx.setFlickerPositions(0, 0.375);
+        flicker.setPosition(0);
+
         telemetry.addData("Status", "Initialized");
         telemetry.addData("=== CONTROLS ===", "");
-        telemetry.addData("ALL ADJUSTMENTS", "Use Pedro Pathing Panels");
-        telemetry.addData("", "Open Panels to tune:");
-        telemetry.addData("- HOOD_POSITION", "0.0 to 1.0");
-        telemetry.addData("- TARGET_RPM", "0 to 6000");
-        telemetry.addData("- HOOD_INCREMENT", "Adjustment step");
-        telemetry.addData("- RPM_INCREMENT", "Adjustment step");
+        telemetry.addData("RT (gp1)", "Hold to intake balls");
+        telemetry.addData("RBumper (gp2)", "Shoot all 3 slots");
+        telemetry.addData("LBumper (gp2)", "Kill switch (abort shoot)");
+        telemetry.addData("RBumper (gp1)", "Reverse intake");
+        telemetry.addData("DpadUp/Down (gp2)", "Manual hood adjust (no target)");
         telemetry.update();
-        
-        waitForStart();
-        
-        flickPos1 = flickRest1;
-        loopTimer.reset();
+
+        // Init loop — show spindexer status while waiting for start
+        while (!isStarted() && !isStopRequested()) {
+            updateSensors();
+            sdx.addTelemetry(telemetry);
+            telemetry.update();
+        }
+
+        if (isStopRequested()) return;
+        spindexerAxon.setTargetRotation(SpindexerController.P1); // start at P1
+
         while (opModeIsActive()) {
-            
-            // === Limelight distance-based shooter tuning (same as Cassius_Blue) ===
+
+            // Update sensors every loop
+            updateSensors();
+
+            // === Gamepad inputs ===
+            double RTrigger1 = gamepad1.right_trigger;
+            boolean RBumper1 = gamepad1.right_bumper;
+            boolean RBumper2 = gamepad2.right_bumper;
+            boolean LBumper2 = gamepad2.left_bumper;
+            boolean dpadUp2 = gamepad2.dpad_up;
+            boolean dpadDown2 = gamepad2.dpad_down;
+
+            // === Intake with SpindexerController (same as Cassius_Blue) ===
+            boolean intakeRequested = RTrigger1 > 0.1;
+            boolean runIntakeMotor = sdx.updateIntake(intakeRequested);
+
+            if (runIntakeMotor) {
+                intake.setPower(0.875);
+                intake2.setPower(1);
+            } else if (sdx.isShooting()) {
+                intake.setPower(0);
+                intake2.setPower(0);
+            } else if (RBumper1) {
+                intake.setPower(-0.875); // reverse intake
+                intake2.setPower(-0.875);
+            } else {
+                intake.setPower(0);
+                intake2.setPower(0);
+            }
+
+            // === Limelight distance-based shooter tuning ===
             LLResult limelightResult = getLatestResult();
             double distanceInches = 0.0;
+            double trigDistanceInches = 0.0;
             boolean hasDistance = false;
             int detectedTagId = 0;
             double ty = 0.0;
@@ -82,7 +115,7 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
 
             if (limelightResult != null && limelightResult.isValid() &&
                 limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
-                // Find blue goal tag (ID 20) specifically — same as Cassius_Blue
+                // Find blue goal tag (ID 20) specifically
                 LLResultTypes.FiducialResult blueGoalForHood = null;
                 for (LLResultTypes.FiducialResult f : limelightResult.getFiducialResults()) {
                     detectedTagId = (int) f.getFiducialId();
@@ -94,114 +127,104 @@ public class Flywheel_Hood_Tuner extends LinearOpMode {
                 if (blueGoalForHood != null) {
                     ty = blueGoalForHood.getTargetYDegrees();
                     tx = blueGoalForHood.getTargetXDegrees();
+
+                    // --- 3D pose distance (primary — more accurate) ---
+                    Pose3D tagPose = blueGoalForHood.getTargetPoseCameraSpace();
+                    if (tagPose != null) {
+                        // Camera space: X = right, Y = down, Z = forward (meters)
+                        double xMeters = tagPose.getPosition().x;
+                        double zMeters = tagPose.getPosition().z;
+                        // Horizontal distance on the ground plane (ignore vertical)
+                        distanceInches = Math.sqrt(xMeters * xMeters + zMeters * zMeters) * 39.3701;
+                        hasDistance = true;
+                    }
+
+                    // --- Trig distance (fallback + telemetry comparison) ---
                     double totalAngle = cameraMountAngle + ty;
                     double heightDifference = targetHeight - cameraHeight;
                     if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
-                        distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
-                        hasDistance = true;
+                        trigDistanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                        if (!hasDistance) {
+                            distanceInches = trigDistanceInches;
+                            hasDistance = true;
+                        }
                     }
                 }
             }
 
             // Use ShooterLookup when distance is available (same logic as Cassius_Blue)
             if (hasDistance) {
-                // Smooth distance to eliminate frame-to-frame jitter
                 if (smoothedDistance < 0) {
-                    smoothedDistance = distanceInches; // first reading — use raw
+                    smoothedDistance = distanceInches;
                 } else {
                     smoothedDistance = smoothedDistance + SMOOTHING_ALPHA * (distanceInches - smoothedDistance);
                 }
-                // Lookup table is primary — always applies when target is visible
                 ShooterLookup.Result tuned = ShooterLookup.lookup(smoothedDistance);
                 targetRpm = tuned.rpm;
                 targetHoodPos = tuned.hoodPos;
                 hood.setPosition(targetHoodPos);
+                sdx.setShootRpm(targetRpm);
             } else {
                 // No target — fall back to manual Panels values
                 targetRpm = TARGET_RPM;
                 targetHoodPos = HOOD_POSITION;
-                hood.setPosition(targetHoodPos);
+                sdx.setShootRpm(targetRpm);
+                // Manual hood adjust via dpad when no target
+                double currentHoodPos = hood.getPosition();
+                if (dpadUp2) {
+                    hood.setPosition(Math.min(1.0, currentHoodPos + 0.01));
+                } else if (dpadDown2) {
+                    hood.setPosition(Math.max(0.0, currentHoodPos - 0.01));
+                } else {
+                    hood.setPosition(targetHoodPos);
+                }
             }
 
-            // Apply flywheel RPM
-            ((DcMotorEx) flywheel).setVelocity(targetRpm * 28 / 60.0); // Convert RPM to ticks/sec
+            // Apply flywheel RPM only when NOT shooting — SpindexerController owns flywheel during shoot
+            if (!sdx.isShooting()) {
+                ((DcMotorEx) flywheel).setVelocity(targetRpm * 28 / 60.0);
+            }
 
             // Get current flywheel RPM
-            intake.setPower(0.5);
-            double currentVelocity = ((DcMotorEx) flywheel).getVelocity(); // ticks per second
-            double currentRPM = currentVelocity * 60.0 / 28.0; // Convert to RPM (28 ticks per revolution)
+            double currentVelocity = ((DcMotorEx) flywheel).getVelocity();
+            double currentRPM = currentVelocity * 60.0 / 28.0;
 
-            // Flicker state machine with variable speed
-            double dt = loopTimer.seconds();
-            loopTimer.reset();
-            double step = FLICK_SPEED * dt; // position change this loop
+            // === Shooting sequence (same as Cassius_Blue) ===
+            // SpindexerController handles everything:
+            //   slot tracking, skip empties, smart direction, flicker timing
+            //   RBumper2 = shoot, LBumper2 = kill switch
+            sdx.updateShoot(RBumper2, LBumper2, flywheel);
 
-            boolean currentA = gamepad1.a;
-            if (currentA && !lastA && flickState == FlickState.REST) {
-                flickState = FlickState.SWEEPING_TO_SHOOT;
-            }
-            lastA = currentA;
-
-            switch (flickState) {
-                case REST:
-                    flickPos1 = flickRest1;
-                    break;
-                case SWEEPING_TO_SHOOT:
-                    flickPos1 = moveToward(flickPos1, flickShoot1, step);
-                    if (flickPos1 == flickShoot1) {
-                        flickState = FlickState.HOLDING;
-                        flickTimer.reset();
-                    }
-                    break;
-                case HOLDING:
-                    if (flickTimer.seconds() >= FLICK_HOLD_TIME) {
-                        flickState = FlickState.SWEEPING_TO_REST;
-                    }
-                    break;
-                case SWEEPING_TO_REST:
-                    flickPos1 = moveToward(flickPos1, flickRest1, step);
-                    if (flickPos1 == flickRest1) {
-                        flickState = FlickState.REST;
-                    }
-                    break;
-            }
-            flicker.setPosition(flickPos1);
-            
-            // Display telemetry
+            // === Telemetry ===
             telemetry.addData("=== LIMELIGHT ===", "");
             if (hasDistance) {
-                telemetry.addData("Target Detected", "ID: %d", detectedTagId);
-                telemetry.addData("Raw Distance", "%.2f in", distanceInches);
+                telemetry.addData("Target", "ID: %d", detectedTagId);
+                telemetry.addData("3D Pose Distance", "%.2f in", distanceInches);
+                telemetry.addData("Trig Distance", "%.2f in", trigDistanceInches);
                 telemetry.addData("Smoothed Distance", "%.2f in", smoothedDistance);
                 telemetry.addData("TY Angle", "%.2f°", ty);
-                telemetry.addData("Total Angle", "%.2f°", cameraMountAngle + ty);
-                telemetry.addData("Source", "LOOKUP TABLE (auto)");
+                telemetry.addData("Source", "3D POSE (auto)");;
             } else {
-                telemetry.addData("Target Detected", "None");
+                telemetry.addData("Target", "None");
                 telemetry.addData("Source", "PANELS (manual fallback)");
             }
             telemetry.addData("", "");
-            
-            telemetry.addData("=== HOOD ===", "");
-            telemetry.addData("Hood Position", "%.3f", targetHoodPos);
-            telemetry.addData("", "");
-            
-            telemetry.addData("=== FLYWHEEL ===", "");
+
+            telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Target RPM", "%.0f", targetRpm);
             telemetry.addData("Current RPM", "%.0f", currentRPM);
             telemetry.addData("Error", "%.0f RPM", targetRpm - currentRPM);
+            telemetry.addData("Hood Position", "%.3f", hood.getPosition());
             telemetry.addData("", "");
-            telemetry.addData("=== FLICKER ===", "");
-            telemetry.addData("Flick Speed", "%.1f pos/sec", FLICK_SPEED);
-            telemetry.addData("Hold Time", "%.2f sec", FLICK_HOLD_TIME);
-            telemetry.addData("Flick State", flickState.toString());
+
+            telemetry.addData("=== SPINDEXER ===", "");
+            telemetry.addData("Ball Present", isBallPresent());
+            telemetry.addData("Ball Color", isBallPresent() ? detectBallColor() : "--");
+            telemetry.addData("Spindexer Angle", "%.1f°", spindexerAxon.getRawAngle());
+            sdx.addTelemetry(telemetry);
+
             telemetry.update();
         }
     }
-
-    /** Move current toward target by at most step, clamped to target */
-    private double moveToward(double current, double target, double step) {
-        if (Math.abs(target - current) <= step) return target;
-        return current + Math.signum(target - current) * step;
-    }
 }
+

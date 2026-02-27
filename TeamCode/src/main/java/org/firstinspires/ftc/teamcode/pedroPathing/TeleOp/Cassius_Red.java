@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.bylazar.telemetry.TelemetryManager;
 import java.util.List;
@@ -60,8 +61,8 @@ public class Cassius_Red extends LinearOpMode {
         
         // Spindexer controller — handles intake detection, slot tracking, and shooting
         SpindexerController sdx = new SpindexerController();
-        sdx.setFlickerPositions(0.1, 0.5);
-        flicker.setPosition(0.1);
+        sdx.setFlickerPositions(0, 0.375);
+        flicker.setPosition(0);
 
 
        
@@ -282,12 +283,22 @@ public class Cassius_Red extends LinearOpMode {
                     }
                 }
                 if (redGoalForHood != null) {
-                    double ty = redGoalForHood.getTargetYDegrees();
-                    double totalAngle = cameraMountAngle + ty;
-                    double heightDifference = targetHeight - cameraHeight;
-                    if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
-                        distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                    // --- 3D pose distance (more accurate than trig) ---
+                    Pose3D tagPose = redGoalForHood.getTargetPoseCameraSpace();
+                    if (tagPose != null) {
+                        double xMeters = tagPose.getPosition().x;
+                        double zMeters = tagPose.getPosition().z;
+                        distanceInches = Math.sqrt(xMeters * xMeters + zMeters * zMeters) * 39.3701;
                         hasDistance = true;
+                    } else {
+                        // Fallback to trig if 3D pose unavailable
+                        double ty = redGoalForHood.getTargetYDegrees();
+                        double totalAngle = cameraMountAngle + ty;
+                        double heightDifference = targetHeight - cameraHeight;
+                        if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
+                            distanceInches = heightDifference / Math.tan(Math.toRadians(totalAngle));
+                            hasDistance = true;
+                        }
                     }
                 }
             }

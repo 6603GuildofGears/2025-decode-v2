@@ -251,20 +251,22 @@ public class RTPAxon {
         lastError = error;
         lastDerivative = derivative;
 
-        final double DEADZONE = 2.0;
-        if (Math.abs(error) > DEADZONE) {
-            double pwr = -(kP * error + kD * derivative);
-            // Ensure minimum power floor so small errors still move the servo
-            if (Math.abs(pwr) < minPower) {
-                pwr = minPower * Math.signum(pwr);
-            }
-            // Clamp to maxPower
-            if (pwr > maxPower)  pwr = maxPower;
-            if (pwr < -maxPower) pwr = -maxPower;
-            setPower(pwr);
-        } else {
-            setPower(0);
+        // Always run PID — CR servos have no holding torque at power=0,
+        // so we must actively correct even tiny errors to prevent flop.
+        double pwr = -(kP * error + kD * derivative);
+
+        // Only apply min-power floor when error is significant enough to
+        // warrant movement (> 1°). Below that, let PID output go to zero
+        // naturally so the servo doesn't buzz/oscillate at the target.
+        final double MIN_POWER_DEADZONE = 1.0;
+        if (Math.abs(error) > MIN_POWER_DEADZONE && Math.abs(pwr) < minPower) {
+            pwr = minPower * Math.signum(pwr);
         }
+
+        // Clamp to maxPower
+        if (pwr > maxPower)  pwr = maxPower;
+        if (pwr < -maxPower) pwr = -maxPower;
+        setPower(pwr);
     }
 
     // ── Telemetry helper ──

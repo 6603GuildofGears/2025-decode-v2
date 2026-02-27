@@ -15,18 +15,18 @@ import java.util.List;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline.*;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline.*;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
-import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
-import org.firstinspires.ftc.vision.VisionPortal;
-import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
-import org.firstinspires.ftc.robotcore.external.stream.CameraStreamServer;
-import android.util.Size;
+
+// Ball detection
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline.BallDetection;
 
 
 
-@TeleOp(name="Cassius Red", group="TeleOp")
-public class Cassius_Red extends LinearOpMode {
+@TeleOp(name="Cassius Blue + Ball Detect", group="TeleOp")
+public class Cassius_Blue_BallDetect extends LinearOpMode {
 
 
 
@@ -42,14 +42,8 @@ public class Cassius_Red extends LinearOpMode {
         // Direct Limelight reference for turret PID (bypasses pipeline abstraction)
         Limelight3A limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
-        // Open Logitech webcam via VisionPortal so Panels CameraStream widget can display it
-        VisionPortal cameraPortal = new VisionPortal.Builder()
-                .setCamera(hardwareMap.get(WebcamName.class, "logitech"))
-                .setCameraResolution(new Size(640, 480))
-                .build();
-
-        // Route this portal to the DS / Panels camera stream
-        CameraStreamServer.getInstance().setSource(cameraPortal);
+        // Ball detection via YOLOv8n TFLite model on the Logitech webcam
+        BallDetectorPipeline.init(this, "logitech");
 
         telemetry.addData("Status", "Hardware initialized");
         telemetry.update();
@@ -69,7 +63,7 @@ public class Cassius_Red extends LinearOpMode {
 
 
 
-    double baseRpm = 3000; // default RPM for shooter
+    double baseRpm = 3000; // default RPM for shooter (NOTE: 'intake' variable is actually the shooter motor)
     double targetRpm = baseRpm; // updated from Limelight lookup when available
     double targetHoodPos = hood.getPosition();
     // Limelight distance config (inches/degrees)
@@ -147,8 +141,14 @@ public class Cassius_Red extends LinearOpMode {
         // Init loop — show spindexer/sensor telemetry while waiting for start
         while (!isStarted() && !isStopRequested()) {
             updateSensors();
+            // Poll ball detector during init
+            BallDetectorPipeline.pollOnce();
             telemetry.addData("=== INIT ===", homed ? "HOMED ✓ — Ready" : "HOME FAILED");
             telemetry.addData("Turret Pos", turret.getCurrentPosition());
+            telemetry.addData("=== BALL DETECT ===", "");
+            telemetry.addData("Camera", BallDetectorPipeline.isReady() ? "READY" : "Starting...");
+            telemetry.addData("Balls", BallDetectorPipeline.getBallCount());
+            telemetry.addData("Sequence", BallDetectorPipeline.getBallSequence());
             sdx.addTelemetry(telemetry);
             telemetry.update();
         }
@@ -160,6 +160,9 @@ public class Cassius_Red extends LinearOpMode {
                pollOnce();
                // Update sensors every loop so isMagPressed() stays current
                updateSensors();
+               // Poll ball detector every loop
+               BallDetectorPipeline.pollOnce();
+
                boolean LStickIn2 = gamepad2.left_stick_button;
                 boolean RStickIn2 = gamepad2.right_stick_button;
                 boolean LBumper1 = gamepad1.left_bumper;
@@ -169,8 +172,8 @@ public class Cassius_Red extends LinearOpMode {
                 double RStickY = gamepad1.right_stick_y;
                 double RStickX = -gamepad1.right_stick_x;
 
-                double LTrigger1 = gamepad1.left_trigger;
-                double RTrigger1 = gamepad1.right_trigger;
+                double LTrigger1 = gamepad1.left_trigger; // need to be a value between 0 and 1
+                double RTrigger1 = gamepad1.right_trigger; // need to be a value between 0 and 1
 
                 boolean a1 = gamepad1.a;
                 boolean b1 = gamepad1.b;
@@ -206,7 +209,18 @@ public class Cassius_Red extends LinearOpMode {
 
       
                if (Math.abs(LStickX) > 0 || Math.abs(LStickY) > 0 || Math.abs(RStickX) > 0) {
-                    double rotation = 0;
+                    //Orientation angles = imu.getAngularOrientation();
+                    double rotation = 0; //Math.toRadians(angles.firstAngle);
+                /*
+                if (Math.abs(LStickX) < .05 && Math.abs(RStickX) < .05) {
+                    SetPower(LStickY, LStickY, LStickY, LStickY);
+                }
+                else if (Math.abs(LStickY) < .05 && Math.abs(RStickX) < .05) {
+                    SetPower(LStickX, -LStickX, -LStickX, LStickX);//+--+
+                }
+                */
+
+                  
 
                     double r = Math.hypot(LStickX, LStickY);
                     double robotAngle = Math.atan2(LStickY, LStickX) - Math.PI / 4;
@@ -217,7 +231,12 @@ public class Cassius_Red extends LinearOpMode {
                     double v3 = r * Math.sin(robotAngle) + rightX * gear; //lb
                     double v4 = r * Math.cos(robotAngle) -rightX * gear; //rb
 
+
+
                   SetPower(v1, v3, v2, v4);
+
+
+
 
                 } else if (LBumper1) {
                     SetPower(gear, -gear, gear, -gear);
@@ -226,13 +245,14 @@ public class Cassius_Red extends LinearOpMode {
                     SetPower(gear, -gear, gear, -gear);
 
                 }  else if (dpadUp1) {
-                    SetPower(1 , 1 , 1 , 1 );
+                    SetPower(1 , 1 , 1 , 1 ); //0.3
                 } else if (dpadRight1) {
-                    SetPower(1, -1, -1, 1);
+                    SetPower(1, -1, -1, 1); //0.5
                 } else if (dpadLeft1) {
                     SetPower(-1, 1, 1, -1);
                 } else if (dpadDown1) {
                     SetPower(-1, -1, -1, -1);
+
 
                 } else {
                     frontLeft.setPower(0);
@@ -242,11 +262,15 @@ public class Cassius_Red extends LinearOpMode {
                 }
 
 
+
+
+
                 // AUXILIARY CODE
 
 
             
             telemetry.addData("spindexer angle", String.format("%.1f\u00b0", spindexerAxon.getRawAngle()));
+            // Manual turret dpad removed — auto-aim handles turret now
 
 
             // Intake with automatic spindexer rotation via SpindexerController
@@ -260,8 +284,8 @@ public class Cassius_Red extends LinearOpMode {
                 intake.setPower(0); // stop intake during shoot sequence
                 intake2.setPower(0);
             } else if (RBumper1) {
-                intake.setPower(-0.6); // intake out (reverse)
-                intake2.setPower(-0.6);
+                intake.setPower(-0.5); // intake out (reverse)
+                intake2.setPower(-0.5);
             } else {
                 intake.setPower(0);
                 intake2.setPower(0);
@@ -269,23 +293,23 @@ public class Cassius_Red extends LinearOpMode {
 
 
             // Limelight-based shooter tuning (distance -> rpm + hood)
-            // Only use red goal (AprilTag ID 24) for distance/hood
+            // Only use blue goal (AprilTag ID 20) for distance/hood
             LLResult limelightResult = getLatestResult();
             double distanceInches = 0.0;
             boolean hasDistance = false;
             if (limelightResult != null && limelightResult.isValid() &&
                 limelightResult.getFiducialResults() != null && !limelightResult.getFiducialResults().isEmpty()) {
-                // Find red goal tag (ID 24) specifically
-                LLResultTypes.FiducialResult redGoalForHood = null;
+                // Find blue goal tag (ID 20) specifically
+                LLResultTypes.FiducialResult blueGoalForHood = null;
                 for (LLResultTypes.FiducialResult f : limelightResult.getFiducialResults()) {
-                    if ((int) f.getFiducialId() == 24) {
-                        redGoalForHood = f;
+                    if ((int) f.getFiducialId() == 20) {
+                        blueGoalForHood = f;
                         break;
                     }
                 }
-                if (redGoalForHood != null) {
+                if (blueGoalForHood != null) {
                     // --- 3D pose distance (more accurate than trig) ---
-                    Pose3D tagPose = redGoalForHood.getTargetPoseCameraSpace();
+                    Pose3D tagPose = blueGoalForHood.getTargetPoseCameraSpace();
                     if (tagPose != null) {
                         double xMeters = tagPose.getPosition().x;
                         double zMeters = tagPose.getPosition().z;
@@ -293,7 +317,7 @@ public class Cassius_Red extends LinearOpMode {
                         hasDistance = true;
                     } else {
                         // Fallback to trig if 3D pose unavailable
-                        double ty = redGoalForHood.getTargetYDegrees();
+                        double ty = blueGoalForHood.getTargetYDegrees();
                         double totalAngle = cameraMountAngle + ty;
                         double heightDifference = targetHeight - cameraHeight;
                         if (Math.abs(totalAngle) > 0.5 && Math.abs(totalAngle) < 89.5) {
@@ -322,13 +346,15 @@ public class Cassius_Red extends LinearOpMode {
                 sdx.setShootRpm(baseRpm);
                 double currentHoodPos = hood.getPosition();
                 if (dpadUp2){
-                     hood.setPosition(Math.min(1.0, currentHoodPos + 0.01));
+                     hood.setPosition(Math.min(1.0, currentHoodPos + 0.01)); // Slide up
                  } else if (dpadDown2){
-                     hood.setPosition(Math.max(0.0, currentHoodPos - 0.01));
+                     hood.setPosition(Math.max(0.0, currentHoodPos - 0.01)); // Slide down
                 }
             }
 
-            // Shooting sequence — SpindexerController handles everything
+            // Shooting sequence — SpindexerController handles everything:
+            //   slot tracking, skip empties, smart direction, flicker timing
+            //   RBumper2 = shoot, LBumper2 = kill switch
             sdx.updateShoot(RBumper2, LBumper2, flywheel); 
 
             // Mag sensor state tracking
@@ -337,7 +363,7 @@ public class Cassius_Red extends LinearOpMode {
 
             // ================================================================
             //  TURRET TRACKING (from Turret_try — direct Limelight PID)
-            //  Only tracks red goal (AprilTag ID 24)
+            //  Only tracks blue goal (AprilTag ID 20)
             // ================================================================
 
             int turretPosition = turret.getCurrentPosition();
@@ -365,31 +391,31 @@ public class Cassius_Red extends LinearOpMode {
                 turretPower = 0;
                 turretMode = "AIM OFF";
             } else {
-                // === AUTO-AIM: read Limelight directly, filter for red goal (tag 24) ===
+                // === AUTO-AIM: read Limelight directly, filter for blue goal (tag 20) ===
                 try {
                     LLResult result = limelight.getLatestResult();
 
-                    LLResultTypes.FiducialResult redGoal = null;
+                    LLResultTypes.FiducialResult blueGoal = null;
                     if (result != null && result.isValid()) {
                         List<LLResultTypes.FiducialResult> fiducials = result.getFiducialResults();
                         if (fiducials != null) {
                             for (LLResultTypes.FiducialResult f : fiducials) {
-                                if ((int) f.getFiducialId() == 24) {
-                                    redGoal = f;
+                                if ((int) f.getFiducialId() == 20) {
+                                    blueGoal = f;
                                     break;
                                 }
                             }
                         }
                     }
 
-                    if (redGoal != null) {
-                        // Red goal found — PID tracking
+                    if (blueGoal != null) {
+                        // Blue goal found — PID tracking
                         targetWasVisible = true;
                         targetLostTimer.reset();
                         homingToMag = false;
                         turretMode = "LOCKED ON";
 
-                        double tx = redGoal.getTargetXDegrees();
+                        double tx = blueGoal.getTargetXDegrees();
 
                         double dt = turretTimer.seconds();
                         turretTimer.reset();
@@ -425,7 +451,7 @@ public class Cassius_Red extends LinearOpMode {
                         turretLastError = error;
 
                     } else {
-                        // No red goal visible — handle target loss
+                        // No blue goal visible — handle target loss
                         if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
                             // Coast briefly — keep last motor power
                             turretPower = lastTurretPower;
@@ -472,6 +498,21 @@ public class Cassius_Red extends LinearOpMode {
             turret.setPower(turretPower);
             lastTurretPower = turretPower; // save for coasting next cycle
 
+            // ================================================================
+            //  BALL DETECTION TELEMETRY
+            // ================================================================
+            List<BallDetection> balls = BallDetectorPipeline.getDetectedBalls();
+
+            telemetry.addData("=== BALL DETECT ===", "");
+            telemetry.addData("Ball Count", BallDetectorPipeline.getBallCount());
+            telemetry.addData("Sequence", BallDetectorPipeline.getBallSequence());
+            telemetry.addData("Compute", String.format("%.0f ms", BallDetectorPipeline.getComputeMs()));
+            for (BallDetection b : balls) {
+                telemetry.addData(
+                    String.format("#%d %s", b.rampPosition, b.isGreen ? "GREEN" : "PURPLE"),
+                    String.format("%.0f%% at (%.0f, %.0f)", b.confidence * 100, b.centerX, b.centerY));
+            }
+
             // Display telemetry
             telemetry.addData("=== LIMELIGHT ===", "");
             if (hasTarget()) {
@@ -488,12 +529,14 @@ public class Cassius_Red extends LinearOpMode {
             
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
+            telemetry.addData("Auto-Aim", autoAimEnabled ? "ON" : "OFF");
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
             
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Target RPM", String.format("%.0f", targetRpm));
             telemetry.addData("Actual RPM", String.format("%.0f", flywheel.getVelocity() * 60.0 / 28.0));
             telemetry.addData("Hood Angle", String.format("%.3f", hood.getPosition()));
+            telemetry.addData(">>>  SENSOR COLOR  <<<", isBallPresent() ? detectBallColor() : "-- empty --");
             sdx.addTelemetry(telemetry);
             
 
@@ -505,10 +548,14 @@ public class Cassius_Red extends LinearOpMode {
             telemetryM.debug("Distance: " + (hasDistance ? String.format("%.1f in", distanceInches) : "--"));
             telemetryM.debug("RPM: " + String.format("%.0f", targetRpm) + " | Hood: " + String.format("%.3f", hood.getPosition()));
             telemetryM.debug("Flywheel: " + String.format("%.0f", flywheel.getVelocity()));
+            telemetryM.debug("Balls: " + BallDetectorPipeline.getBallCount() + " | " + BallDetectorPipeline.getBallSequence());
             telemetry.update(); // Push telemetry to Driver Station
             telemetryM.update(); // Push Panels data separately
  
         }
+
+        // Cleanup ball detector
+        BallDetectorPipeline.stop();
 
     }
 

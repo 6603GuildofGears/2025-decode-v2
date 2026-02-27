@@ -30,6 +30,7 @@ public class Blue_Front extends OpMode {
 
     private DcMotorEx flywheel;
     private DcMotorEx intake;
+    private DcMotorEx intakeMotor2;
     private DcMotorEx turret;
     private Motor_PipeLine motorPipeline;
     private Servo_Pipeline servoPipeline;
@@ -74,14 +75,14 @@ public class Blue_Front extends OpMode {
     PathState pathState;
 
     // Poses from the provided coordinates
-    private final Pose startPose = new Pose(21, 123, Math.toRadians(142));
-    private final Pose shootPose = new Pose(49, 82, Math.toRadians(180));
-    private final Pose intake1 = new Pose(34, 80, Math.toRadians(180));       // Intake 1 position
-    private final Pose intake1Pose2 = new Pose(30, 80, Math.toRadians(180));  // Intake 1 waypoint 2
-    private final Pose intake1Pose3 = new Pose(25, 80, Math.toRadians(180));  // Intake 1 waypoint 3
+    private final Pose startPose = new Pose(20, 120, Math.toRadians(144));
+    private final Pose shootPose = new Pose(55, 88, Math.toRadians(180));
+    private final Pose intake1 = new Pose(40, 76, Math.toRadians(180));       // Intake 1 position
+    private final Pose intake1Pose2 = new Pose(36, 80, Math.toRadians(180));  // Intake 1 waypoint 2
+    private final Pose intake1Pose3 = new Pose(32, 80, Math.toRadians(180));  // Intake 1 waypoint 3
     private final Pose intake2 = new Pose(40, 56, Math.toRadians(180));       // Intake 2 position
-    private final Pose intake2Pose1 = new Pose(34, 56, Math.toRadians(180));  // Intake 2 waypoint 1
-    private final Pose intake2Pose2 = new Pose(30, 56, Math.toRadians(180));  // Intake 2 waypoint 2
+    private final Pose intake2Pose1 = new Pose(36, 56, Math.toRadians(180));  // Intake 2 waypoint 1
+    private final Pose intake2Pose2 = new Pose(36, 56, Math.toRadians(180));  // Intake 2 waypoint 2
     private final Pose intake2Pose3 = new Pose(25, 56, Math.toRadians(180));  // Intake 2 waypoint 3
     private final Pose endPose = new Pose(24, 72, Math.toRadians(180));       // Park position
 
@@ -224,6 +225,7 @@ public class Blue_Front extends OpMode {
                     spindexerController.prefillAllSlots();
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else if (shootSequenceStarted) {
                     spindexerController.updateShoot(false, false, flywheel);
@@ -232,6 +234,7 @@ public class Blue_Front extends OpMode {
                 // Transition when shooting is complete (may finish after robot stops)
                 if (shootSequenceStarted && !spindexerController.isShooting()) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     // Confirmed = balls that left the chamber = balls we need to replace
@@ -259,6 +262,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -287,6 +291,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -314,6 +319,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -340,6 +346,7 @@ public class Blue_Front extends OpMode {
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     intakeRunning = false;
                 }
 
@@ -354,6 +361,7 @@ public class Blue_Front extends OpMode {
                 if (!shootSequenceStarted) {
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else {
                     spindexerController.updateShoot(false, false, flywheel);
@@ -361,6 +369,7 @@ public class Blue_Front extends OpMode {
 
                 if (!spindexerController.isShooting() && shootSequenceStarted) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     // Confirmed = balls that left the chamber = balls we need to replace
@@ -399,6 +408,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -426,6 +436,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -453,6 +464,7 @@ public class Blue_Front extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.875);
+                    intakeMotor2.setPower(-0.875);
                     intakeRunning = true;
                 }
 
@@ -479,6 +491,7 @@ public class Blue_Front extends OpMode {
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     intakeRunning = false;
                 }
 
@@ -497,6 +510,7 @@ public class Blue_Front extends OpMode {
                 if (!shootSequenceStarted) {
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else {
                     spindexerController.updateShoot(false, false, flywheel);
@@ -504,6 +518,7 @@ public class Blue_Front extends OpMode {
 
                 if (!spindexerController.isShooting() && shootSequenceStarted) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
@@ -553,6 +568,7 @@ public class Blue_Front extends OpMode {
         Motor_PipeLine.resetMotors();
         flywheel = Motor_PipeLine.flywheel;
         intake = Motor_PipeLine.intake;
+        intakeMotor2 = Motor_PipeLine.intake2;
         turret = Motor_PipeLine.turret;
 
         Sensor.initSensors(this);

@@ -84,7 +84,7 @@ public class Cassius_Blue extends LinearOpMode {
       
         // Turret safety limits in DEGREES
         double turretMinDeg = 5;
-        double turretMaxDeg = 300;
+        double turretMaxDeg = 280;
         boolean limitsEnabled = true;
         double LIMIT_SLOW_ZONE_DEG = 15;
         double TICKS_PER_DEG = 2.64;
@@ -93,9 +93,9 @@ public class Cassius_Blue extends LinearOpMode {
         boolean lastMagState = false;
 
         // === TURRET PID (from Turret_try — direct Limelight, no IMU) ===
-        double kP = 0.027;
+        double kP = 0.015;
         double kI = 0.0001;
-        double kD = 0.005;
+        double kD = 0.002;
         double targetX = 0.0;
         double turretIntegral = 0.0;
         double turretLastError = 0.0;
@@ -104,7 +104,7 @@ public class Cassius_Blue extends LinearOpMode {
 
         double POSITION_TOLERANCE = 1.5;
         double MIN_POWER = 0.05;
-        double MAX_TURRET_POWER = 0.7;
+        double MAX_TURRET_POWER = 0.4;
         double TARGET_LOST_TIMEOUT = 2.0;
         double HOME_POWER = -0.2;
         boolean INVERT_MOTOR = false;
@@ -112,6 +112,8 @@ public class Cassius_Blue extends LinearOpMode {
         boolean targetWasVisible = false;
         boolean homingToMag = false;
         double lastTurretPower = 0; // remember last power for coasting (matches Turret_try)
+        boolean autoAimEnabled = true;  // Y2 toggles this
+        boolean lastY2 = false;         // edge detection for Y2
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -280,7 +282,8 @@ public class Cassius_Blue extends LinearOpMode {
                 intake.setPower(0); // stop intake during shoot sequence
                 intake2.setPower(0);
             } else if (RBumper1) {
-                intake.setPower(-5); // intake out (reverse)
+                intake.setPower(-0.6); // intake out (reverse)
+                intake2.setPower(-0.6);
             } else {
                 intake.setPower(0);
                 intake2.setPower(0);
@@ -366,18 +369,25 @@ public class Cassius_Blue extends LinearOpMode {
             double turretPower = 0;
             String turretMode = "IDLE";
 
-            // --- Manual turret control — gamepad2 left stick X ---
-            double manualInput = LStickX2 / 1.125;
-            boolean manualTurret = Math.abs(manualInput) > 0.03;
+            // --- Y2 toggle: auto-aim on/off ---
+            if (y2 && !lastY2) autoAimEnabled = !autoAimEnabled;
+            lastY2 = y2;
+
+            // --- Manual turret control — gamepad2 dpad left/right ---
+            boolean manualTurret = dpadLeft2 || dpadRight2;
 
             if (manualTurret) {
                 // === MANUAL OVERRIDE ===
-                turretPower = manualInput * MAX_TURRET_POWER;
+                turretPower = (dpadRight2 ? 1 : -1) * 0.4;
                 targetWasVisible = false;
                 homingToMag = false;
                 turretIntegral = 0;
                 turretLastError = 0;
                 turretMode = "MANUAL";
+            } else if (!autoAimEnabled) {
+                // Auto-aim disabled — hold position
+                turretPower = 0;
+                turretMode = "AIM OFF";
             } else {
                 // === AUTO-AIM: read Limelight directly, filter for blue goal (tag 20) ===
                 try {
@@ -441,21 +451,15 @@ public class Cassius_Blue extends LinearOpMode {
                     } else {
                         // No blue goal visible — handle target loss
                         if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
-                            // Coast briefly — keep last motor power (matches Turret_try)
+                            // Coast briefly — keep last motor power
                             turretPower = lastTurretPower;
                             turretMode = "COASTING";
                         } else {
-                            // Home to mag sensor
-                            homingToMag = true;
-                            if (isMagPressed()) {
-                                turretPower = 0;
-                                turretIntegral = 0;
-                                turretLastError = 0;
-                                turretMode = "HOME";
-                            } else {
-                                turretPower = HOME_POWER;
-                                turretMode = "HOMING";
-                            }
+                            // Stop turret — no auto-home
+                            turretPower = 0;
+                            turretIntegral = 0;
+                            turretLastError = 0;
+                            turretMode = "IDLE";
                         }
                     }
                 } catch (Exception e) {

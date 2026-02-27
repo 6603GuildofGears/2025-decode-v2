@@ -56,10 +56,10 @@ public class SpindexerController {
     private static final double CONFIRM_SEC   = 0.1;   // ball must be seen continuously this long
     private static final double HOLD_SEC      = 0.05;  // pause after ball confirmed before rotating
 
-    private static final double SPINUP_SEC    = 1.5;   // flywheel spin-up time
-    public static double FLICK_SEC     = 0.25;   // flicker hold time — how long flicker stays extended
+    private static final double RPM_READY_TOLERANCE = 100;  // flywheel is "at speed" when within ±25 RPM
+    public static double FLICK_SEC     = 0.4;   // flicker hold time — how long flicker stays extended
     public static double POST_FLICK_SEC = 0.25;    // pause after flicker retracts before advancing (must be long enough for servo to fully return)
-    public static double SHOOT_SETTLE_SEC = 0.25; // settle time before firing each shot
+    public static double SHOOT_SETTLE_SEC = 0.6; // settle time before firing each shot (extra recovery for later shots)
 
     // ========== Misfire retry ==========
     private static final int    MAX_RETRIES       = 1;    // how many times to retry a misfire before giving up
@@ -101,12 +101,8 @@ public class SpindexerController {
 
     // Flywheel
     private double shootRpm = 3000;
-    private double activeShootRpm = 0;  // the RPM actually commanded during shooting (incl. boost)
-
     // ========== RPM drop detection ==========
     private static final double RPM_DROP_THRESHOLD = 150;  // RPM drop that indicates a ball was fired
-    public static double FIRST_SHOT_BOOST  = 100;   // extra RPM added ONLY to the 1st shot
-    private static final double RPM_BOOST_2ND_3RD = 0;   // extra RPM for 2nd and 3rd shots
     private double preFlickTPS = 0;   // flywheel velocity captured right before flick
     private boolean shotDetected = false;  // true if RPM drop seen during this flick
     private boolean[] slotEmpty = {true, true, true};  // tracks which slots are actually empty
@@ -360,21 +356,22 @@ public class SpindexerController {
                     flicker.setPosition(flickRest);
                     shotNumber = 0;  // first shot
                     retryCount = 0;  // fresh retries for this slot
-                    // First shot gets its own boost
-                    activeShootRpm = shootRpm + FIRST_SHOT_BOOST;
-                    flywheel.setVelocity(rpmToTPS(activeShootRpm));
+                    flywheel.setVelocity(rpmToTPS(shootRpm));
                     sTimer.reset();
                     sState = SState.SPINUP;
                 }
                 break;
 
             case SPINUP:
-                // Continuously re-apply boosted velocity so it doesn't get overridden
-                flywheel.setVelocity(rpmToTPS(activeShootRpm));
+                // Continuously re-apply velocity so it doesn't get overridden
+                flywheel.setVelocity(rpmToTPS(shootRpm));
                 // RTPAxon handles servo motion — check if arrived
                 boolean servoReady = spindexerAxon.isAtTarget(5);
+                // Check if flywheel is within ±25 RPM of target
+                double currentRpm = flywheel.getVelocity() * 60.0 / 28.0;
+                boolean flywheelReady = Math.abs(currentRpm - shootRpm) <= RPM_READY_TOLERANCE;
                 // Wait for BOTH flywheel speed AND servo arrival
-                if (sTimer.seconds() >= SPINUP_SEC && servoReady) {
+                if (flywheelReady && servoReady) {
                     sTimer.reset();
                     sState = SState.SHOOT_SETTLE;
                 }
@@ -382,9 +379,10 @@ public class SpindexerController {
 
             case SHOOT_SETTLE:
                 // Keep flywheel at target while settling
-                flywheel.setVelocity(rpmToTPS(activeShootRpm));
-                // Wait for spindexer to settle, then fire unconditionally
-                if (sTimer.seconds() >= SHOOT_SETTLE_SEC) {
+                flywheel.setVelocity(rpmToTPS(shootRpm));
+                // Fire when flywheel is within ±25 RPM of target
+                double settleRpm = flywheel.getVelocity() * 60.0 / 28.0;
+                if (Math.abs(settleRpm - shootRpm) <= RPM_READY_TOLERANCE) {
                     preFlickTPS = flywheel.getVelocity();
                     shotDetected = false;
                     flicker.setPosition(flickShoot);
@@ -415,17 +413,14 @@ public class SpindexerController {
                     // Advance to next slot in the shoot queue
                     shootQueueIndex++;
                     if (shootQueueIndex >= 3) {
-                        // All 3 slots fired — done
-                        flywheel.setVelocity(0);
+                        // All 3 slots fired — flywheel stays on, killed in DONE after 1s
                         sTimer.reset();
                         sState = SState.DONE;
                     } else {
                         // Advance to next slot in queue
                         shootSlot = shootQueue[shootQueueIndex];
                         shotNumber++;
-                        // Set RPM for 2nd and 3rd shots
-                        activeShootRpm = shootRpm;
-                        flywheel.setVelocity(rpmToTPS(activeShootRpm));
+                        flywheel.setVelocity(rpmToTPS(shootRpm));
                         sTimer.reset();
                         sState = SState.RETRACTING;
                     }
@@ -452,7 +447,9 @@ public class SpindexerController {
                 break;
 
             case DONE:
-                if (sTimer.seconds() >= 0.3) {
+                if (sTimer.seconds() >= 1.0) {
+                    // Kill flywheel after 1 second
+                    flywheel.setVelocity(0);
                     // Move spindexer back to first intake position so intake can resume
                     currentSlot = 0;
                     servoTarget = INTAKE_POSITIONS[0];
@@ -646,7 +643,7 @@ public class SpindexerController {
         telemetry.addData("Open Slots", getOpenSlots());
         telemetry.addData("Confirmed Shots", confirmedShots + "/3");
         if (sState != SState.IDLE && sState != SState.DONE) {
-            telemetry.addData("Flywheel Target", String.format("%.0f RPM (boost: +%.0f)", activeShootRpm, activeShootRpm - shootRpm));
+            telemetry.addData("Flywheel Target", String.format("%.0f RPM", shootRpm));
         }
         if (sState == SState.FIRE) {
             telemetry.addData("Shot Detected", shotDetected ? "YES (RPM drop)" : "waiting...");

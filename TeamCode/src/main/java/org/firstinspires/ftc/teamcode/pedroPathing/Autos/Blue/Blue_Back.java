@@ -30,6 +30,7 @@ public class Blue_Back extends OpMode {
 
     private DcMotorEx flywheel;
     private DcMotorEx intake;
+    private DcMotorEx intakeMotor2;
     private DcMotorEx turret;
     private Motor_PipeLine motorPipeline;
     private Servo_Pipeline servoPipeline;
@@ -228,12 +229,14 @@ public class Blue_Back extends OpMode {
                     spindexerController.prefillAllSlots();
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else {
                     spindexerController.updateShoot(false, false, flywheel);
                 }
                 if (!spindexerController.isShooting() && shootSequenceStarted) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
@@ -249,6 +252,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -271,6 +275,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -293,6 +298,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -318,6 +324,7 @@ public class Blue_Back extends OpMode {
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     intakeRunning = false;
                 }
 
@@ -332,12 +339,14 @@ public class Blue_Back extends OpMode {
                 if (!shootSequenceStarted) {
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else {
                     spindexerController.updateShoot(false, false, flywheel);
                 }
                 if (!spindexerController.isShooting() && shootSequenceStarted) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
@@ -365,6 +374,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -387,6 +397,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -409,6 +420,7 @@ public class Blue_Back extends OpMode {
                     pathStarted = true;
 
                     intake.setPower(-0.275);
+                    intakeMotor2.setPower(-0.275);
                     intakeRunning = true;
                 }
 
@@ -434,6 +446,7 @@ public class Blue_Back extends OpMode {
 
                 if (follower.getCurrentTValue() >= 0.5) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     intakeRunning = false;
                 }
 
@@ -452,12 +465,14 @@ public class Blue_Back extends OpMode {
                 if (!shootSequenceStarted) {
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
+                    intakeMotor2.setPower(-0.5);
                     shootSequenceStarted = true;
                 } else {
                     spindexerController.updateShoot(false, false, flywheel);
                 }
                 if (!spindexerController.isShooting() && shootSequenceStarted) {
                     intake.setPower(0);
+                    intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
                     shootSequenceStarted = false;
                     spindexerController.resetShootState();
@@ -504,6 +519,7 @@ public class Blue_Back extends OpMode {
         Motor_PipeLine.resetMotors();
         flywheel = Motor_PipeLine.flywheel;
         intake = Motor_PipeLine.intake;
+        intakeMotor2 = Motor_PipeLine.intake2;
         turret = Motor_PipeLine.turret;
 
         Sensor.initSensors(this);

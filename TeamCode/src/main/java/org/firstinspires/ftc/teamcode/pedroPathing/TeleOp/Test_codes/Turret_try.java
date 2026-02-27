@@ -24,10 +24,10 @@ public class Turret_try extends OpMode {
     private Limelight3A limelight;
 
     // ── Tunable PID values (adjusted with gamepad2 buttons) ──
-    private double kP = 0.027;
+    private double kP = 0.015;
     private double kI = 0.0001;
-    private double kD = 0.005;
-    private double maxPwr = 0.7;
+    private double kD = 0.002;
+    private double maxPwr = 0.4;
     private double minPwr = 0.05;
     private double deadband = 1.5;
     private boolean invertMotor = false;

@@ -114,6 +114,14 @@ public class Cassius_Red extends LinearOpMode {
         boolean autoAimEnabled = true;  // Y2 toggles this
         boolean lastY2 = false;         // edge detection for Y2
 
+        // === MOTIF FIRE: left trigger starts sequence ===
+        // Sequence: turn turret → 20°, lock on via Limelight, auto-shoot
+        int motifState = 0; // 0=IDLE, 1=TURN_TO_20, 2=LOCK_ON, 3=SHOOT
+        ElapsedTime motifTimer = new ElapsedTime();
+        boolean lastLTrigger1 = false; // edge detection for left trigger
+        double MOTIF_TARGET_DEG = 20.0;
+        boolean motifShootTriggered = false;
+
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
 
@@ -329,11 +337,27 @@ public class Cassius_Red extends LinearOpMode {
             }
 
             // Shooting sequence — SpindexerController handles everything
-            sdx.updateShoot(RBumper2, LBumper2, flywheel); 
+            //   Motif fire state 3 also triggers a shoot
+            boolean motifShootNow = (motifState == 3 && !motifShootTriggered);
+            sdx.updateShoot(RBumper2 || motifShootNow, LBumper2, flywheel);
+            if (motifShootNow) motifShootTriggered = true;
+            // Motif fire: finish once shoot sequence completes
+            if (motifState == 3 && motifShootTriggered && !sdx.isShooting()) {
+                motifState = 0; // sequence complete → back to IDLE
+            }
 
             // Mag sensor state tracking
             boolean currentMagState = isMagPressed();
             lastMagState = currentMagState;
+
+            // === MOTIF FIRE: left trigger starts the sequence ===
+            boolean ltPressed = LTrigger1 > 0.25;
+            if (ltPressed && !lastLTrigger1 && motifState == 0) {
+                motifState = 1;  // start → turn turret to 20°
+                motifTimer.reset();
+                motifShootTriggered = false;
+            }
+            lastLTrigger1 = ltPressed;
 
             // ================================================================
             //  TURRET TRACKING (from Turret_try — direct Limelight PID)
@@ -352,7 +376,16 @@ public class Cassius_Red extends LinearOpMode {
             // --- Manual turret control — gamepad2 dpad left/right ---
             boolean manualTurret = dpadLeft2 || dpadRight2;
 
-            if (manualTurret) {
+            if (motifState == 1) {
+                // === MOTIF FIRE step 1: turn turret to 20° ===
+                double motifError = MOTIF_TARGET_DEG - turretDeg;
+                turretPower = Math.max(-0.3, Math.min(0.3, motifError * 0.02));
+                turretMode = "MOTIF→20°";
+                if (Math.abs(motifError) < 2.0) {
+                    motifState = 2;  // close enough → start locking on
+                    motifTimer.reset();
+                }
+            } else if (manualTurret) {
                 // === MANUAL OVERRIDE ===
                 turretPower = (dpadRight2 ? 1 : -1) * 0.4;
                 targetWasVisible = false;
@@ -360,6 +393,7 @@ public class Cassius_Red extends LinearOpMode {
                 turretIntegral = 0;
                 turretLastError = 0;
                 turretMode = "MANUAL";
+                if (motifState > 0) motifState = 0; // cancel motif on manual override
             } else if (!autoAimEnabled) {
                 // Auto-aim disabled — hold position
                 turretPower = 0;
@@ -425,18 +459,11 @@ public class Cassius_Red extends LinearOpMode {
                         turretLastError = error;
 
                     } else {
-                        // No red goal visible — handle target loss
-                        if (targetWasVisible && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT) {
-                            // Coast briefly — keep last motor power
-                            turretPower = lastTurretPower;
-                            turretMode = "COASTING";
-                        } else {
-                            // Stop turret — no auto-home
-                            turretPower = 0;
-                            turretIntegral = 0;
-                            turretLastError = 0;
-                            turretMode = "IDLE";
-                        }
+                        // No red goal visible — freeze turret in place
+                        turretPower = 0;
+                        turretIntegral = 0;
+                        turretLastError = 0;
+                        turretMode = "HOLDING";
                     }
                 } catch (Exception e) {
                     turretPower = 0;
@@ -472,6 +499,15 @@ public class Cassius_Red extends LinearOpMode {
             turret.setPower(turretPower);
             lastTurretPower = turretPower; // save for coasting next cycle
 
+            // Motif fire: state 2 — wait for Limelight lock, then transition to shoot
+            if (motifState == 2) {
+                if (turretMode.equals("LOCKED ON") || motifTimer.seconds() > 3.0) {
+                    motifState = 3;  // locked on (or timeout) → shoot!
+                    motifTimer.reset();
+                    motifShootTriggered = false;
+                }
+            }
+
             // Display telemetry
             telemetry.addData("=== LIMELIGHT ===", "");
             if (hasTarget()) {
@@ -489,11 +525,14 @@ public class Cassius_Red extends LinearOpMode {
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
+            String[] motifLabels = {"IDLE", "TURN→20°", "LOCKING", "SHOOTING"};
+            telemetry.addData("Motif Fire", motifLabels[motifState]);
             
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Target RPM", String.format("%.0f", targetRpm));
             telemetry.addData("Actual RPM", String.format("%.0f", flywheel.getVelocity() * 60.0 / 28.0));
             telemetry.addData("Hood Angle", String.format("%.3f", hood.getPosition()));
+            telemetry.addData(">>>  SENSOR COLOR  <<<", isBallPresent() ? detectBallColor() : "-- empty --");
             sdx.addTelemetry(telemetry);
             
 

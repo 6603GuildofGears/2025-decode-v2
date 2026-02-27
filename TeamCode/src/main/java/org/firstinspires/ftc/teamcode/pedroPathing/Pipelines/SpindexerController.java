@@ -367,9 +367,9 @@ public class SpindexerController {
                 flywheel.setVelocity(rpmToTPS(shootRpm));
                 // RTPAxon handles servo motion — check if arrived
                 boolean servoReady = spindexerAxon.isAtTarget(5);
-                // Check if flywheel is within ±25 RPM of target
+                // Check if flywheel is at or above target RPM
                 double currentRpm = flywheel.getVelocity() * 60.0 / 28.0;
-                boolean flywheelReady = Math.abs(currentRpm - shootRpm) <= RPM_READY_TOLERANCE;
+                boolean flywheelReady = currentRpm >= (shootRpm - RPM_READY_TOLERANCE);
                 // Wait for BOTH flywheel speed AND servo arrival
                 if (flywheelReady && servoReady) {
                     sTimer.reset();
@@ -380,9 +380,9 @@ public class SpindexerController {
             case SHOOT_SETTLE:
                 // Keep flywheel at target while settling
                 flywheel.setVelocity(rpmToTPS(shootRpm));
-                // Fire when flywheel is within ±25 RPM of target
+                // Fire when flywheel is at or above target RPM
                 double settleRpm = flywheel.getVelocity() * 60.0 / 28.0;
-                if (Math.abs(settleRpm - shootRpm) <= RPM_READY_TOLERANCE) {
+                if (settleRpm >= (shootRpm - RPM_READY_TOLERANCE)) {
                     preFlickTPS = flywheel.getVelocity();
                     shotDetected = false;
                     flicker.setPosition(flickShoot);

@@ -493,6 +493,13 @@ public class SpindexerController {
     private int shootQueueIndex = 0;        // which queue entry we're on
 
     private int findFirstShootSlot() {
+        // If using a pre-built motif queue, don't overwrite it
+        if (useColorOrder) {
+            shootQueueIndex = 0;
+            return shootQueue[0];
+        }
+        
+        // Otherwise, build a proximity-based queue
         double currentAngle = spindexerAxon.getRawAngle();
         double distToP1 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P1));
         double distToP2 = Math.abs(shortestAngleDist(currentAngle, SHOOT_P2));
@@ -722,6 +729,37 @@ public class SpindexerController {
     public int     getTotalShotsFired(){ return totalShotsFired; }
     /** Reset lifetime counter */
     public void    resetTotalShotsFired(){ totalShotsFired = 0; }
+
+    // ========== Motif Queue Support ==========
+    
+    /**
+     * Get all slot colors as an array.
+     * For use with MotifQueue.buildMotifQueue().
+     */
+    public String[] getSlotColors() {
+        return slotColor.clone(); // Return copy to prevent external modification
+    }
+    
+    /**
+     * Get all slot empty status as an array.
+     * For use with MotifQueue.buildMotifQueue().
+     */
+    public boolean[] getSlotEmptyStatus() {
+        return slotEmpty.clone(); // Return copy
+    }
+    
+    /**
+     * Set a custom shoot queue (from MotifQueue or other logic).
+     * This will be used during the next shoot sequence.
+     * 
+     * @param queue Array of 3 slot indices (0-2) in firing order
+     */
+    public void setShootQueue(int[] queue) {
+        if (queue != null && queue.length == 3) {
+            System.arraycopy(queue, 0, shootQueue, 0, 3);
+            useColorOrder = true; // Flag that we're using a custom queue
+        }
+    }
 
     /** Add telemetry */
     public void addTelemetry(org.firstinspires.ftc.robotcore.external.Telemetry telemetry) {

@@ -142,6 +142,20 @@ REM Force stop and restart the app
 timeout /t 2 /nobreak >nul
 "%ADB%" -s %TARGET% shell am start -n com.qualcomm.ftcrobotcontroller/org.firstinspires.ftc.robotcontroller.internal.FtcRobotControllerActivity
 
-echo [deploy] ✓ App restarted with new code
-echo [deploy] Connection maintained for debugging
+REM Reconnect ADB to maintain stable connection for future deploys
+echo [deploy] Reconnecting ADB connection...
+timeout /t 3 /nobreak >nul
+"%ADB%" reconnect device >nul 2>&1
+timeout /t 2 /nobreak >nul
+
+REM Verify connection is stable
+"%ADB%" -s %TARGET% shell echo ok >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [deploy] ✓ App restarted with new code
+    echo [deploy] ✓ Connection verified and stable for next deploy
+) else (
+    echo [deploy] ✓ App restarted with new code
+    echo [WARN] Connection may be unstable - run 'adb reconnect device' if next deploy fails
+)
+
 exit /b 0

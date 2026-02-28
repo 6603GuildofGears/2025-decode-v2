@@ -76,8 +76,8 @@ public class Blue_Front extends OpMode {
 
     // Poses from the provided coordinates
     private final Pose startPose = new Pose(20, 120, Math.toRadians(144));
-    private final Pose shootPose = new Pose(55, 88, Math.toRadians(180));
-    private final Pose intake1 = new Pose(40, 76, Math.toRadians(180));       // Intake 1 position
+    private final Pose shootPose = new Pose(49, 84, Math.toRadians(180));
+    private final Pose intake1 = new Pose(40, 80, Math.toRadians(180));       // Intake 1 position
     private final Pose intake1Pose2 = new Pose(36, 80, Math.toRadians(180));  // Intake 1 waypoint 2
     private final Pose intake1Pose3 = new Pose(32, 80, Math.toRadians(180));  // Intake 1 waypoint 3
     private final Pose intake2 = new Pose(40, 56, Math.toRadians(180));       // Intake 2 position

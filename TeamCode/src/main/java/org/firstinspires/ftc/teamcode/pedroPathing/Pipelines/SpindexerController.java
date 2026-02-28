@@ -58,7 +58,8 @@ public class SpindexerController {
 
     private static final double RPM_READY_TOLERANCE = 100;  // flywheel is "at speed" when within ±25 RPM
     public static double FLICK_SEC     = 0.4;   // flicker hold time — how long flicker stays extended
-    public static double POST_FLICK_SEC = 0.25;    // pause after flicker retracts before advancing (must be long enough for servo to fully return)
+    public static double POST_FLICK_SEC = 0.35;    // pause after flicker retracts before advancing (must be long enough for servo to fully return)
+    public static double POST_FLICK_SEC_FINAL = 0.5; // longer pause after LAST shot to prevent jamming when transitioning to intake
     public static double SHOOT_SETTLE_SEC = 0.6; // settle time before firing each shot (extra recovery for later shots)
 
     // ========== Misfire retry ==========
@@ -427,9 +428,9 @@ public class SpindexerController {
                     // Advance to next slot in the shoot queue
                     shootQueueIndex++;
                     if (shootQueueIndex >= 3) {
-                        // All 3 slots fired — flywheel stays on, killed in DONE after 1s
+                        // All 3 slots fired — go to RETRACTING with longer timeout before DONE
                         sTimer.reset();
-                        sState = SState.DONE;
+                        sState = SState.RETRACTING;
                     } else {
                         // Advance to next slot in queue
                         shootSlot = shootQueue[shootQueueIndex];
@@ -443,11 +444,20 @@ public class SpindexerController {
 
             case RETRACTING:
                 // Wait for flicker to retract before moving spindexer
-                if (sTimer.seconds() >= POST_FLICK_SEC) {
-                    currentSlot = shootSlot;
-                    servoTarget = SHOOT_POSITIONS[shootSlot];
-                    spindexerAxon.setTargetRotation(servoTarget);
-                    sState = SState.ADVANCING;
+                if (shootQueueIndex >= 3) {
+                    // Last shot — use longer retract time, then go to DONE
+                    if (sTimer.seconds() >= POST_FLICK_SEC_FINAL) {
+                        sTimer.reset();
+                        sState = SState.DONE;
+                    }
+                } else {
+                    // Not last shot — use normal retract time, advance to next shot
+                    if (sTimer.seconds() >= POST_FLICK_SEC) {
+                        currentSlot = shootSlot;
+                        servoTarget = SHOOT_POSITIONS[shootSlot];
+                        spindexerAxon.setTargetRotation(servoTarget);
+                        sState = SState.ADVANCING;
+                    }
                 }
                 break;
 
@@ -464,6 +474,8 @@ public class SpindexerController {
                 if (sTimer.seconds() >= 1.0) {
                     // Kill flywheel after 1 second
                     flywheel.setVelocity(0);
+                    // Ensure flicker is fully retracted before intake resumes
+                    flicker.setPosition(flickRest);
                     // Move spindexer back to first intake position so intake can resume
                     currentSlot = 0;
                     servoTarget = INTAKE_POSITIONS[0];

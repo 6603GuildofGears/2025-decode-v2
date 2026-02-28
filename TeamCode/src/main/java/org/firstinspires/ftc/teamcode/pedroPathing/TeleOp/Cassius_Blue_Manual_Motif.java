@@ -26,8 +26,8 @@ import android.util.Size;
 
 
 
-@TeleOp(name="Cassius Blue", group="TeleOp")
-public class Cassius_Blue extends LinearOpMode {
+@TeleOp(name="Cassius Blue Manual Motif", group="TeleOp")
+public class Cassius_Blue_Manual_Motif extends LinearOpMode {
 
 
 

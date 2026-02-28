@@ -114,13 +114,14 @@ public class Cassius_Red extends LinearOpMode {
         boolean autoAimEnabled = true;  // Y2 toggles this
         boolean lastY2 = false;         // edge detection for Y2
 
-        // === MOTIF FIRE: left trigger starts sequence ===
-        // Sequence: turn turret → 20°, lock on via Limelight, auto-shoot
-        int motifState = 0; // 0=IDLE, 1=TURN_TO_20, 2=LOCK_ON, 3=SHOOT
+        // === MOTIF FIRE: gamepad2 A starts sequence ===
+        // Sequence: scan balls → turn turret → 20° → lock on → auto-shoot
+        int motifState = 0; // 0=IDLE, 1=SCAN, 2=TURN_TO_20, 3=LOCK_ON, 4=SHOOT
         ElapsedTime motifTimer = new ElapsedTime();
-        boolean lastLTrigger1 = false; // edge detection for left trigger
+        boolean lastA2Motif = false; // edge detection for gamepad2 A (motif fire)
         double MOTIF_TARGET_DEG = 20.0;
         boolean motifShootTriggered = false;
+        boolean motifTargetSeen = false; // true once goal tag is seen during match (persists)
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -324,8 +325,9 @@ public class Cassius_Red extends LinearOpMode {
                 targetHoodPos = tuned.hoodPos;
                 hood.setPosition(targetHoodPos);
                 sdx.setShootRpm(targetRpm);
-            } else {
-                // Manual hood control is secondary — only when no target
+            } else if (!sdx.isShooting()) {
+                // Manual hood control is secondary — only when no target AND not shooting
+                // While shooting, keep last known RPM/hood so we don't revert mid-sequence
                 targetRpm = baseRpm;
                 sdx.setShootRpm(baseRpm);
                 double currentHoodPos = hood.getPosition();
@@ -337,12 +339,12 @@ public class Cassius_Red extends LinearOpMode {
             }
 
             // Shooting sequence — SpindexerController handles everything
-            //   Motif fire state 3 also triggers a shoot
-            boolean motifShootNow = (motifState == 3 && !motifShootTriggered);
+            //   Motif fire state 4 also triggers a shoot
+            boolean motifShootNow = (motifState == 4 && !motifShootTriggered);
             sdx.updateShoot(RBumper2 || motifShootNow, LBumper2, flywheel);
             if (motifShootNow) motifShootTriggered = true;
             // Motif fire: finish once shoot sequence completes
-            if (motifState == 3 && motifShootTriggered && !sdx.isShooting()) {
+            if (motifState == 4 && motifShootTriggered && !sdx.isShooting()) {
                 motifState = 0; // sequence complete → back to IDLE
             }
 
@@ -350,14 +352,23 @@ public class Cassius_Red extends LinearOpMode {
             boolean currentMagState = isMagPressed();
             lastMagState = currentMagState;
 
-            // === MOTIF FIRE: left trigger starts the sequence ===
-            boolean ltPressed = LTrigger1 > 0.25;
-            if (ltPressed && !lastLTrigger1 && motifState == 0) {
-                motifState = 1;  // start → turn turret to 20°
+            // === MOTIF FIRE: gamepad2 A starts the sequence ===
+            if (a2 && !lastA2Motif && motifState == 0) {
+                motifState = 1;  // start → scan balls
+                sdx.startScan("RED"); // scan & order by red balls first
                 motifTimer.reset();
                 motifShootTriggered = false;
             }
-            lastLTrigger1 = ltPressed;
+            lastA2Motif = a2;
+
+            // === MOTIF state 1: SCAN — wait for spindexer scan to finish ===
+            if (motifState == 1) {
+                boolean scanDone = sdx.updateScan();
+                if (scanDone) {
+                    motifState = 2;  // scan done → turn turret
+                    motifTimer.reset();
+                }
+            }
 
             // ================================================================
             //  TURRET TRACKING (from Turret_try — direct Limelight PID)
@@ -376,13 +387,13 @@ public class Cassius_Red extends LinearOpMode {
             // --- Manual turret control — gamepad2 dpad left/right ---
             boolean manualTurret = dpadLeft2 || dpadRight2;
 
-            if (motifState == 1) {
-                // === MOTIF FIRE step 1: turn turret to 20° ===
+            if (motifState == 2) {
+                // === MOTIF FIRE step 2: turn turret to 20° ===
                 double motifError = MOTIF_TARGET_DEG - turretDeg;
                 turretPower = Math.max(-0.3, Math.min(0.3, motifError * 0.02));
-                turretMode = "MOTIF→20°";
+                turretMode = "MOTIF\u219220\u00b0";
                 if (Math.abs(motifError) < 2.0) {
-                    motifState = 2;  // close enough → start locking on
+                    motifState = 3;  // close enough → start locking on
                     motifTimer.reset();
                 }
             } else if (manualTurret) {
@@ -499,10 +510,16 @@ public class Cassius_Red extends LinearOpMode {
             turret.setPower(turretPower);
             lastTurretPower = turretPower; // save for coasting next cycle
 
-            // Motif fire: state 2 — wait for Limelight lock, then transition to shoot
-            if (motifState == 2) {
-                if (turretMode.equals("LOCKED ON") || motifTimer.seconds() > 3.0) {
-                    motifState = 3;  // locked on (or timeout) → shoot!
+            // Log whether goal tag (ID 24) has been seen during the match
+            // Skip updating during shoot sequence to avoid false positives
+            if (!sdx.isShooting() && turretMode.equals("LOCKED ON")) {
+                motifTargetSeen = true;
+            }
+
+            // Motif fire: state 3 — once target is seen, shoot immediately
+            if (motifState == 3) {
+                if (motifTargetSeen || motifTimer.seconds() > 3.0) {
+                    motifState = 4;  // target seen (or timeout) → shoot!
                     motifTimer.reset();
                     motifShootTriggered = false;
                 }
@@ -513,20 +530,27 @@ public class Cassius_Red extends LinearOpMode {
             if (hasTarget()) {
                 LLResult llCheck = getLatestResult();
                 if (llCheck != null && llCheck.isValid() && llCheck.getFiducialResults() != null && !llCheck.getFiducialResults().isEmpty()) {
-                    int firstTag = (int) llCheck.getFiducialResults().get(0).getFiducialId();
-                    telemetry.addData("Tag ID", firstTag);
+                    StringBuilder tagList = new StringBuilder();
+                    for (LLResultTypes.FiducialResult f : llCheck.getFiducialResults()) {
+                        if (tagList.length() > 0) tagList.append(", ");
+                        tagList.append((int) f.getFiducialId());
+                    }
+                    telemetry.addData("Tags Seen", tagList.toString());
+                    telemetry.addData("# Tags", llCheck.getFiducialResults().size());
                 } else {
-                    telemetry.addData("Tag ID", "NONE");
+                    telemetry.addData("Tags Seen", "NONE");
                 }
             } else {
-                telemetry.addData("Tag ID", "NONE");
+                telemetry.addData("Tags Seen", "NONE");
             }
             
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
-            String[] motifLabels = {"IDLE", "TURN→20°", "LOCKING", "SHOOTING"};
+            String[] motifLabels = {"IDLE", "SCANNING", "TURN→20°", "LOCKING", "SHOOTING"};
             telemetry.addData("Motif Fire", motifLabels[motifState]);
+            telemetry.addData("Motif Target Seen", motifTargetSeen ? "YES ✓" : "NO");
+            telemetry.addData("Scan Order", sdx.getSlotColor(0) + " → " + sdx.getSlotColor(1) + " → " + sdx.getSlotColor(2));
             
             telemetry.addData("=== SHOOTER ===", "");
             telemetry.addData("Target RPM", String.format("%.0f", targetRpm));
@@ -538,6 +562,8 @@ public class Cassius_Red extends LinearOpMode {
 
             
             // Push key data to Panels
+            String[] motifPanelLabels = {"IDLE", "TURN\u219220\u00b0", "LOCKING", "SHOOTING"};
+            telemetryM.debug("MOTIF: " + motifPanelLabels[motifState]);
             telemetryM.debug("Turret: " + String.format("%.1f\u00b0", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
             telemetryM.debug("PID: kP=" + String.format("%.4f", kP) + " kI=" + String.format("%.5f", kI) + " kD=" + String.format("%.4f", kD));
             telemetryM.debug("Mag: " + (isMagPressed() ? "PRESSED" : "---"));

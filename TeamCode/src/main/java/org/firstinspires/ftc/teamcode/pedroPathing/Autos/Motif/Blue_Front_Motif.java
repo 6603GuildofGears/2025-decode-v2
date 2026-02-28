@@ -22,7 +22,6 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
  * Scans for obelisk tag (21/22/23) during init_loop,
  * then shoots balls in the motif-required color order.
  */
-@Disabled
 @Autonomous(name = "Blue Front MOTIF", group = "Blue")
 public class Blue_Front_Motif extends OpMode {
     private Follower follower;

@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine.*;
 
 
-@Disabled
 @Autonomous(name="Move", group="Auto")
 public class move extends LinearOpMode {
 
@@ -23,12 +22,12 @@ public class move extends LinearOpMode {
         
         if (opModeIsActive()) {
             // Move forward at half speed
-            frontLeft.setPower(-0.25);
-            frontRight.setPower(-0.25);
-            backLeft.setPower(-0.25);
-            backRight.setPower(-0.25);
+            frontLeft.setPower(-0.75);
+            frontRight.setPower(-0.75);
+            backLeft.setPower(-0.75);
+            backRight.setPower(-0.75);
             
-            sleep(1250); // Move for 2 seconds
+            sleep(3000); // Move for 2 seconds
             
             // Stop all motors
             frontLeft.setPower(0);  

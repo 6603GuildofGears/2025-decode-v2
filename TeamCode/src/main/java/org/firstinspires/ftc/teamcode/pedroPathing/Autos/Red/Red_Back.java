@@ -14,7 +14,6 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motor_PipeLine;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
-import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.limelightvision.LLResult;
@@ -42,33 +41,32 @@ public class Red_Back extends OpMode {
 
     // Limelight-based shooter tuning
     private Limelight3A limelight;
-    private double shootRpm = 3000;
-    private double shootHood = 0.0;
+    private double shootRpm = 4625;
+    private double shootHood = 0.5;
     private double smoothedDistance = -1;
     private static final double SMOOTHING_ALPHA = 0.3;
     private static final int GOAL_TAG_ID = 24; // red goal
 
     // Turret auto-aim
-    private static final double TURRET_TARGET_DEG = 85.0;
+    private static final double TURRET_SHOOT_DEG = 71.6;  // turret position to shoot
+    private double turretTargetDeg = TURRET_SHOOT_DEG;     // active target
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
     private static final double TURRET_LIMIT_DEG = 5.0;
 
 
         public enum PathState {
-            DRIVE_STARTPOSE_TO_SHOOTPOSE,
+            TURRET_TO_SHOOT,
             SHOOT_PRELOAD,
             DRIVE_SHOOTPOSE_TO_INTAKE1,
             DRIVE_INTAKE1_TO_INTAKE1POSE2,
             DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3,
-            DRIVE_INTAKE1POSE3_TO_SHOOTPOSE,
-            SHOOT_INTAKE1,
-            DRIVE_SHOOTPOSE_TO_INTAKE2,
+            DRIVE_INTAKE1POSE3_TO_INTAKE2,
             DRIVE_INTAKE2_TO_INTAKE2POSE1,
             DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2,
             DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3,
             DRIVE_INTAKE2POSE3_TO_SHOOTPOSE,
-            SHOOT_INTAKE2,
+            SHOOT_ALL,
             DRIVE_SHOOTPOSE_TO_ENDPOSE,
         }
 
@@ -76,7 +74,7 @@ public class Red_Back extends OpMode {
 
 
     // Poses — mirrored from Blue_Back (redX = 144 - blueX, same Y)
-    private final Pose startPose = new Pose(87, 9, Math.toRadians(0));
+    private final Pose startPose = new Pose(87, 9, Math.toRadians(90));
 
     private final Pose shootPose = new Pose(87, 20, Math.toRadians(0));    // Shooting position
 
@@ -97,12 +95,11 @@ public class Red_Back extends OpMode {
     private boolean pathStarted = false;
 
 
-    private PathChain driveStartPoseShootPose;
+    private PathChain driveStartToIntake1;
     private PathChain driveShootPoseToIntake1;
     private PathChain driveIntake1ToIntake1Pose2;
     private PathChain driveIntake1Pose2ToIntake1Pose3;
-    private PathChain driveIntake1Pose3ToShootPose;
-    private PathChain driveShootPoseToIntake2;
+    private PathChain driveIntake1Pose3ToIntake2;
     private PathChain driveIntake2ToIntake2Pose1;
     private PathChain driveIntake2Pose1ToIntake2Pose2;
     private PathChain driveIntake2Pose2ToIntake2Pose3;
@@ -112,13 +109,13 @@ public class Red_Back extends OpMode {
 
  public void buildPaths() {
 
-     driveStartPoseShootPose = follower.pathBuilder()
-            .addPath(new BezierLine(startPose, shootPose))
-            .setConstantHeadingInterpolation(shootPose.getHeading())
+        driveStartToIntake1 = follower.pathBuilder()
+            .addPath(new BezierLine(startPose, intake1))
+            .setConstantHeadingInterpolation(intake1.getHeading())
             .build();
 
         driveShootPoseToIntake1 = follower.pathBuilder()
-            .addPath(new BezierLine(shootPose, intake1))
+            .addPath(new BezierLine(startPose, intake1))
             .setConstantHeadingInterpolation(intake1.getHeading())
             .build();
 
@@ -132,13 +129,8 @@ public class Red_Back extends OpMode {
             .setConstantHeadingInterpolation(intake1Pose3.getHeading())
             .build();
 
-        driveIntake1Pose3ToShootPose = follower.pathBuilder()
-            .addPath(new BezierLine(intake1Pose3, shootPose))
-            .setLinearHeadingInterpolation(intake1Pose3.getHeading(), shootPose.getHeading())
-            .build();
-
-        driveShootPoseToIntake2 = follower.pathBuilder()
-            .addPath(new BezierLine(shootPose, intake2))
+        driveIntake1Pose3ToIntake2 = follower.pathBuilder()
+            .addPath(new BezierLine(intake1Pose3, intake2))
             .setConstantHeadingInterpolation(intake2.getHeading())
             .build();
 
@@ -171,16 +163,21 @@ public class Red_Back extends OpMode {
     private void updateTurret() {
         int pos = turret.getCurrentPosition();
         double posDeg = pos / TICKS_PER_DEG;
-        double targetTicks = TURRET_TARGET_DEG * TICKS_PER_DEG;
+        double targetTicks = turretTargetDeg * TICKS_PER_DEG;
         double error = targetTicks - pos;
         double power = error * TURRET_P_GAIN;
         power = Math.max(-TURRET_MAX_POWER, Math.min(TURRET_MAX_POWER, power));
-        if (posDeg > TURRET_TARGET_DEG + TURRET_LIMIT_DEG && power > 0) {
+        if (posDeg > turretTargetDeg + TURRET_LIMIT_DEG && power > 0) {
             power = 0;
-        } else if (posDeg < TURRET_TARGET_DEG - TURRET_LIMIT_DEG && power < 0) {
+        } else if (posDeg < turretTargetDeg - TURRET_LIMIT_DEG && power < 0) {
             power = 0;
         }
         turret.setPower(power);
+    }
+
+    private boolean isTurretAtTarget(double toleranceDeg) {
+        double posDeg = turret.getCurrentPosition() / TICKS_PER_DEG;
+        return Math.abs(posDeg - turretTargetDeg) < toleranceDeg;
     }
 
     /**
@@ -220,17 +217,19 @@ public class Red_Back extends OpMode {
         updateShooterFromLimelight();
 
         switch (pathState) {
-            case DRIVE_STARTPOSE_TO_SHOOTPOSE:
-                if (!pathStarted) {
-                    follower.followPath(driveStartPoseShootPose, true);
+            case TURRET_TO_SHOOT:
+                // Spin up flywheel, wait for turret to reach shoot position
+                if (!shooterStarted) {
+                    turretTargetDeg = TURRET_SHOOT_DEG;
                     Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
                     flywheel.setVelocity(getTickSpeed(shootRpm));
-                    pathStarted = true;
-                }
-                if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.SHOOT_PRELOAD;
-                    pathStarted = false;
                     shooterTimer.reset();
+                    shooterStarted = true;
+                }
+                if (isTurretAtTarget(2.0) || shooterTimer.seconds() >= 2.0) {
+                    pathState = PathState.SHOOT_PRELOAD;
+                    shooterTimer.reset();
+                    shooterStarted = false;
                 }
                 break;
 
@@ -318,57 +317,16 @@ public class Red_Back extends OpMode {
                         ballWaitStarted = true;
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
-                        pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                        pathState = PathState.DRIVE_INTAKE1POSE3_TO_INTAKE2;
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
                 }
                 break;
 
-            case DRIVE_INTAKE1POSE3_TO_SHOOTPOSE:
+            case DRIVE_INTAKE1POSE3_TO_INTAKE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1Pose3ToShootPose, true);
-                    flywheel.setVelocity(getTickSpeed(shootRpm));
-                    pathStarted = true;
-                }
-
-                if (follower.getCurrentTValue() >= 0.5) {
-                    intake.setPower(0);
-                    intakeMotor2.setPower(0);
-                    intakeRunning = false;
-                }
-
-                if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.SHOOT_INTAKE1;
-                    pathStarted = false;
-                    shooterTimer.reset();
-                }
-                break;
-
-            case SHOOT_INTAKE1:
-                if (!shootSequenceStarted) {
-                    spindexerController.updateShoot(true, false, flywheel);
-                    intake.setPower(-0.5);
-                    intakeMotor2.setPower(-0.5);
-                    shootSequenceStarted = true;
-                } else {
-                    spindexerController.updateShoot(false, false, flywheel);
-                }
-                if (!spindexerController.isShooting() && shootSequenceStarted) {
-                    intake.setPower(0);
-                    intakeMotor2.setPower(0);
-                    flywheel.setVelocity(0);
-                    shootSequenceStarted = false;
-                    spindexerController.resetShootState();
-                    spindexerController.clearAllSlots();
-                    Servo_Pipeline.flicker.setPosition(0);
-                    pathState = PathState.DRIVE_SHOOTPOSE_TO_INTAKE2;
-                }
-                break;
-
-            case DRIVE_SHOOTPOSE_TO_INTAKE2:
-                if (!pathStarted) {
-                    follower.followPath(driveShootPoseToIntake2, true);
+                    follower.followPath(driveIntake1Pose3ToIntake2, true);
                     pathStarted = true;
                 }
 
@@ -460,19 +418,16 @@ public class Red_Back extends OpMode {
                     intakeRunning = false;
                 }
 
-                if (follower.getCurrentTValue() >= 0.5 && !shooterStarted) {
-                    shooterTimer.reset();
-                    shooterStarted = true;
-                }
-
                 if (pathStarted && !follower.isBusy()) {
-                    pathState = PathState.SHOOT_INTAKE2;
+                    pathState = PathState.SHOOT_ALL;
                     pathStarted = false;
+                    shooterTimer.reset();
                 }
                 break;
 
-            case SHOOT_INTAKE2:
+            case SHOOT_ALL:
                 if (!shootSequenceStarted) {
+                    spindexerController.prefillAllSlots();
                     spindexerController.updateShoot(true, false, flywheel);
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(-0.5);
@@ -522,7 +477,7 @@ public class Red_Back extends OpMode {
              @Override
     public void init() {
     
-    pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
+    pathState = PathState.TURRET_TO_SHOOT;
     pathTimer = new Timer();
     opmodeTimer = new Timer();
     opmodeTimer.resetTimer();
@@ -544,8 +499,6 @@ public class Red_Back extends OpMode {
     Servo_Pipeline.flicker.setPosition(0);
     Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
 
-    // Initialize Limelight for distance-based shooter tuning
-    Limelight_Pipeline.initLimelight(this);
     limelight = hardwareMap.get(Limelight3A.class, "limelight");
 
     buildPaths();
@@ -555,7 +508,7 @@ public class Red_Back extends OpMode {
 
      public void start () {
     opmodeTimer.resetTimer();
-    pathState = PathState.DRIVE_STARTPOSE_TO_SHOOTPOSE;
+    pathState = PathState.TURRET_TO_SHOOT;
     spindexerController.goToSlot(0);
     }
 
@@ -572,6 +525,8 @@ public class Red_Back extends OpMode {
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));
         telemetry.addData("Path time (s): ", pathTimer.getElapsedTimeSeconds());
+        telemetry.addData("Shooter rpm", flywheel.getVelocity() * 60.0 / 28.0);
+        telemetry.addData("Target rpm", shootRpm);
         telemetry.update();
     
     }

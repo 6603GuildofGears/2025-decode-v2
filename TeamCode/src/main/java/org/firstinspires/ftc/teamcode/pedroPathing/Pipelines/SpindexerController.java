@@ -113,8 +113,17 @@ public class SpindexerController {
     private int totalShotsFired = 0;  // lifetime confirmed shots across all sequences
 
     // ========== Motif ordering ==========
-    private String[] motifOrder = null;   // null = default P3→P2→P1, else color sequence
+    private String[] motifOrder = null;   // null = default P3→P1, else color sequence
     private int motifIndex = 0;           // which motif position we're shooting next (0, 1, 2)
+    private boolean useColorOrder = false; // true = shoot queue was built by color scan
+
+    // ========== Ball scan (for motif fire) ==========
+    private enum ScanState { IDLE, MOVING, SETTLING, READING, DONE }
+    private ScanState scanState = ScanState.IDLE;
+    private int scanSlot = 0;
+    private ElapsedTime scanTimer = new ElapsedTime();
+    private String scanAlliance = "BLUE";
+    private static final double SCAN_SETTLE_SEC = 0.3;
 
     // ========== Constructor ==========
     public SpindexerController() {}
@@ -139,6 +148,7 @@ public class SpindexerController {
     public void clearMotifOrder() {
         this.motifOrder = null;
         this.motifIndex = 0;
+        this.useColorOrder = false;
     }
 
     /**
@@ -342,11 +352,13 @@ public class SpindexerController {
 
             case IDLE:
                 if (shootPressed) {
-                    // Always assume all 3 slots are loaded when we shoot
-                    prefillAllSlots();
+                    // If color-ordered (from scan), keep existing slotColor/slotEmpty
+                    if (!useColorOrder) {
+                        prefillAllSlots();
+                    }
                     confirmedShots = 0;  // reset per-sequence counter
 
-                    // Find first slot to shoot (nearest end)
+                    // Find first slot to shoot (color-ordered or nearest end)
                     shootSlot = findFirstShootSlot();
 
                     currentSlot = shootSlot;
@@ -380,9 +392,11 @@ public class SpindexerController {
             case SHOOT_SETTLE:
                 // Keep flywheel at target while settling
                 flywheel.setVelocity(rpmToTPS(shootRpm));
-                // Fire when flywheel is at or above target RPM
+                // Fire only when flywheel RPM is ready AND spindexer is at correct position
                 double settleRpm = flywheel.getVelocity() * 60.0 / 28.0;
-                if (settleRpm >= (shootRpm - RPM_READY_TOLERANCE)) {
+                boolean rpmReady = settleRpm >= (shootRpm - RPM_READY_TOLERANCE);
+                boolean posReady = spindexerAxon.isAtTarget(5);
+                if (rpmReady && posReady) {
                     preFlickTPS = flywheel.getVelocity();
                     shotDetected = false;
                     flicker.setPosition(flickShoot);
@@ -533,6 +547,101 @@ public class SpindexerController {
             if (!slotEmpty[i]) return i;
         }
         return -1;
+    }
+
+    // ======================================================================
+    //  BALL SCAN — rotates through slots, reads sensor, builds color queue
+    // ======================================================================
+
+    /**
+     * Start a ball scan. Moves spindexer through P1→P2→P3, reads sensor at each.
+     * Call updateScan() each loop until isScanDone() returns true.
+     * @param alliance  "BLUE" or "RED" — alliance-color balls are queued first
+     */
+    public void startScan(String alliance) {
+        scanAlliance = alliance;
+        scanSlot = 0;
+        spindexerAxon.setTargetRotation(INTAKE_POSITIONS[0]);
+        scanTimer.reset();
+        scanState = ScanState.MOVING;
+    }
+
+    /**
+     * Call every loop during motif scan. Returns true when scan is complete.
+     */
+    public boolean updateScan() {
+        spindexerAxon.update();
+        switch (scanState) {
+            case IDLE:
+                return false;
+            case MOVING:
+                if (spindexerAxon.isAtTarget(5)) {
+                    scanTimer.reset();
+                    scanState = ScanState.SETTLING;
+                }
+                break;
+            case SETTLING:
+                if (scanTimer.seconds() >= SCAN_SETTLE_SEC) {
+                    scanState = ScanState.READING;
+                }
+                break;
+            case READING:
+                updateSensors();
+                if (isBallPresent()) {
+                    slotColor[scanSlot] = detectBallColor();
+                    slotEmpty[scanSlot] = false;
+                } else {
+                    slotColor[scanSlot] = "NONE";
+                    slotEmpty[scanSlot] = true;
+                }
+                scanSlot++;
+                if (scanSlot >= 3) {
+                    buildColorShootQueue();
+                    scanState = ScanState.DONE;
+                    return true;
+                }
+                spindexerAxon.setTargetRotation(INTAKE_POSITIONS[scanSlot]);
+                scanState = ScanState.MOVING;
+                break;
+            case DONE:
+                return true;
+        }
+        return false;
+    }
+
+    /** Is the scan finished? */
+    public boolean isScanDone() { return scanState == ScanState.DONE; }
+
+    /** Get the scan slot currently being processed (0-2) */
+    public int getScanSlot() { return scanSlot; }
+
+    /**
+     * Build shoot queue by color: alliance-color balls fire FIRST.
+     * Opponent/other color balls fire after.
+     */
+    private void buildColorShootQueue() {
+        int idx = 0;
+        // First pass: alliance-color balls
+        for (int i = 0; i < 3; i++) {
+            if (!slotEmpty[i] && slotColor[i].equalsIgnoreCase(scanAlliance)) {
+                shootQueue[idx++] = i;
+            }
+        }
+        // Second pass: other colors (not alliance, not empty)
+        for (int i = 0; i < 3; i++) {
+            if (!slotEmpty[i] && !slotColor[i].equalsIgnoreCase(scanAlliance)
+                    && !"NONE".equals(slotColor[i])) {
+                shootQueue[idx++] = i;
+            }
+        }
+        // Fill remaining with empty slots (just for array completeness)
+        for (int i = 0; i < 3; i++) {
+            if (slotEmpty[i]) {
+                shootQueue[idx++] = i;
+                if (idx >= 3) break;
+            }
+        }
+        useColorOrder = true;
     }
 
     // ======================================================================

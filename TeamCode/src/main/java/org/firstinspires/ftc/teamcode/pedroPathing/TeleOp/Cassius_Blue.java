@@ -18,6 +18,8 @@ import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pi
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Limelight_Pipeline;
 import static org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor.*;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Motif;
+import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.MotifQueue;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
@@ -116,13 +118,16 @@ public class Cassius_Blue extends LinearOpMode {
         boolean lastY2 = false;         // edge detection for Y2
 
         // === MOTIF FIRE: gamepad2 A starts sequence ===
-        // Sequence: scan balls → turn turret → 20° → lock on → auto-shoot
-        int motifState = 0; // 0=IDLE, 1=SCAN, 2=TURN_TO_20, 3=LOCK_ON, 4=SHOOT
+        // Sequence: scan obelisk tag → scan balls → build queue → turn turret → 20° → lock on → auto-shoot
+        int motifState = 0; // 0=IDLE, 1=SCAN_TAG, 2=SCAN_BALLS, 3=TURN_TO_20, 4=LOCK_ON, 5=SHOOT
         ElapsedTime motifTimer = new ElapsedTime();
         boolean lastA2Motif = false; // edge detection for gamepad2 A (motif fire)
         double MOTIF_TARGET_DEG = 20.0;
         boolean motifShootTriggered = false;
         boolean motifTargetSeen = false; // true once goal tag is seen during match (persists)
+        int detectedMotifTag = -1;  // Obelisk tag ID (21/22/23)
+        String[] motifOrder = null;  // Required shoot order from motif
+        boolean motifTagLocked = false;
 
         // Panels telemetry
         TelemetryManager telemetryM = PanelsTelemetry.INSTANCE.getTelemetry();
@@ -364,11 +369,11 @@ public class Cassius_Blue extends LinearOpMode {
             //   slot tracking, skip empties, smart direction, flicker timing
             //   RBumper2 = shoot, LBumper2 = kill switch
             //   Motif fire state 4 also triggers a shoot
-            boolean motifShootNow = (motifState == 4 && !motifShootTriggered);
+            boolean motifShootNow = (motifState == 5 && !motifShootTriggered);
             sdx.updateShoot(RBumper2 || motifShootNow, LBumper2, flywheel);
             if (motifShootNow) motifShootTriggered = true;
             // Motif fire: finish once shoot sequence completes
-            if (motifState == 4 && motifShootTriggered && !sdx.isShooting()) {
+            if (motifState == 5 && motifShootTriggered && !sdx.isShooting()) {
                 motifState = 0; // sequence complete → back to IDLE
             }
 
@@ -378,18 +383,49 @@ public class Cassius_Blue extends LinearOpMode {
 
             // === MOTIF FIRE: gamepad2 A starts the sequence ===
             if (a2 && !lastA2Motif && motifState == 0) {
-                motifState = 1;  // start → scan balls
-                sdx.startScan("BLUE"); // scan & order by blue balls first
+                motifState = 1;  // start → scan obelisk tag
                 motifTimer.reset();
                 motifShootTriggered = false;
+                motifTagLocked = false;
+                detectedMotifTag = -1;
             }
             lastA2Motif = a2;
 
-            // === MOTIF state 1: SCAN — wait for spindexer scan to finish ===
+            // === MOTIF state 1: SCAN_TAG — detect obelisk AprilTag (21/22/23) ===
             if (motifState == 1) {
+                Limelight_Pipeline.pollOnce();
+                int tagId = Limelight_Pipeline.getObeliskTagId();
+                if (tagId != -1 && !motifTagLocked) {
+                    detectedMotifTag = tagId;
+                    motifOrder = Motif.getShootOrder(tagId);
+                    motifTagLocked = true;
+                }
+                // After 2 seconds or tag found, proceed to ball scan
+                if (motifTagLocked || motifTimer.seconds() >= 2.0) {
+                    if (!motifTagLocked) {
+                        // Fallback — shoot any order
+                        motifOrder = Motif.getShootOrder(-1);
+                    }
+                    motifState = 2;  // → scan balls
+                    sdx.startScan("BLUE");
+                    motifTimer.reset();
+                }
+            }
+
+            // === MOTIF state 2: SCAN_BALLS — wait for spindexer scan to finish ===
+            if (motifState == 2) {
                 boolean scanDone = sdx.updateScan();
                 if (scanDone) {
-                    motifState = 2;  // scan done → turn turret
+                    // Build motif queue based on detected tag and scanned balls
+                    if (motifOrder != null) {
+                        int[] queue = MotifQueue.buildMotifQueue(
+                            motifOrder,
+                            sdx.getSlotColors(),
+                            sdx.getSlotEmptyStatus()
+                        );
+                        sdx.setShootQueue(queue);
+                    }
+                    motifState = 3;  // scan & queue done → turn turret
                     motifTimer.reset();
                 }
             }
@@ -411,13 +447,13 @@ public class Cassius_Blue extends LinearOpMode {
             // --- Manual turret control — gamepad2 dpad left/right ---
             boolean manualTurret = dpadLeft2 || dpadRight2;
 
-            if (motifState == 2) {
-                // === MOTIF FIRE step 2: turn turret to 20° ===
+            if (motifState == 3) {
+                // === MOTIF FIRE step 3: turn turret to 20° ===
                 double motifError = MOTIF_TARGET_DEG - turretDeg;
                 turretPower = Math.max(-0.3, Math.min(0.3, motifError * 0.02));
-                turretMode = "MOTIF\u219220\u00b0";
+                turretMode = "MOTIF→20°";
                 if (Math.abs(motifError) < 2.0) {
-                    motifState = 3;  // close enough → start locking on
+                    motifState = 4;  // close enough → start locking on
                     motifTimer.reset();
                 }
             } else if (manualTurret) {
@@ -540,10 +576,10 @@ public class Cassius_Blue extends LinearOpMode {
                 motifTargetSeen = true;
             }
 
-            // Motif fire: state 3 — once target is seen, shoot immediately
-            if (motifState == 3) {
+            // Motif fire: state 4 — LOCK_ON — once target is seen, shoot immediately
+            if (motifState == 4) {
                 if (motifTargetSeen || motifTimer.seconds() > 3.0) {
-                    motifState = 4;  // target seen (or timeout) → shoot!
+                    motifState = 5;  // target seen (or timeout) → shoot!
                     motifTimer.reset();
                     motifShootTriggered = false;
                 }
@@ -571,8 +607,11 @@ public class Cassius_Blue extends LinearOpMode {
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
             telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
-            String[] motifLabels = {"IDLE", "SCANNING", "TURN→20°", "LOCKING", "SHOOTING"};
+            String[] motifLabels = {"IDLE", "SCAN TAG", "SCAN BALLS", "TURN→20°", "LOCKING", "SHOOTING"};
             telemetry.addData("Motif Fire", motifLabels[motifState]);
+            if (motifTagLocked && detectedMotifTag != -1) {
+                telemetry.addData("Motif Detected", Motif.getMotifName(detectedMotifTag));
+            }
             telemetry.addData("Motif Target Seen", motifTargetSeen ? "YES ✓" : "NO");
             telemetry.addData("Scan Order", sdx.getSlotColor(0) + " → " + sdx.getSlotColor(1) + " → " + sdx.getSlotColor(2));
             

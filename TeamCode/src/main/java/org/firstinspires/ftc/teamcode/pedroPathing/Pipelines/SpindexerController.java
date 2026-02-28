@@ -727,6 +727,15 @@ public class SpindexerController {
     public boolean isSlotEmpty(int i) { return (i >= 0 && i < 3) && slotEmpty[i]; }
     public boolean isShooting()       { return sState != SState.IDLE && sState != SState.DONE; }
     public int     getBallCount()     { int c = 0; for (boolean e : slotEmpty) if (!e) c++; return c; }
+    
+    // ========== Setters ==========
+    /** Set slot color (for camera-based ball detection update) */
+    public void setSlotColor(int slot, String color) {
+        if (slot >= 0 && slot < 3) {
+            slotColor[slot] = color;
+        }
+    }
+    
     /** Number of open slots available for intake (0-3) */
     public int     getOpenSlots()     { return 3 - getBallCount(); }
     /** Total misfire count since last reset (for diagnostics) */

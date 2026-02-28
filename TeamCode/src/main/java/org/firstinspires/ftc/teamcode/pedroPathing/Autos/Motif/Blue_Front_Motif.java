@@ -22,6 +22,10 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.SpindexerController
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Servo_Pipeline;
 import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.ShooterLookup;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline;
+import org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.Test_codes.BallDetectorPipeline.BallDetection;
+
+import java.util.List;
 
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
@@ -50,27 +54,47 @@ public class Blue_Front_Motif extends OpMode {
 
     // Shooter settings (fixed for autonomous shoot pose)
     // Shoot pose (49, 84) to blue basket - approximately 30-35 inches
-    private double shootRpm = 3000;     // From ShooterLookup for ~30-35"
-    private double shootHood = 0.375;     // From ShooterLookup for ~30-35"
+    private double shootRpm = 3250;     // From ShooterLookup for ~30-35"
+    private double shootHood = 0.5;     // From ShooterLookup for ~30-35"
     private static final int GOAL_TAG_ID = 20; // blue goal
 
+    // End position shooter settings
+    // End pose (55, 209) to blue basket - different angle/distance
+    private double endShootRpm = 3400;     // RPM for end position shot
+    private double endShootHood = 0.52;    // Hood angle for end position shot
+
     // Turret auto-aim
-    private static final double TURRET_TARGET_DEG = 94;  // Shooting angle
-    private static final double TURRET_MOTIF_SCAN_DEG = 30;  // Angle to scan for motif tag
+    private static final double TURRET_TARGET_DEG = 94;  // Shooting angle for initial shootPose
+    private static final double TURRET_END_SHOOT_DEG = 85;  // Shooting angle for endPose
+    private static final double TURRET_MOTIF_SCAN_DEG = 100;  // Angle to scan for motif tag
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
     private static final double TURRET_LIMIT_DEG = 5.0;
+    private boolean shootingFromEndPose = false;  // Track which shooting position we're using
     
     // Motif scan timing
     private static final double MOTIF_SCAN_TIME_SEC = 1.8;  // How long to scan for motif during drive
     private ElapsedTime motifScanTimer = new ElapsedTime();
-    private boolean scanningForMotif = false;  // True while turret scans at 30° for motif
+    private boolean scanningForMotif = false;  // True while turret scans at 100° for motif
     private boolean turretAtShootAngle = false;  // True when turret reaches 94° after scan
     
     // Auto time management
     private static final double AUTO_TIME_LIMIT_SEC = 30.0;  // Total autonomous time
     private static final double EMERGENCY_ABORT_TIME_SEC = 25.0;  // Abort and park when this time is reached (5 seconds remaining)
     private boolean emergencyAbortTriggered = false;
+    
+    // Ball detection camera
+    private boolean useCameraDetection = true;  // Enable camera-based ball detection
+    private ElapsedTime cameraUpdateTimer = new ElapsedTime();  // Throttle camera updates
+
+    // Spindexer unjam detection
+    private double lastSpindexerAngle = 0;
+    private ElapsedTime spindexerStuckTimer = new ElapsedTime();
+    private boolean isUnjamming = false;
+    private ElapsedTime unjamTimer = new ElapsedTime();
+    private static final double STUCK_THRESHOLD_SEC = 1.0;  // Time before declaring stuck
+    private static final double ANGLE_CHANGE_THRESHOLD = 3.0;  // Minimum angle movement to consider "moving"
+    private static final double UNJAM_DURATION_SEC = 0.5;  // How long to reverse intake
 
     // Motif detection
     private int detectedTagId = -1;
@@ -83,7 +107,8 @@ public class Blue_Front_Motif extends OpMode {
         DRIVE_SHOOTPOSE_TO_INTAKE1,
         DRIVE_INTAKE1_TO_INTAKE1POSE2,
         DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3,
-        DRIVE_INTAKE1POSE3_TO_SHOOTPOSE,
+        DRIVE_INTAKE1POSE3_TO_INTAKE1POSE4,
+        DRIVE_INTAKE1POSE4_TO_SHOOTPOSE,
         SHOOT_INTAKE1,
         DRIVE_SHOOTPOSE_TO_INTAKE2,
         DRIVE_INTAKE2_TO_INTAKE2POSE1,
@@ -92,6 +117,7 @@ public class Blue_Front_Motif extends OpMode {
         DRIVE_INTAKE2POSE3_TO_SHOOTPOSE,
         SHOOT_INTAKE2,
         DRIVE_SHOOTPOSE_TO_ENDPOSE,
+        SHOOT_AT_ENDPOSE
     }
 
     PathState pathState;
@@ -100,13 +126,14 @@ public class Blue_Front_Motif extends OpMode {
     private final Pose startPose = new Pose(20, 120, Math.toRadians(144));
     private final Pose shootPose = new Pose(49, 84, Math.toRadians(180));
     private final Pose intake1 = new Pose(37, 76, Math.toRadians(180));       // Intake 1 position
-    private final Pose intake1Pose2 = new Pose(35, 76, Math.toRadians(180));  // Intake 1 waypoint 2
-    private final Pose intake1Pose3 = new Pose(33, 76, Math.toRadians(180));  // Intake 1 waypoint 3
+    private final Pose intake1Pose2 = new Pose(35.5, 76, Math.toRadians(180));  // Intake 1 waypoint 2
+    private final Pose intake1Pose3 = new Pose(30, 76, Math.toRadians(180));  // Intake 1 waypoint 3
+    private final Pose intake1Pose4 = new Pose(28, 76, Math.toRadians(180));  // Intake 1 waypoint 4 (2 inches forward)
     private final Pose intake2 = new Pose(45, 56, Math.toRadians(180));       // Intake 2 position
     private final Pose intake2Pose1 = new Pose(37, 56, Math.toRadians(180));  // Intake 2 waypoint 1
-    private final Pose intake2Pose2 = new Pose(33, 56, Math.toRadians(180));  // Intake 2 waypoint 2
-    private final Pose intake2Pose3 = new Pose(29, 56, Math.toRadians(180));  // Intake 2 waypoint 3
-    private final Pose endPose = new Pose(24, 72, Math.toRadians(180));       // Park position
+    private final Pose intake2Pose2 = new Pose(35, 56, Math.toRadians(180));  // Intake 2 waypoint 2
+    private final Pose intake2Pose3 = new Pose(31, 56, Math.toRadians(180));  // Intake 2 waypoint 3
+    private final Pose endPose = new Pose(55, 209, Math.toRadians(180));       // Final shoot position
 
     private boolean pathStarted = false;
 
@@ -114,7 +141,8 @@ public class Blue_Front_Motif extends OpMode {
     private PathChain driveShootPoseToIntake1;
     private PathChain driveIntake1ToIntake1Pose2;
     private PathChain driveIntake1Pose2ToIntake1Pose3;
-    private PathChain driveIntake1Pose3ToShootPose;
+    private PathChain driveIntake1Pose3ToIntake1Pose4;
+    private PathChain driveIntake1Pose4ToShootPose;
     private PathChain driveShootPoseToIntake2;
     private PathChain driveIntake2ToIntake2Pose1;
     private PathChain driveIntake2Pose1ToIntake2Pose2;
@@ -143,9 +171,14 @@ public class Blue_Front_Motif extends OpMode {
                 .setConstantHeadingInterpolation(intake1Pose3.getHeading())
                 .build();
 
-        driveIntake1Pose3ToShootPose = follower.pathBuilder()
-                .addPath(new BezierLine(intake1Pose3, shootPose))
-                .setLinearHeadingInterpolation(intake1Pose3.getHeading(), shootPose.getHeading())
+        driveIntake1Pose3ToIntake1Pose4 = follower.pathBuilder()
+                .addPath(new BezierLine(intake1Pose3, intake1Pose4))
+                .setConstantHeadingInterpolation(intake1Pose4.getHeading())
+                .build();
+
+        driveIntake1Pose4ToShootPose = follower.pathBuilder()
+                .addPath(new BezierLine(intake1Pose4, shootPose))
+                .setLinearHeadingInterpolation(intake1Pose4.getHeading(), shootPose.getHeading())
                 .build();
 
         driveShootPoseToIntake2 = follower.pathBuilder()
@@ -180,8 +213,9 @@ public class Blue_Front_Motif extends OpMode {
     }
 
     private void updateTurret() {
-        // Use different target angle based on whether we're scanning for motif
-        double targetDeg = scanningForMotif ? TURRET_MOTIF_SCAN_DEG : TURRET_TARGET_DEG;
+        // Use different target angle based on whether we're scanning for motif or shooting from endPose
+        double shootTargetDeg = shootingFromEndPose ? TURRET_END_SHOOT_DEG : TURRET_TARGET_DEG;
+        double targetDeg = scanningForMotif ? TURRET_MOTIF_SCAN_DEG : shootTargetDeg;
             
         int pos = turret.getCurrentPosition();
         double posDeg = pos / TICKS_PER_DEG;
@@ -197,7 +231,7 @@ public class Blue_Front_Motif extends OpMode {
         turret.setPower(power);
         
         // Check if turret is at shoot angle (used to gate shooting start)
-        turretAtShootAngle = (Math.abs(posDeg - TURRET_TARGET_DEG) <= TURRET_LIMIT_DEG);
+        turretAtShootAngle = (Math.abs(posDeg - shootTargetDeg) <= TURRET_LIMIT_DEG);
     }
 
     // Commented out - not needed since we shoot from fixed position in autonomous
@@ -231,6 +265,77 @@ public class Blue_Front_Motif extends OpMode {
     */
 
     private double getTickSpeed(double rpm) { return rpm * 28.0 / 60.0; }
+    
+    /**
+     * Check if spindexer is stuck and needs unjamming.
+     * Returns true if currently executing unjam routine.
+     */
+    private boolean checkAndUnjamSpindexer() {
+        if (isUnjamming) {
+            // Currently unjamming - run reverse intake
+            if (unjamTimer.seconds() < UNJAM_DURATION_SEC) {
+                // Reverse at half speed
+                intake.setPower(0.25);
+                intakeMotor2.setPower(-0.5);
+                return true;
+            } else {
+                // Unjam complete - resume normal intake
+                isUnjamming = false;
+                spindexerStuckTimer.reset();
+                lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
+                return false;
+            }
+        }
+
+        // Check if spindexer is moving during intake
+        if (intakeRunning) {
+            double currentAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
+            double angleDelta = Math.abs(currentAngle - lastSpindexerAngle);
+            
+            // Handle 360° wraparound
+            if (angleDelta > 180) {
+                angleDelta = 360 - angleDelta;
+            }
+
+            if (angleDelta > ANGLE_CHANGE_THRESHOLD) {
+                // Spindexer is moving - reset stuck timer
+                spindexerStuckTimer.reset();
+                lastSpindexerAngle = currentAngle;
+            } else if (spindexerStuckTimer.seconds() >= STUCK_THRESHOLD_SEC) {
+                // Spindexer hasn't moved for too long - start unjam
+                isUnjamming = true;
+                unjamTimer.reset();
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Update spindexer slot colors from camera ball detection.
+     * Called during intake to provide visual confirmation of ball colors.
+     */
+    private void updateSpindexerFromCamera() {
+        if (!useCameraDetection) return;
+        
+        // Poll camera once per call
+        BallDetectorPipeline.pollOnce();
+        List<BallDetection> balls = BallDetectorPipeline.getDetectedBalls();
+        
+        // Update spindexer slots based on detected balls
+        // Ball positions 1-3 map to spindexer slots 0-2
+        for (BallDetection ball : balls) {
+            int slot = ball.rampPosition - 1;  // Convert 1-based to 0-based
+            if (slot >= 0 && slot <= 2) {
+                String color = ball.isGreen ? "GREEN" : "PURPLE";
+                // Only update if slot is marked as filled
+                if (!spindexer.isSlotEmpty(slot)) {
+                    spindexer.setSlotColor(slot, color);
+                }
+            }
+        }
+    }
 
     public void statePathUpdate() {
         updateTurret();
@@ -269,7 +374,7 @@ public class Blue_Front_Motif extends OpMode {
                     pathStarted = true;
                 }
                 
-                // Scan for motif tag while turret is at 30°
+                // Scan for motif tag while turret is at 40°
                 if (scanningForMotif) {
                     if (!motifLocked) {
                         Limelight_Pipeline.pollOnce();
@@ -282,7 +387,7 @@ public class Blue_Front_Motif extends OpMode {
                         }
                     }
                     
-                    // Stop scanning after timeout or detection
+                    // Stop scanning after timeout or detection (give full scan time)
                     if (motifLocked || motifScanTimer.seconds() >= MOTIF_SCAN_TIME_SEC) {
                         scanningForMotif = false;
                         if (!motifLocked) {
@@ -373,6 +478,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -384,7 +493,7 @@ public class Blue_Front_Motif extends OpMode {
                         ballsNeeded--;
                         if (ballsNeeded <= 0) {
                             // Got all we need — skip remaining intake waypoints
-                            pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                            pathState = PathState.DRIVE_INTAKE1POSE4_TO_SHOOTPOSE;
                         } else {
                             pathState = PathState.DRIVE_INTAKE1_TO_INTAKE1POSE2;
                         }
@@ -402,6 +511,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -412,7 +525,7 @@ public class Blue_Front_Motif extends OpMode {
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
                         ballsNeeded--;
                         if (ballsNeeded <= 0) {
-                            pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                            pathState = PathState.DRIVE_INTAKE1POSE4_TO_SHOOTPOSE;
                         } else {
                             pathState = PathState.DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3;
                         }
@@ -430,6 +543,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -439,16 +556,44 @@ public class Blue_Front_Motif extends OpMode {
                     }
                     if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
                         ballsNeeded--;
-                        pathState = PathState.DRIVE_INTAKE1POSE3_TO_SHOOTPOSE;
+                        pathState = PathState.DRIVE_INTAKE1POSE3_TO_INTAKE1POSE4;
                         pathStarted = false;
                         ballWaitStarted = false;
                     }
                 }
                 break;
 
-            case DRIVE_INTAKE1POSE3_TO_SHOOTPOSE:
+            case DRIVE_INTAKE1POSE3_TO_INTAKE1POSE4:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1Pose3ToShootPose, true);
+                    follower.followPath(driveIntake1Pose3ToIntake1Pose4, 0.625, true);
+                    pathStarted = true;
+
+                    intake.setPower(-0.5);
+                    intakeMotor2.setPower(1.0);
+                    intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
+                }
+
+                if (pathStarted && !follower.isBusy()) {
+                    if (!ballWaitStarted) {
+                        ballWaitTimer.reset();
+                        ballWaitStarted = true;
+                    }
+                    if (Sensor.isBallPresent() || ballWaitTimer.seconds() >= 1.0) {
+                        ballsNeeded--;
+                        pathState = PathState.DRIVE_INTAKE1POSE4_TO_SHOOTPOSE;
+                        pathStarted = false;
+                        ballWaitStarted = false;
+                    }
+                }
+                break;
+
+            case DRIVE_INTAKE1POSE4_TO_SHOOTPOSE:
+                if (!pathStarted) {
+                    follower.followPath(driveIntake1Pose4ToShootPose, true);
                     flywheel.setVelocity(getTickSpeed(shootRpm));
                     
                     // Start color scan during drive to identify balls
@@ -482,6 +627,7 @@ public class Blue_Front_Motif extends OpMode {
                         spindexer.setShootQueue(queue);
                     }
                     pathState = PathState.SHOOT_INTAKE1;
+                    shootingFromEndPose = false;  // Reset for initial shoot position
                     pathStarted = false;
                 }
                 
@@ -543,6 +689,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -571,6 +721,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -599,6 +753,10 @@ public class Blue_Front_Motif extends OpMode {
                     intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                     intakeRunning = true;
+                    
+                    // Initialize unjam tracking
+                    spindexerStuckTimer.reset();
+                    lastSpindexerAngle = Servo_Pipeline.spindexerAxon.getRawAngle();
                 }
 
                 if (pathStarted && !follower.isBusy()) {
@@ -650,6 +808,7 @@ public class Blue_Front_Motif extends OpMode {
                         spindexer.setShootQueue(queue);
                     }
                     pathState = PathState.SHOOT_INTAKE2;
+                    shootingFromEndPose = false;  // Reset for initial shoot position
                     pathStarted = false;
                 }
                 
@@ -691,14 +850,44 @@ public class Blue_Front_Motif extends OpMode {
             case DRIVE_SHOOTPOSE_TO_ENDPOSE:
                 if (!pathStarted) {
                     follower.followPath(driveShootPoseToEndPose, true);
+                    shootingFromEndPose = true;  // Enable end position shooter settings
+                    flywheel.setVelocity(getTickSpeed(endShootRpm));
+                    Servo_Pipeline.hood.setPosition(endShootHood);
                     pathStarted = true;
                 }
-                if (pathStarted && !follower.isBusy()) {
-                    telemetry.addLine("Auto Complete");
+                if (pathStarted && !follower.isBusy() && turretAtShootAngle) {
+                    pathState = PathState.SHOOT_AT_ENDPOSE;
                     pathStarted = false;
+                } else if (pathStarted && !follower.isBusy() && !turretAtShootAngle) {
+                    telemetry.addLine("Waiting for turret to reach end shoot angle...");
+                }
+                telemetry.addLine("Driving to end position...");
+                telemetry.addData("End Shoot Angle", String.format("%.1f°", TURRET_END_SHOOT_DEG));
+                break;
+
+            case SHOOT_AT_ENDPOSE:
+                if (!shootSequenceStarted) {
+                    spindexer.updateShoot(true, false, flywheel);
+                    intake.setPower(-0.5);
+                    intakeMotor2.setPower(1.0);
+                    shootSequenceStarted = true;
+                } else {
+                    spindexer.updateShoot(false, false, flywheel);
+                }
+
+                if (!spindexer.isShooting() && shootSequenceStarted) {
+                    intake.setPower(0);
+                    intakeMotor2.setPower(0);
+                    flywheel.setVelocity(0);
+                    shootSequenceStarted = false;
+                    int confirmed = spindexer.getConfirmedShots();
+                    spindexer.resetShootState();
+                    telemetry.addLine("End position shots complete — Auto finished");
                     turret.setPower(0);
                     requestOpModeStop();
                 }
+                telemetry.addLine("Shooting from end position");
+                telemetry.addData("Shot", spindexer.getConfirmedShots() + "/3");
                 break;
 
             default:
@@ -728,6 +917,24 @@ public class Blue_Front_Motif extends OpMode {
         spindexer.setFlickerPositions(0, 0.375);
         spindexer.setShootRpm(shootRpm);
         spindexer.prefillAllSlots();
+        
+        // Initialize ball detection camera
+        try {
+            BallDetectorPipeline.init(this, "logitech");
+            telemetry.addData("Ball Camera", "Initialized");
+        } catch (Exception e) {
+            useCameraDetection = false;
+            telemetry.addData("Ball Camera", "Failed - using color sensors only");
+        }
+        
+        // Initialize ball detection camera
+        try {
+            BallDetectorPipeline.init(this, "logitech");
+            telemetry.addData("Ball Camera", "Initialized");
+        } catch (Exception e) {
+            useCameraDetection = false;
+            telemetry.addData("Ball Camera", "Failed - using color sensors only");
+        }
 
         // Initialize Limelight for obelisk motif detection during init
         Limelight_Pipeline.initLimelight(this);
@@ -785,11 +992,36 @@ public class Blue_Front_Motif extends OpMode {
     @Override
     public void loop() {
         follower.update();
+        Sensor.updateSensors();  // Update color sensors
+        
+        // Check for spindexer jam and run unjam routine if needed
+        boolean unjamming = checkAndUnjamSpindexer();
+        
+        // Update spindexer from camera periodically (every 200ms to avoid lag)
+        if (useCameraDetection && cameraUpdateTimer.milliseconds() >= 200) {
+            updateSpindexerFromCamera();
+            cameraUpdateTimer.reset();
+        }
+        
         statePathUpdate();
-        spindexer.updateIntake(intakeRunning);
+        
+        // Only update intake state machine if not unjamming
+        if (!unjamming) {
+            spindexer.updateIntake(intakeRunning);
+        }
 
         telemetry.addData("Motif", motifLocked ? Motif.getMotifName(detectedTagId) : "FALLBACK (shoot any order)");
         telemetry.addData("Path state", pathState.toString());
+        
+        if (unjamming) {
+            telemetry.addData("*** UNJAMMING ***", String.format("%.1fs", unjamTimer.seconds()));
+        }
+        
+        // Show camera ball detections
+        if (useCameraDetection) {
+            telemetry.addData("Camera Balls", BallDetectorPipeline.getBallSequence());
+        }
+        
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
         telemetry.addData("Heading", Math.toDegrees(follower.getPose().getHeading()));

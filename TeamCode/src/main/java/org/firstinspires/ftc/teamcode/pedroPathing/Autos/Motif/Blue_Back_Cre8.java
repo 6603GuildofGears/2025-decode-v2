@@ -21,11 +21,11 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
 /**
- * Red Back Auto with Motif detection - Simplified with single intake cycle
- * Start at 90° heading, turret at 75°, one intake cycle before parking
+ * Blue Back Auto with Motif detection - Simplified with single intake cycle
+ * Start at 90° heading, turret at 120°, one intake cycle before parking
  */
-@Autonomous(name = "Red Back cre8 playoffs", group = "Red")
-public class Red_Back_Motif extends OpMode {
+@Autonomous(name = "Blue Back cre8 playoffs", group = "Blue")
+public class Blue_Back_Cre8 extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     private SpindexerController spindexer;
@@ -41,11 +41,11 @@ public class Red_Back_Motif extends OpMode {
 
     // Shooter settings
     private double shootRpm = 4150;
-    private double shootHood = 0.575;
-    private static final int GOAL_TAG_ID = 10;
+    private double shootHood = 0.55;
+    private static final int GOAL_TAG_ID = 20;
 
-    // Turret - RED BACK ANGLES
-    private static final double TURRET_TARGET_DEG = 74;
+    // Turret - BLUE BACK ANGLES
+    private static final double TURRET_TARGET_DEG = 30;
     private static final double TURRET_MOTIF_SCAN_DEG = 60;
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
@@ -72,11 +72,11 @@ public class Red_Back_Motif extends OpMode {
 
     PathState pathState;
 
-    // Poses - mirrored from Blue_Back with 90° heading
-    private final Pose startPose = new Pose(87, 9, Math.toRadians(90));
-    private final Pose intake1 = new Pose(136, 20, Math.toRadians(0));
-    private final Pose intake2 = new Pose(136, 10, Math.toRadians(0));
-    private final Pose endPose = new Pose(100, 12, Math.toRadians(90));
+    // Poses - mirrored from Red_Back with 90° heading
+    private final Pose startPose = new Pose(57, 9, Math.toRadians(90));
+    private final Pose intake1 = new Pose(8, 20, Math.toRadians(225));
+    private final Pose intake2 = new Pose(8, 10, Math.toRadians(225));
+    private final Pose endPose = new Pose(44, 12, Math.toRadians(90));
 
     private boolean pathStarted = false;
 
@@ -331,7 +331,7 @@ public class Red_Back_Motif extends OpMode {
         buildPaths();
         follower.setPose(startPose);
 
-        telemetry.addData("Status", "Initialized - Red Back with intake cycle");
+        telemetry.addData("Status", "Initialized - Blue Back with intake cycle");
         telemetry.update();
     }
 

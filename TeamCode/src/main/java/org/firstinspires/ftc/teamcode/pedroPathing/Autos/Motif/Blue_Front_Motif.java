@@ -64,9 +64,9 @@ public class Blue_Front_Motif extends OpMode {
     private double endShootHood = 0.52;    // Hood angle for end position shot
 
     // Turret auto-aim
-    private static final double TURRET_TARGET_DEG = 94;  // Shooting angle for initial shootPose
+    private static final double TURRET_TARGET_DEG = 96;  // Shooting angle for initial shootPose
     private static final double TURRET_END_SHOOT_DEG = 85;  // Shooting angle for endPose
-    private static final double TURRET_MOTIF_SCAN_DEG = 100;  // Angle to scan for motif tag
+    private static final double TURRET_MOTIF_SCAN_DEG = 135;  // Angle to scan for motif tag
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
     private static final double TURRET_LIMIT_DEG = 5.0;
@@ -75,8 +75,8 @@ public class Blue_Front_Motif extends OpMode {
     // Motif scan timing
     private static final double MOTIF_SCAN_TIME_SEC = 1.8;  // How long to scan for motif during drive
     private ElapsedTime motifScanTimer = new ElapsedTime();
-    private boolean scanningForMotif = false;  // True while turret scans at 100° for motif
-    private boolean turretAtShootAngle = false;  // True when turret reaches 94° after scan
+    private boolean scanningForMotif = false;  // True while turret scans at 135° for motif
+    private boolean turretAtShootAngle = false;  // True when turret reaches 96° after scan
     
     // Auto time management
     private static final double AUTO_TIME_LIMIT_SEC = 30.0;  // Total autonomous time
@@ -95,6 +95,12 @@ public class Blue_Front_Motif extends OpMode {
     private static final double STUCK_THRESHOLD_SEC = 1.0;  // Time before declaring stuck
     private static final double ANGLE_CHANGE_THRESHOLD = 3.0;  // Minimum angle movement to consider "moving"
     private static final double UNJAM_DURATION_SEC = 0.5;  // How long to reverse intake
+
+    // Full spindexer handling - reverse intake when all 3 slots are full
+    private boolean isFullSpindexerReversing = false;
+    private ElapsedTime fullSpindexerReverseTimer = new ElapsedTime();
+    private static final double FULL_SPINDEXER_REVERSE_SEC = 0.75;  // How long to reverse when full
+    private boolean lastAllSlotsFull = false;  // Track state to detect transition to full
 
     // Motif detection
     private int detectedTagId = -1;
@@ -127,13 +133,13 @@ public class Blue_Front_Motif extends OpMode {
     private final Pose shootPose = new Pose(49, 84, Math.toRadians(180));
     private final Pose intake1 = new Pose(37, 76, Math.toRadians(180));       // Intake 1 position
     private final Pose intake1Pose2 = new Pose(35.5, 76, Math.toRadians(180));  // Intake 1 waypoint 2
-    private final Pose intake1Pose3 = new Pose(30, 76, Math.toRadians(180));  // Intake 1 waypoint 3
-    private final Pose intake1Pose4 = new Pose(28, 76, Math.toRadians(180));  // Intake 1 waypoint 4 (2 inches forward)
+    private final Pose intake1Pose3 = new Pose(28, 76, Math.toRadians(180));  // Intake 1 waypoint 3
+    private final Pose intake1Pose4 = new Pose(21, 76, Math.toRadians(180));  // Intake 1 waypoint 4 (2 inches forward)
     private final Pose intake2 = new Pose(45, 56, Math.toRadians(180));       // Intake 2 position
-    private final Pose intake2Pose1 = new Pose(37, 56, Math.toRadians(180));  // Intake 2 waypoint 1
-    private final Pose intake2Pose2 = new Pose(35, 56, Math.toRadians(180));  // Intake 2 waypoint 2
-    private final Pose intake2Pose3 = new Pose(31, 56, Math.toRadians(180));  // Intake 2 waypoint 3
-    private final Pose endPose = new Pose(55, 209, Math.toRadians(180));       // Final shoot position
+    private final Pose intake2Pose1 = new Pose(35.5, 56, Math.toRadians(180));  // Intake 2 waypoint 1
+    private final Pose intake2Pose2 = new Pose(28, 56, Math.toRadians(180));  // Intake 2 waypoint 2
+    private final Pose intake2Pose3 = new Pose(21, 56, Math.toRadians(180));  // Intake 2 waypoint 3
+    private final Pose endPose = new Pose(55, 72, Math.toRadians(180));       // Final shoot position
 
     private boolean pathStarted = false;
 
@@ -313,6 +319,43 @@ public class Blue_Front_Motif extends OpMode {
     }
 
     /**
+     * Check if all 3 spindexer slots are full and reverse intake if needed.
+     * Returns true if currently in the reverse process.
+     */
+    private boolean checkAndReverseIfFullSpindexer() {
+        // Check if all 3 slots are full
+        boolean[] emptyStatus = spindexer.getSlotEmptyStatus();
+        boolean allSlotsFull = (emptyStatus != null && 
+                                emptyStatus.length >= 3 && 
+                                !emptyStatus[0] && !emptyStatus[1] && !emptyStatus[2]);
+
+        // Detect transition from not-all-full to all-full
+        if (allSlotsFull && !lastAllSlotsFull && !isFullSpindexerReversing && intakeRunning) {
+            // All slots just became full - start reverse
+            isFullSpindexerReversing = true;
+            fullSpindexerReverseTimer.reset();
+            intake.setPower(0.5);  // Reverse intake
+            intakeMotor2.setPower(-1.0);  // Reverse intake2
+        }
+        
+        lastAllSlotsFull = allSlotsFull;
+
+        // If currently reversing, check if time is up
+        if (isFullSpindexerReversing) {
+            if (fullSpindexerReverseTimer.seconds() >= FULL_SPINDEXER_REVERSE_SEC) {
+                // Time's up - restore normal intake direction
+                isFullSpindexerReversing = false;
+                if (intakeRunning) {
+                    intake.setPower(-0.5);
+                    intakeMotor2.setPower(1.0);
+                }
+            }
+        }
+
+        return isFullSpindexerReversing;
+    }
+
+    /**
      * Update spindexer slot colors from camera ball detection.
      * Called during intake to provide visual confirmation of ball colors.
      */
@@ -472,7 +515,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_SHOOTPOSE_TO_INTAKE1:
                 if (!pathStarted) {
-                    follower.followPath(driveShootPoseToIntake1, 0.625, true);
+                    follower.followPath(driveShootPoseToIntake1, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -505,7 +548,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE1_TO_INTAKE1POSE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1ToIntake1Pose2, 0.625, true);
+                    follower.followPath(driveIntake1ToIntake1Pose2, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -537,7 +580,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE1POSE2_TO_INTAKE1POSE3:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1Pose2ToIntake1Pose3, 0.625, true);
+                    follower.followPath(driveIntake1Pose2ToIntake1Pose3, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -565,7 +608,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE1POSE3_TO_INTAKE1POSE4:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake1Pose3ToIntake1Pose4, 0.625, true);
+                    follower.followPath(driveIntake1Pose3ToIntake1Pose4, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -683,7 +726,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE2_TO_INTAKE2POSE1:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2ToIntake2Pose1, 0.625, true);
+                    follower.followPath(driveIntake2ToIntake2Pose1, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -715,7 +758,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE2POSE1_TO_INTAKE2POSE2:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2Pose1ToIntake2Pose2, 0.625, true);
+                    follower.followPath(driveIntake2Pose1ToIntake2Pose2, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -747,7 +790,7 @@ public class Blue_Front_Motif extends OpMode {
 
             case DRIVE_INTAKE2POSE2_TO_INTAKE2POSE3:
                 if (!pathStarted) {
-                    follower.followPath(driveIntake2Pose2ToIntake2Pose3, 0.625, true);
+                    follower.followPath(driveIntake2Pose2ToIntake2Pose3, 0.5, true);
                     pathStarted = true;
 
                     intake.setPower(-0.5);
@@ -997,6 +1040,9 @@ public class Blue_Front_Motif extends OpMode {
         // Check for spindexer jam and run unjam routine if needed
         boolean unjamming = checkAndUnjamSpindexer();
         
+        // Check if all 3 slots are full and reverse intake if needed
+        boolean fullSpindexerReversing = checkAndReverseIfFullSpindexer();
+        
         // Update spindexer from camera periodically (every 200ms to avoid lag)
         if (useCameraDetection && cameraUpdateTimer.milliseconds() >= 200) {
             updateSpindexerFromCamera();
@@ -1005,8 +1051,8 @@ public class Blue_Front_Motif extends OpMode {
         
         statePathUpdate();
         
-        // Only update intake state machine if not unjamming
-        if (!unjamming) {
+        // Only update intake state machine if not unjamming and not reversing due to full spindexer
+        if (!unjamming && !fullSpindexerReversing) {
             spindexer.updateIntake(intakeRunning);
         }
 
@@ -1015,6 +1061,10 @@ public class Blue_Front_Motif extends OpMode {
         
         if (unjamming) {
             telemetry.addData("*** UNJAMMING ***", String.format("%.1fs", unjamTimer.seconds()));
+        }
+        
+        if (fullSpindexerReversing) {
+            telemetry.addData("*** FULL SPINDEXER - REVERSING ***", String.format("%.2fs", fullSpindexerReverseTimer.seconds()));
         }
         
         // Show camera ball detections

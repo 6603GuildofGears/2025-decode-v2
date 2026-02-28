@@ -280,9 +280,6 @@ public class Cassius_Blue_BallDetect extends LinearOpMode {
             if (runIntakeMotor) {
                 intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
                 intake2.setPower(1);
-            } else if (sdx.isShooting()) {
-                intake.setPower(0); // stop intake during shoot sequence
-                intake2.setPower(0);
             } else if (RBumper1) {
                 intake.setPower(-0.5); // intake out (reverse)
                 intake2.setPower(-0.5);

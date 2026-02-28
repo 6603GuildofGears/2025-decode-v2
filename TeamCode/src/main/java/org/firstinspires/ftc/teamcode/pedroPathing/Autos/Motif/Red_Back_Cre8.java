@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.pedroPathing.Autos.Motif;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.pedropathing.util.Timer;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.*;
@@ -21,11 +22,12 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Pipelines.Sensor;
 import static org.firstinspires.ftc.teamcode.pedroPathing.TeleOp.TurretConfig.*;
 
 /**
- * Red Back Auto with Motif detection - Simplified with single intake cycle
- * Start at 90° heading, turret at 75°, one intake cycle before parking
+ * Simplified Red Back Auto - Just shoot preload and park
  */
-@Autonomous(name = "Red Back cre8 playoffs", group = "Red")
-public class Red_Back_Motif extends OpMode {
+
+@Disabled
+@Autonomous(name = "Red Back cre8 old", group = "Red")
+public class Red_Back_Cre8 extends OpMode {
     private Follower follower;
     private Timer pathTimer, opmodeTimer;
     private SpindexerController spindexer;
@@ -35,18 +37,17 @@ public class Red_Back_Motif extends OpMode {
     private DcMotorEx turret;
     private Motor_PipeLine motorPipeline;
     private Servo_Pipeline servoPipeline;
-    private boolean intakeRunning = false;
     private boolean shootSequenceStarted = false;
     private boolean scanningInProgress = false;
 
     // Shooter settings
-    private double shootRpm = 4150;
-    private double shootHood = 0.575;
+    private double shootRpm = 4100;
+    private double shootHood = 0.5;
     private static final int GOAL_TAG_ID = 10;
 
-    // Turret - RED BACK ANGLES
-    private static final double TURRET_TARGET_DEG = 74;
-    private static final double TURRET_MOTIF_SCAN_DEG = 60;
+    // Turret
+    private static final double TURRET_TARGET_DEG = 75;
+    private static final double TURRET_MOTIF_SCAN_DEG = 75;
     private static final double TURRET_P_GAIN = 0.006;
     private static final double TURRET_MAX_POWER = 0.30;
     private static final double TURRET_LIMIT_DEG = 5.0;
@@ -55,34 +56,26 @@ public class Red_Back_Motif extends OpMode {
     private ElapsedTime motifScanTimer = new ElapsedTime();
     private boolean scanningForMotif = false;
     private boolean turretAtShootAngle = false;
-
     
-    // Motif detection
+    // Motif
     private int detectedTagId = -1;
     private String[] motifOrder = null;
     private boolean motifLocked = false;
 
     public enum PathState {
         SHOOT_PRELOAD,
-        DRIVE_TO_INTAKE2,
-        DRIVE_INTAKE2_TO_SHOOTPOSE,
-        SHOOT_INTAKE2,
-        DRIVE_TO_ENDPOSE
+        DRIVE_SHOOT_TO_END
     }
 
     PathState pathState;
 
-    // Poses - mirrored from Blue_Back with 90° heading
+    // Simple poses - start (shoot here) and end (park)
     private final Pose startPose = new Pose(87, 9, Math.toRadians(90));
-    private final Pose intake1 = new Pose(136, 20, Math.toRadians(0));
-    private final Pose intake2 = new Pose(136, 10, Math.toRadians(0));
-    private final Pose endPose = new Pose(100, 12, Math.toRadians(90));
+    private final Pose endPose = new Pose(97, 12, Math.toRadians(90));
 
     private boolean pathStarted = false;
 
-    private PathChain driveToIntake2;
-    private PathChain driveIntake2ToShootPose;
-    private PathChain driveToEndPose;
+    private PathChain driveShootToEnd;
 
     private void updateTurret() {
         double targetDeg = scanningForMotif ? TURRET_MOTIF_SCAN_DEG : TURRET_TARGET_DEG;
@@ -104,19 +97,7 @@ public class Red_Back_Motif extends OpMode {
     private double getTickSpeed(double rpm) { return rpm * 28.0 / 60.0; }
 
     public void buildPaths() {
-        driveToIntake2 = follower.pathBuilder()
-                .addPath(new BezierLine(startPose, intake1))
-                .setLinearHeadingInterpolation(startPose.getHeading(), intake1.getHeading())
-                .addPath(new BezierLine(intake1, intake2))
-                .setConstantHeadingInterpolation(intake2.getHeading())
-                .build();
-
-        driveIntake2ToShootPose = follower.pathBuilder()
-                .addPath(new BezierLine(intake2, startPose))
-                .setLinearHeadingInterpolation(intake2.getHeading(), startPose.getHeading())
-                .build();
-
-        driveToEndPose = follower.pathBuilder()
+        driveShootToEnd = follower.pathBuilder()
                 .addPath(new BezierLine(startPose, endPose))
                 .setConstantHeadingInterpolation(endPose.getHeading())
                 .build();
@@ -128,7 +109,7 @@ public class Red_Back_Motif extends OpMode {
         switch (pathState) {
             case SHOOT_PRELOAD:
                 if (!shootSequenceStarted) {
-                    // Spin up flywheel and start scanning
+                    // Spin up flywheel
                     Servo_Pipeline.spindexerAxon.setTargetRotation(SpindexerController.P1);
                     flywheel.setVelocity(getTickSpeed(shootRpm));
                     
@@ -183,7 +164,7 @@ public class Red_Back_Motif extends OpMode {
                 
                 if (readyToShoot) {
                     spindexer.updateShoot(true, false, flywheel);
-                    intake.setPower(-0.75);
+                    intake.setPower(-0.5);
                     intakeMotor2.setPower(1.0);
                 } else {
                     spindexer.updateShoot(false, false, flywheel);
@@ -193,11 +174,12 @@ public class Red_Back_Motif extends OpMode {
                     intake.setPower(0);
                     intakeMotor2.setPower(0);
                     flywheel.setVelocity(0);
+                    shootSequenceStarted = false;
                     spindexer.resetShootState();
                     spindexer.clearAllSlots();
                     Servo_Pipeline.flicker.setPosition(0);
 
-                    pathState = PathState.DRIVE_TO_INTAKE2;
+                    pathState = PathState.DRIVE_SHOOT_TO_END;
                     pathStarted = false;
                 }
                 telemetry.addLine("Shooting preload");
@@ -206,93 +188,9 @@ public class Red_Back_Motif extends OpMode {
                 telemetry.addData("Confirmed", spindexer.getConfirmedShots());
                 break;
 
-            case DRIVE_TO_INTAKE2:
+            case DRIVE_SHOOT_TO_END:
                 if (!pathStarted) {
-                    follower.followPath(driveToIntake2, true);
-                    pathStarted = true;
-                }
-                
-                // Run intake during drive
-                if (!intakeRunning) {
-                    intake.setPower(0.5);
-                    intakeMotor2.setPower(0.5);
-                    spindexer.startScan("GREEN");
-                    scanningInProgress = true;
-                    intakeRunning = true;
-                }
-                
-                // Update ball scanning
-                if (scanningInProgress && !spindexer.isScanDone()) {
-                    spindexer.updateScan();
-                } else if (scanningInProgress && spindexer.isScanDone()) {
-                    scanningInProgress = false;
-                }
-                
-                if (pathStarted && !follower.isBusy()) {
-                    intake.setPower(0);
-                    intakeMotor2.setPower(0);
-                    intakeRunning = false;
-                    
-                    pathState = PathState.DRIVE_INTAKE2_TO_SHOOTPOSE;
-                    pathStarted = false;
-                }
-                telemetry.addLine("Driving to intake 2");
-                break;
-
-            case DRIVE_INTAKE2_TO_SHOOTPOSE:
-                if (!pathStarted) {
-                    follower.followPath(driveIntake2ToShootPose, true);
-                    flywheel.setVelocity(getTickSpeed(shootRpm));
-                    pathStarted = true;
-                }
-                
-                if (pathStarted && !follower.isBusy() && turretAtShootAngle) {
-                    // Build shoot queue if we have motif order
-                    if (motifOrder != null) {
-                        int[] queue = MotifQueue.buildMotifQueue(
-                            motifOrder,
-                            spindexer.getSlotColors(),
-                            spindexer.getSlotEmptyStatus()
-                        );
-                        spindexer.setShootQueue(queue);
-                    }
-                    
-                    pathState = PathState.SHOOT_INTAKE2;
-                    pathStarted = false;
-                    shootSequenceStarted = false;
-                }
-                telemetry.addLine("Returning to shoot");
-                break;
-
-            case SHOOT_INTAKE2:
-                if (!shootSequenceStarted) {
-                    spindexer.updateShoot(true, false, flywheel);
-                    intake.setPower(-0.5);
-                    intakeMotor2.setPower(1.0);
-                    shootSequenceStarted = true;
-                } else {
-                    spindexer.updateShoot(false, false, flywheel);
-                }
-
-                if (!spindexer.isShooting() && shootSequenceStarted) {
-                    intake.setPower(0);
-                    intakeMotor2.setPower(0);
-                    flywheel.setVelocity(0);
-                    shootSequenceStarted = false;
-                    spindexer.resetShootState();
-                    spindexer.clearAllSlots();
-                    Servo_Pipeline.flicker.setPosition(0);
-
-                    pathState = PathState.DRIVE_TO_ENDPOSE;
-                    pathStarted = false;
-                }
-                telemetry.addLine("Shooting intake 2");
-                telemetry.addData("Confirmed", spindexer.getConfirmedShots());
-                break;
-
-            case DRIVE_TO_ENDPOSE:
-                if (!pathStarted) {
-                    follower.followPath(driveToEndPose, true);
+                    follower.followPath(driveShootToEnd, true);
                     pathStarted = true;
                 }
                 if (pathStarted && !follower.isBusy()) {
@@ -331,7 +229,7 @@ public class Red_Back_Motif extends OpMode {
         buildPaths();
         follower.setPose(startPose);
 
-        telemetry.addData("Status", "Initialized - Red Back with intake cycle");
+        telemetry.addData("Status", "Initialized - Simple Mode");
         telemetry.update();
     }
 
@@ -370,7 +268,7 @@ public class Red_Back_Motif extends OpMode {
         Sensor.updateSensors();
         
         statePathUpdate();
-        spindexer.updateIntake(false);
+        spindexer.updateIntake(false);  // No intaking
 
         telemetry.addData("Motif System", motifLocked ? "ON" : "OFF");
         telemetry.addData("Path", pathState.toString());

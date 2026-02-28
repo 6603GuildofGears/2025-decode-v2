@@ -1,3 +1,4 @@
+
 package org.firstinspires.ftc.teamcode.pedroPathing.TeleOp;
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -119,6 +120,8 @@ public class Cassius_Blue extends LinearOpMode {
 
         // === MOTIF FIRE: gamepad2 A starts sequence ===
         // Sequence: scan obelisk tag → scan balls → build queue → turn turret → 20° → lock on → auto-shoot
+        boolean motifEnabled = true;    // X2 toggles motif on/off
+        boolean lastX2 = false;         // edge detection for X2
         int motifState = 0; // 0=IDLE, 1=SCAN_TAG, 2=SCAN_BALLS, 3=TURN_TO_20, 4=LOCK_ON, 5=SHOOT
         ElapsedTime motifTimer = new ElapsedTime();
         boolean lastA2Motif = false; // edge detection for gamepad2 A (motif fire)
@@ -292,9 +295,6 @@ public class Cassius_Blue extends LinearOpMode {
             if (runIntakeMotor) {
                 intake.setPower(1); // intake in (spindexer auto-rotates on ball detect)
                 intake2.setPower(1);
-            } else if (sdx.isShooting()) {
-                intake.setPower(0); // stop intake during shoot sequence
-                intake2.setPower(0);
             } else if (RBumper1) {
                 intake.setPower(-0.6); // intake out (reverse)
                 intake2.setPower(-0.6);
@@ -381,8 +381,12 @@ public class Cassius_Blue extends LinearOpMode {
             boolean currentMagState = isMagPressed();
             lastMagState = currentMagState;
 
+            // --- X2 toggle: motif on/off ---
+            if (x2 && !lastX2) motifEnabled = !motifEnabled;
+            lastX2 = x2;
+
             // === MOTIF FIRE: gamepad2 A starts the sequence ===
-            if (a2 && !lastA2Motif && motifState == 0) {
+            if (motifEnabled && a2 && !lastA2Motif && motifState == 0) {
                 motifState = 1;  // start → scan obelisk tag
                 motifTimer.reset();
                 motifShootTriggered = false;
@@ -606,8 +610,7 @@ public class Cassius_Blue extends LinearOpMode {
             
             telemetry.addData("=== TURRET ===", "");
             telemetry.addData("Mode", turretMode);
-            telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));
-            String[] motifLabels = {"IDLE", "SCAN TAG", "SCAN BALLS", "TURN→20°", "LOCKING", "SHOOTING"};
+            telemetry.addData("Turret Angle", String.format("%.1f°", turretDeg));            telemetry.addData("Motif Enabled", motifEnabled ? "YES [X2 toggle]" : "NO [X2 toggle]");            String[] motifLabels = {"IDLE", "SCAN TAG", "SCAN BALLS", "TURN→20°", "LOCKING", "SHOOTING"};
             telemetry.addData("Motif Fire", motifLabels[motifState]);
             if (motifTagLocked && detectedMotifTag != -1) {
                 telemetry.addData("Motif Detected", Motif.getMotifName(detectedMotifTag));
@@ -625,7 +628,7 @@ public class Cassius_Blue extends LinearOpMode {
 
             
             // Push key data to Panels
-            String[] motifPanelLabels = {"IDLE", "TURN\u219220\u00b0", "LOCKING", "SHOOTING"};
+            String[] motifPanelLabels = {"IDLE", "SCAN TAG", "SCAN BALLS", "TURN\u219220\u00b0", "LOCKING", "SHOOTING"};
             telemetryM.debug("MOTIF: " + motifPanelLabels[motifState]);
             telemetryM.debug("Turret: " + String.format("%.1f\u00b0", turretDeg) + " | Pwr: " + String.format("%.3f", turretPower) + " | " + turretMode);
             telemetryM.debug("PID: kP=" + String.format("%.4f", kP) + " kI=" + String.format("%.5f", kI) + " kD=" + String.format("%.4f", kD));
